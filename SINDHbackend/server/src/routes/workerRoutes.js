@@ -19,7 +19,7 @@ router.post('/register', async (req, res) => {
     // Validate worker data
     console.log('\nValidating worker data...');
     try {
-    await worker.validate();
+      await worker.validate();
       console.log('✓ Validation successful');
     } catch (validationError) {
       console.error('✗ Validation failed:', {
@@ -27,6 +27,7 @@ router.post('/register', async (req, res) => {
         message: validationError.message
       });
       return res.status(400).json({ 
+        success: false,
         message: 'Validation failed', 
         errors: validationError.errors 
       });
@@ -41,12 +42,17 @@ router.post('/register', async (req, res) => {
     // Send response
     console.log('\nSending response...');
     const response = { 
+      success: true,
       message: 'Worker registered successfully',
-      worker: {
-        id: worker._id,
-        name: worker.name,
-        phone: worker.phone,
-        rating: worker.rating
+      data: {
+        worker: {
+          id: worker._id,
+          name: worker.name,
+          phone: worker.phone,
+          rating: worker.rating,
+          shaktiScore: worker.shaktiScore,
+          profileCompletionPercentage: worker.profileCompletionPercentage
+        }
       }
     };
     console.log('Response:', JSON.stringify(response, null, 2));
@@ -61,9 +67,28 @@ router.post('/register', async (req, res) => {
       name: error.name
     });
     
-    res.status(400).json({ 
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    // Handle specific errors
+    let statusCode = 500;
+    let errorMessage = error.message;
+    
+    if (error.code === 11000) {
+      statusCode = 409;
+      if (error.message.includes('phone')) {
+        errorMessage = 'Phone number already registered';
+      } else if (error.message.includes('aadharNumber')) {
+        errorMessage = 'Aadhar number already registered';
+      } else {
+        errorMessage = 'Account already exists';
+      }
+    } else if (error.name === 'ValidationError') {
+      statusCode = 400;
+      errorMessage = 'Invalid data provided';
+    }
+    
+    res.status(statusCode).json({ 
+      success: false,
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -256,40 +281,32 @@ router.post('/login', async (req, res) => {
     console.log('Timestamp:', new Date().toISOString());
     console.log('Phone:', phone);
 
+    if (!phone) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Phone number is required' 
+      });
+    }
+
     // Find worker by phone number
     const worker = await Worker.findOne({ phone });
-    console.log('Result of Worker.findOne:', JSON.stringify(worker, null, 2));
+    console.log('Worker found:', !!worker);
     
     if (!worker) {
       console.log('✗ Login failed: Worker not found');
-      return res.status(404).json({ message: 'Worker not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Worker not found. Please register first.' 
+      });
     }
     
-    console.log('✓ Worker found, fetching job applications...');
+    console.log('✓ Worker found, updating login status...');
 
-    // Get job applications with full details
-    const jobApplications = await JobApplication.find({ worker: worker._id })
-      .populate({
-        path: 'job',
-        select: 'title salary location status employer description'
-      })
-      .populate({
-        path: 'employer',
-        select: 'name company'
-      })
-      .sort({ updatedAt: -1 });
-    
-    console.log('\nFetched job applications:', jobApplications.length);
+    // Update last login
+    worker.lastLogin = new Date();
+    worker.isLoggedIn = 1;
+    await worker.save();
 
-    // Separate current and past jobs
-    const currentJobs = jobApplications.filter(app => 
-      ['pending', 'accepted'].includes(app.status)
-    );
-    const pastJobs = jobApplications.filter(app => 
-      app.status === 'completed'
-    );
-
-    // Log login success and profile information
     console.log('✓ Login successful');
     console.log('\nWorker Profile:');
     console.log(JSON.stringify({
@@ -298,58 +315,19 @@ router.post('/login', async (req, res) => {
       phone: worker.phone,
       skills: worker.skills,
       rating: worker.rating,
-      shaktiScore: worker.shaktiScore,
-      location: worker.location,
-      languages: worker.languages,
-      experience: worker.experience
+      shaktiScore: worker.shaktiScore
     }, null, 2));
-
-    console.log('\n=== Current Active Jobs ===');
-    console.log(`Total current jobs: ${currentJobs.length}`);
-    if (currentJobs.length > 0) {
-      currentJobs.forEach((app, index) => {
-        console.log(`\nJob ${index + 1}:`);
-        console.log(JSON.stringify({
-          jobId: app.job?._id,
-          title: app.job?.title || 'No title',
-          status: app.status,
-          employer: app.employer?.company?.name || app.employer?.name || 'Unknown employer',
-          salary: app.job?.salary || 'Not specified',
-          appliedAt: app.appliedAt,
-          location: app.job?.location || 'Location not specified'
-        }, null, 2));
-      });
-    } else {
-      console.log('No current active jobs found');
-    }
-
-    console.log('\n=== Completed Jobs History ===');
-    console.log(`Total completed jobs: ${pastJobs.length}`);
-    if (pastJobs.length > 0) {
-      pastJobs.forEach((app, index) => {
-        console.log(`\nCompleted Job ${index + 1}:`);
-        console.log(JSON.stringify({
-          jobId: app.job?._id,
-          title: app.job?.title || 'No title',
-          employer: app.employer?.company?.name || app.employer?.name || 'Unknown employer',
-          salary: app.job?.salary || 'Not specified',
-          completedAt: app.completedAt,
-          location: app.job?.location || 'Location not specified'
-        }, null, 2));
-      });
-    } else {
-      console.log('No completed jobs found');
-    }
     console.log('\n=== End Worker Login ===\n');
 
-    // Send response with full profile data
+    // Send comprehensive response
     res.json({
+      success: true,
       message: 'Login successful',
-      worker: {
-        ...worker.toObject(),
-        jobHistory: {
-          current: currentJobs,
-          past: pastJobs
+      data: {
+        worker: {
+          ...worker.toObject(),
+          id: worker._id, // Ensure id field is present
+          type: 'worker' // Explicitly set user type
         }
       }
     });
@@ -362,8 +340,9 @@ router.post('/login', async (req, res) => {
     });
     
     res.status(500).json({ 
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      success: false,
+      message: 'Login failed. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

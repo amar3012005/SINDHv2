@@ -1,4 +1,4 @@
-# SINDH Application - "Accept Job" Button Issue Fix
+# I N D U S Application - "Accept Job" Button Issue Fix
 
 ## Issue Summary
 The "Accept Job" button was not appearing on the Available Jobs page even when a worker was logged in, likely due to the `user` object from `UserContext` not having the correct type or not being properly recognized.

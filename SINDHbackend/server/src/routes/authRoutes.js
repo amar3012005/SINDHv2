@@ -6,8 +6,12 @@ const JobApplication = require('../models/JobApplication');
 
 // Worker login
 router.post('/workers/login', async (req, res) => {
-  console.log('Worker login attempt:', req.body);
   try {
+    console.log('\n=== Worker Login Attempt ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('Request Body:', req.body);
+    console.log('Headers:', req.headers);
+
     const { phoneNumber } = req.body;
     
     if (!phoneNumber || phoneNumber.length !== 10) {
@@ -31,24 +35,48 @@ router.post('/workers/login', async (req, res) => {
       });
     }
 
-    // Fetch job applications for the worker
+    // Fetch job applications with proper population
     const jobApplications = await JobApplication.find({ worker: worker._id })
       .populate({
         path: 'job',
-        select: 'title location salary status description employerId',
-        populate: {
-          path: 'employerId',
-          select: 'name company'
-        }
+        select: 'title location salary status description'
       })
-      .sort({ updatedAt: -1 })
-      .lean();
+      .populate({
+        path: 'employer',
+        select: 'name company'
+      })
+      .sort({ updatedAt: -1 });
 
-    console.log('Job applications found:', JSON.stringify(jobApplications, null, 2));
+    console.log('\nJob Applications Status:');
+    console.log('Total Applications:', jobApplications.length);
+    jobApplications.forEach((app, index) => {
+      console.log(`\nApplication ${index + 1}:`);
+      console.log({
+        applicationId: app._id,
+        jobId: app.job?._id,
+        jobTitle: app.job?.title,
+        status: app.status,
+        appliedAt: app.applicationDetails?.appliedAt,
+        employer: app.employer?.name,
+        acceptButton: app.status === 'pending' ? 'Shown' : 'Hidden'
+      });
+    });
+
+    // Log session data
+    console.log('\nSession Data:', {
+      userId: worker?._id,
+      isLoggedIn: true,
+      userType: 'worker',
+      timestamp: new Date().toISOString()
+    });
 
     // Separate current and past jobs
-    const currentJobs = jobApplications.filter(app => app.status === 'active' || app.status === 'pending');
-    const pastJobs = jobApplications.filter(app => app.status === 'completed' || app.status === 'rejected');
+    const currentJobs = jobApplications.filter(app => 
+      app.status === 'pending' || app.status === 'accepted'
+    );
+    const pastJobs = jobApplications.filter(app => 
+      app.status === 'completed' || app.status === 'rejected'
+    );
 
     // Return worker data with job history
     const workerData = {
@@ -57,9 +85,10 @@ router.post('/workers/login', async (req, res) => {
       phoneNumber: worker.phone,
       location: worker.location,
       skills: worker.skills,
-      preferredCategory: worker.preferredCategory,
-      expectedSalary: worker.expectedSalary,
-      shaktiScore: worker.shaktiScore,
+      language: worker.language,
+      experience_years: worker.experience_years,
+      available: worker.available,
+      rating: worker.rating,
       jobHistory: {
         current: currentJobs,
         past: pastJobs
@@ -73,7 +102,11 @@ router.post('/workers/login', async (req, res) => {
       data: workerData
     });
   } catch (error) {
-    console.error('Error in worker login:', error);
+    console.error('\n❌ Worker Login Error:', {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     res.status(500).json({ 
       success: false,
       message: 'Internal server error',
@@ -101,29 +134,44 @@ router.post('/employers/login', async (req, res) => {
     console.log('Result of Employer.findOne:', employer);
     
     if (!employer) {
-      // User not found, indicate this explicitly
       console.log('Employer not found for phone number:', phoneNumber);
       return res.status(404).json({ 
         success: false,
-        message: 'No employer account found with this phone number.', // More specific message
-        newUser: true // Indicate that this is likely a new user
+        message: 'No employer account found with this phone number.',
+        newUser: true
       });
     }
 
-    // Return employer data (excluding sensitive information)
+    // Update employer login status
+    employer.isLoggedIn = 1;
+    employer.lastLogin = new Date();
+    await employer.save();
+
+    // Format the employer data correctly
     const employerData = {
-      id: employer._id,
+      id: employer._id.toString(),
+      _id: employer._id.toString(),
       name: employer.name,
       phoneNumber: employer.phone,
+      phone: employer.phone,
+      email: employer.email,
       company: employer.company,
       location: employer.location,
       businessDescription: employer.businessDescription,
       verificationDocuments: employer.verificationDocuments,
       preferredLanguages: employer.preferredLanguages,
-      rating: employer.rating
+      rating: employer.rating,
+      type: 'employer',
+      isLoggedIn: 1,
+      lastLogin: employer.lastLogin
     };
 
-    console.log('Employer login successful for phone:', phoneNumber);
+    console.log('Employer login successful:', {
+      id: employerData.id,
+      name: employerData.name,
+      isLoggedIn: employerData.isLoggedIn
+    });
+
     res.json({
       success: true,
       message: 'Login successful',

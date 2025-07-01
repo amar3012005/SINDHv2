@@ -1,7 +1,7 @@
 # S I N D H Platform Development Context
 
 ## Project Overview
-S I N D H (Sindh) is a digital platform designed to empower rural workforce by connecting workers with employment opportunities. The platform serves as a bridge between rural workers and employers, focusing on daily wage work and local employment opportunities.
+S I N D H (I N D U S) is a digital platform designed to empower rural workforce by connecting workers with employment opportunities. The platform serves as a bridge between rural workers and employers, focusing on daily wage work and local employment opportunities.
 
 ## Platform Evolution
 
@@ -117,8 +117,8 @@ The platform is operational with core features implemented. Recent focus has bee
 ## Development Guidelines
 
 ### Code Structure
-- Frontend: React components in `SINDH-frontend/src`
-- Backend: Express routes in `SINDHbackend/server/src`
+- Frontend: React components in `I N D U S-frontend/src`
+- Backend: Express routes in `I N D U Sbackend/server/src`
 - Shared utilities and configurations
 
 ### Best Practices

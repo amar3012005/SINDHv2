@@ -10,7 +10,7 @@ console.log('🌐 API Configuration:', {
 });
 
 const api = axios.create({
-  baseURL: API_URL, // Use the API_URL constant instead of REACT_APP_API_URL
+  baseURL: API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -30,7 +30,8 @@ const checkConnection = async () => {
   } catch (error) {
     console.error('🔴 Backend connection failed:', {
       url: API_URL,
-      error: error.message
+      error: error.message,
+      suggestion: 'Make sure backend server is running on http://localhost:5000'
     });
     return false;
   }

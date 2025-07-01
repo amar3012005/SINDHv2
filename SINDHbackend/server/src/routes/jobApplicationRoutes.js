@@ -4,205 +4,331 @@ const JobApplication = require('../models/JobApplication');
 const Job = require('../models/Job');
 const Worker = require('../models/Worker');
 const Employer = require('../models/Employer');
-const NotificationService = require('../services/NotificationService');
+const NotificationService = require('../services/notificationService');
 
 // Apply for a job
 router.post('/apply', async (req, res) => {
-  try {
-    const { jobId, workerId } = req.body;
+  console.log('\n=== Job Application Request ===');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('Request Body:', JSON.stringify(req.body, null, 2));
 
-    // Check if application already exists
+  try {
+    const { jobId, workerId, workerDetails } = req.body;
+
+    // Validate required fields
+    if (!jobId || !workerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Job ID and Worker ID are required'
+      });
+    }
+
+    // Check if job exists and is active
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+
+    if (job.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Job is no longer accepting applications'
+      });
+    }
+
+    // Check if worker exists
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker not found'
+      });
+    }
+
+    // Check if worker already applied
     const existingApplication = await JobApplication.findOne({
       job: jobId,
       worker: workerId
     });
 
     if (existingApplication) {
-      return res.status(400).json({ message: 'You have already applied for this job' });
+      return res.status(400).json({
+        success: false,
+        message: 'You have already applied for this job'
+      });
     }
 
-    // Get job details to get employer ID
-    const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({ message: 'Job not found' });
-    }
-
+    // Create the application
     const application = new JobApplication({
       job: jobId,
       worker: workerId,
-      employer: job.employer,
-      status: 'pending'
+      status: 'pending',
+      workerDetails: workerDetails || {},
+      appliedAt: new Date()
     });
 
     await application.save();
 
-    // Send notification to employer
-    await NotificationService.sendNotification({
-      recipient: job.employer,
-      type: 'new_application',
-      message: 'New job application received',
-      data: {
-        jobId,
-        workerId,
-        applicationId: application._id
-      }
+    // Populate job and worker details
+    await application.populate(['job', 'worker']);
+
+    // Get employer details
+    const employer = await Employer.findById(application.job.employer);
+
+    // Send notification to employer about new application
+    try {
+      await NotificationService.notifyNewApplication(
+        application, 
+        application.job, 
+        application.worker, 
+        employer
+      );
+      console.log('✓ New application notification sent to employer');
+    } catch (notificationError) {
+      console.error('Error sending new application notification:', notificationError);
+    }
+
+    console.log('✓ Job application created successfully');
+
+    res.status(201).json({
+      success: true,
+      message: 'Application submitted successfully',
+      data: application
     });
 
-    res.status(201).json(application);
   } catch (error) {
-    console.error('Error applying for job:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get applications for a worker
-router.get('/worker/:workerId', async (req, res) => {
-  try {
-    const applications = await JobApplication.find({ worker: req.params.workerId })
-      .populate('job')
-      .populate('employer', 'company.name')
-      .sort({ appliedAt: -1 });
-
-    res.json(applications);
-  } catch (error) {
-    console.error('Error fetching worker applications:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get applications for an employer
-router.get('/employer/:employerId', async (req, res) => {
-  try {
-    const applications = await JobApplication.find({ employer: req.params.employerId })
-      .populate('job')
-      .populate('worker', 'name skills')
-      .sort({ appliedAt: -1 });
-
-    res.json(applications);
-  } catch (error) {
-    console.error('Error fetching employer applications:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Update application status
-router.patch('/:applicationId/status', async (req, res) => {
-  try {
-    const { status } = req.body;
-    const application = await JobApplication.findById(req.params.applicationId);
-
-    if (!application) {
-      return res.status(404).json({ message: 'Application not found' });
-    }
-
-    // Validate status transition
-    const validStatuses = ['pending', 'accepted', 'rejected', 'completed'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
-    }
-
-    // Handle special status transitions
-    if (status === 'completed' && application.status !== 'accepted') {
-      return res.status(400).json({ message: 'Only accepted jobs can be marked as completed' });
-    }
-
-    // Update status and related fields
-    application.status = status;
-    application.updatedAt = new Date();
-    
-    if (status === 'completed') {
-      application.completedAt = new Date();
-    }
-    
-    await application.save();
-
-    // Send notification to worker
-    await NotificationService.sendNotification({
-      recipient: application.worker,
-      type: 'application_update',
-      message: `Your job application has been ${status}`,
-      data: {
-        jobId: application.job,
-        applicationId: application._id
-      }
+    console.error('Error creating job application:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit application',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
-
-    res.json(application);
-  } catch (error) {
-    console.error('Error updating application status:', error);
-    res.status(500).json({ message: error.message });
   }
 });
 
-// Get current (active) jobs for a worker
+// Get worker's current applications
 router.get('/worker/:workerId/current', async (req, res) => {
   try {
-    const applications = await JobApplication.find({
-      worker: req.params.workerId,
-      status: { $in: ['pending', 'accepted'] }
+    const { workerId } = req.params;
+
+    console.log('Fetching applications for worker:', workerId);
+
+    const applications = await JobApplication.find({ 
+      worker: workerId,
+      status: { $in: ['pending', 'accepted', 'in-progress'] }
     })
-      .populate('job')
-      .populate('employer', 'company.name')
-      .sort({ appliedAt: -1 });
+    .populate('job')
+    .populate('worker')
+    .sort({ appliedAt: -1 });
 
-    res.json(applications);
-  } catch (error) {
-    console.error('Error fetching current jobs:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
+    console.log(`Found ${applications.length} current applications`);
 
-// Get past (completed) jobs for a worker
-router.get('/worker/:workerId/past', async (req, res) => {
-  try {
-    const applications = await JobApplication.find({
-      worker: req.params.workerId,
-      status: 'completed'
-    })
-      .populate('job')
-      .populate('employer', 'company.name')
-      .sort({ updatedAt: -1 });
-
-    res.json(applications);
-  } catch (error) {
-    console.error('Error fetching past jobs:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Mark job as completed
-router.patch('/:applicationId/complete', async (req, res) => {
-  try {
-    const application = await JobApplication.findById(req.params.applicationId);
-
-    if (!application) {
-      return res.status(404).json({ message: 'Application not found' });
-    }
-
-    if (application.status !== 'accepted') {
-      return res.status(400).json({ message: 'Only accepted jobs can be marked as completed' });
-    }
-
-    application.status = 'completed';
-    application.completedAt = new Date();
-    await application.save();
-
-    // Send notification to employer
-    await NotificationService.sendNotification({
-      recipient: application.employer,
-      type: 'job_completed',
-      message: 'A worker has marked a job as completed',
-      data: {
-        jobId: application.job,
-        applicationId: application._id,
-        completedAt: application.completedAt
-      }
+    res.json({
+      success: true,
+      data: applications,
+      count: applications.length
     });
 
-    res.json(application);
   } catch (error) {
-    console.error('Error completing job:', error);
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching worker applications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch applications',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Get applications for a specific job (for employers)
+router.get('/job/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    console.log('Fetching applications for job:', jobId);
+
+    // Validate jobId format
+    if (!jobId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid job ID format'
+      });
+    }
+
+    const applications = await JobApplication.find({ 
+      job: jobId
+    })
+    .populate('worker', 'name phone email skills experience rating location')
+    .populate('job', 'title companyName salary')
+    .sort({ appliedAt: -1 });
+
+    console.log(`Found ${applications.length} applications for job ${jobId}`);
+
+    // Format the response to include workerDetails for easier frontend access
+    const formattedApplications = applications.map(app => {
+      const appObj = app.toObject();
+      return {
+        ...appObj,
+        workerDetails: appObj.workerDetails || {
+          name: app.worker?.name,
+          phone: app.worker?.phone,
+          email: app.worker?.email,
+          skills: app.worker?.skills || [],
+          experience: app.worker?.experience,
+          rating: app.worker?.rating?.average || 0,
+          location: app.worker?.location
+        }
+      };
+    });
+
+    // Always return data in consistent format
+    res.json({
+      success: true,
+      data: formattedApplications,
+      count: formattedApplications.length
+    });
+
+  } catch (error) {
+    console.error('Error fetching job applications:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch applications',
+      data: [], // Return empty array on error
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Cancel/Delete application
+router.delete('/:applicationId', async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+
+    console.log('Cancelling application:', applicationId);
+
+    const application = await JobApplication.findById(applicationId);
+    
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+
+    // Only allow cancellation if status is pending or accepted
+    if (!['pending', 'accepted'].includes(application.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot cancel application in current status'
+      });
+    }
+
+    await JobApplication.findByIdAndDelete(applicationId);
+
+    console.log('✓ Application cancelled successfully');
+
+    res.json({
+      success: true,
+      message: 'Application cancelled successfully'
+    });
+
+  } catch (error) {
+    console.error('Error cancelling application:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel application',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Update application status (for employers)
+router.patch('/:applicationId/status', async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { status } = req.body;
+
+    console.log('Updating application status:', { applicationId, status });
+
+    // Validate status
+    const validStatuses = ['pending', 'accepted', 'rejected', 'in-progress', 'completed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be one of: ' + validStatuses.join(', ')
+      });
+    }
+
+    const application = await JobApplication.findByIdAndUpdate(
+      applicationId,
+      { 
+        status,
+        updatedAt: new Date()
+      },
+      { new: true }
+    ).populate(['job', 'worker']);
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+
+    // Get employer details
+    const employer = await Employer.findById(application.job.employer);
+    if (!employer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Employer not found'
+      });
+    }
+
+    // Send notifications based on status change
+    try {
+      switch (status) {
+        case 'accepted':
+          await NotificationService.notifyApplicationAccepted(application, application.job, employer);
+          console.log('✓ Acceptance notification sent to worker');
+          break;
+        
+        case 'rejected':
+          await NotificationService.notifyApplicationRejected(application, application.job, employer);
+          console.log('✓ Rejection notification sent to worker');
+          break;
+        
+        case 'in-progress':
+          await NotificationService.notifyJobStarted(application, application.job, employer);
+          console.log('✓ Job started notification sent to worker');
+          break;
+        
+        case 'completed':
+          await NotificationService.notifyJobCompleted(application, application.job, employer);
+          console.log('✓ Job completed notification sent to worker');
+          break;
+      }
+    } catch (notificationError) {
+      console.error('Error sending notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
+
+    console.log('✓ Application status updated successfully');
+
+    res.json({
+      success: true,
+      message: `Application ${status} successfully`,
+      data: application
+    });
+
+  } catch (error) {
+    console.error('Error updating application status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update application status',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

@@ -10,14 +10,117 @@ const JobApplication = require('../models/JobApplication');
 // Create a new job
 router.post('/', async (req, res) => {
   try {
+    console.log('=== New Job Posting ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('\nJob Details:', JSON.stringify(req.body, null, 2));
+    
+    console.log('Validating job data...');
+    
+    // Check for duplicate job submission (within last 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const existingJob = await Job.findOne({
+      title: req.body.title,
+      employer: req.body.employer,
+      'location.city': req.body.location?.city,
+      createdAt: { $gt: fiveMinutesAgo }
+    });
+    
+    if (existingJob) {
+      console.log('⚠️ Duplicate job submission detected');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'A similar job was already posted in the last 5 minutes'
+      });
+    }
+    
+    // Create and save the job
     const job = new Job(req.body);
+    console.log('✅ Job validation successful');
     await job.save();
     
-    // Find and notify matching workers
-    await JobMatchingService.notifyMatchingWorkers(job);
+    console.log('✅ Job saved successfully:', {
+      jobId: job._id,
+      title: job.title,
+      employer: job.employerName,
+      company: job.companyName,
+      location: job.location,
+      salary: job.salary,
+      status: job.status
+    });
     
-    res.status(201).json(job);
+    // Update the employer's postedJobs array with ONLY the job ID
+    if (req.body.employer) {
+      try {
+        // IMPORTANT: Only push the job ID (not a complex object)
+        await Employer.findByIdAndUpdate(
+          req.body.employer,
+          { $push: { postedJobs: job._id } }, // Use the ObjectId directly
+          { new: true }
+        );
+        console.log('✅ Updated employer postedJobs with job ID');
+      } catch (employerError) {
+        console.error('❌ Error updating employer:', employerError);
+        // Don't fail the whole request if the employer update fails
+      }
+    }
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Job posted successfully',
+      job: job 
+    });
   } catch (error) {
+    console.error('❌ Error posting job:', error);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Create a job without immediately updating the employer
+router.post('/create', async (req, res) => {
+  try {
+    console.log('=== New Job Creation Request ===');
+    console.log('Timestamp:', new Date().toISOString());
+    console.log('\nJob Details:', JSON.stringify(req.body, null, 2));
+    
+    // Create and save the job
+    const job = new Job(req.body);
+    console.log('✅ Job validation successful');
+    await job.save();
+    
+    console.log('✅ Job saved successfully:', {
+      jobId: job._id,
+      title: job.title,
+      employer: job.employerName,
+      company: job.companyName,
+      location: job.location,
+      salary: job.salary,
+      status: job.status
+    });
+    
+    // After job is created, update the employer's postedJobs array
+    if (req.body.employer) {
+      try {
+        // IMPORTANT: Only use the job ID as string to avoid ObjectId casting issues
+        const updateResult = await Employer.findByIdAndUpdate(
+          req.body.employer,
+          { $push: { postedJobs: job._id.toString() } },
+          { new: true }
+        );
+        
+        console.log('✅ Updated employer postedJobs array:', updateResult ? 'Success' : 'Failed');
+      } catch (employerError) {
+        console.error('❌ Error updating employer:', employerError);
+        // Don't fail the whole request if employer update fails
+      }
+    }
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Job posted successfully',
+      job: job 
+    });
+  } catch (error) {
+    console.error('❌ Error posting job:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -296,4 +399,80 @@ router.patch('/applications/:applicationId', async (req, res) => {
   }
 });
 
-module.exports = router; 
+// Update job status
+router.patch('/:jobId/update-status', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { status, applicantId, workerDetails, applicationId } = req.body;
+
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    job.status = status;
+    job.assignedWorker = applicantId;
+    job.workerDetails = workerDetails; // Save worker details
+    job.updatedAt = new Date();
+
+    await job.save();
+
+    // Send notification to employer
+    await NotificationService.sendNotification({
+      recipient: job.employer,
+      type: 'worker_applied',
+      message: `${workerDetails.name} has applied for your job: ${job.title}`,
+      data: {
+        jobId,
+        workerId: applicantId,
+        applicationId,
+        workerDetails
+      }
+    });
+
+    res.json(job);
+  } catch (error) {
+    console.error('Error updating job status:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get jobs posted by an employer
+router.get('/employer/:employerId', async (req, res) => {
+  try {
+    const { employerId } = req.params;
+    
+    console.log('Fetching jobs for employer:', employerId);
+
+    // Validate employerId format
+    if (!employerId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid employer ID format',
+        data: []
+      });
+    }
+
+    const jobs = await Job.find({ 
+      employer: employerId 
+    })
+    .populate('employer', 'name company')
+    .sort({ createdAt: -1 });
+    
+    console.log(`Found ${jobs.length} jobs for employer ${employerId}`);
+    
+    // Always return array, even if empty
+    res.json(jobs || []);
+    
+  } catch (error) {
+    console.error('Error fetching employer jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch jobs',
+      data: [], // Return empty array on error
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+module.exports = router;

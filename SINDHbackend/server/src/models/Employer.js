@@ -94,8 +94,12 @@ const employerSchema = new mongoose.Schema({
     }
   }],
   postedJobs: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Job'
+    type: String,
+    ref: 'Job',
+    set: function(v) {
+      // Ensure we're always storing strings
+      return v.toString();
+    }
   }],
   verificationStatus: {
     type: String,
@@ -195,4 +199,4 @@ employerSchema.methods.toJSON = function() {
 
 const Employer = mongoose.model('Employer', employerSchema);
 
-module.exports = Employer; 
+module.exports = Employer;

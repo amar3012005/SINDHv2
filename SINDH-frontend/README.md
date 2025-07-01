@@ -1,4 +1,4 @@
-# SINDH Frontend
+# I N D U S Frontend
 
 A modern React-based web application for connecting daily wage workers with employers, built with a focus on user experience and accessibility.
 
@@ -31,7 +31,7 @@ A modern React-based web application for connecting daily wage workers with empl
 1. Clone the repository:
 ```bash
 git clone [repository-url]
-cd SINDH-frontend
+cd I N D U S-frontend
 ```
 
 2. Install dependencies:
@@ -53,7 +53,7 @@ npm start
 ## 🏗️ Project Structure
 
 ```
-SINDH-frontend/
+I N D U S-frontend/
 ├── src/
 │   ├── components/     # Reusable UI components
 │   ├── pages/         # Page components

@@ -15,7 +15,7 @@ describe('Advanced Rating System Tests', () => {
   let employerToken;
 
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sindh_test', {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/I N D U S_test', {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });

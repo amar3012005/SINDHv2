@@ -1,344 +1,592 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { employerService } from '../../services/employerService';
-import ProfileImageUpload from '../ProfileImageUpload';
-import { useLanguage } from '../../context/LanguageContext';
+import { 
+  User, Building, MapPin, FileText, Phone, Mail, Award, Calendar, 
+  Edit, Settings, Briefcase, Star, ChevronRight, TrendingUp, Users,
+  Clock, CheckCircle, AlertCircle, Plus, Eye, MoreHorizontal, Globe
+} from 'lucide-react';
 
-const EmployerProfile = () => {
-  // const location = useLocation(); // Commenting out unused variable
-  const navigate = useNavigate();
-  // const { translations } = useLanguage(); // Commenting out unused variable
-  const [employer, setEmployer] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showImageUpload, setShowImageUpload] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+const EmployerProfile = ({ employerId, employerData: propEmployerData }) => {
+  const [employerData, setEmployerData] = useState(propEmployerData || null);
+  const [loading, setLoading] = useState(!propEmployerData);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const fetchEmployerData = async (id) => {
+  // Helper function to extract ID from various formats
+  const extractEmployerId = (id) => {
+    if (!id) return null;
+    
+    // If it's already a string and looks like a valid ID, return it
+    if (typeof id === 'string' && id !== '[object Object]' && id !== 'undefined' && id !== 'null') {
+      return id;
+    }
+    
+    // If it's an object, try to get the _id or id property
+    if (typeof id === 'object' && id !== null) {
+      return id._id || id.id || null;
+    }
+    
+    return null;
+  };
+
+  useEffect(() => {
+    // If we have prop data, use it and don't fetch
+    if (propEmployerData) {
+      setEmployerData(propEmployerData);
+      setLoading(false);
+      return;
+    }
+
+    // Try to get employer ID from various sources
+    let idToUse = extractEmployerId(employerId);
+    
+    if (!idToUse) {
+      // Try localStorage - could be stored as object or string
+      const storedId = localStorage.getItem('employerId');
+      const storedEmployer = localStorage.getItem('employer');
+      
+      if (storedId) {
+        try {
+          // Try to parse as JSON in case it's an object
+          const parsedId = JSON.parse(storedId);
+          idToUse = extractEmployerId(parsedId);
+        } catch {
+          // If parsing fails, use as string
+          idToUse = extractEmployerId(storedId);
+        }
+      }
+      
+      if (!idToUse && storedEmployer) {
+        try {
+          const parsedEmployer = JSON.parse(storedEmployer);
+          idToUse = extractEmployerId(parsedEmployer);
+        } catch {
+          // Ignore parsing errors
+        }
+      }
+    }
+    
+    if (!idToUse) {
+      // Try URL params as last resort
+      const urlParams = new URLSearchParams(window.location.search);
+      idToUse = extractEmployerId(urlParams.get('id'));
+    }
+
+    console.log('Extracted employer ID:', idToUse);
+
+    if (idToUse) {
+      fetchEmployerProfile(idToUse);
+    } else {
+      setError('No valid employer ID found. Please log in again.');
+      setLoading(false);
+    }
+  }, [employerId, propEmployerData]);
+
+  const fetchEmployerProfile = async (id) => {
     try {
       setLoading(true);
-      // Fetch employer data from backend using the ID
-      const data = await employerService.getEmployerById(id);
-      console.log('Fetched employer data:', data);
+      setError(null);
       
-      if (data) {
-        // Ensure all required fields are present
-        const formattedData = {
-          ...data,
-          company: {
-            name: data.company?.name || '',
-            type: data.company?.type || '',
-            industry: data.company?.industry || '',
-            description: data.company?.description || '',
-            registrationNumber: data.company?.registrationNumber || ''
-          },
-          location: {
-            village: data.location?.village || '',
-            district: data.location?.district || '',
-            state: data.location?.state || '',
-            pincode: data.location?.pincode || '',
-            address: data.location?.address || ''
-          },
-          verificationDocuments: {
-            aadharNumber: data.verificationDocuments?.aadharNumber || '',
-            panNumber: data.verificationDocuments?.panNumber || '',
-            businessLicense: data.verificationDocuments?.businessLicense || ''
-          },
-          documents: data.documents || [],
-          preferredLanguages: data.preferredLanguages || [],
-          rating: data.rating || { average: 0, count: 0 },
-          reviews: data.reviews || [],
-          verificationStatus: data.verificationStatus || 'pending',
-          isLoggedIn: data.isLoggedIn || 0,
-          registrationDate: data.registrationDate || new Date().toISOString(),
-          lastLogin: data.lastLogin || new Date().toISOString()
-        };
-
-        // Update both localStorage and state
-        localStorage.setItem('employer', JSON.stringify(formattedData));
-        setEmployer(formattedData);
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
-      } else {
-        // If data not found, clear local storage and redirect to registration
-        localStorage.removeItem('employerId');
-        localStorage.removeItem('employer');
-        toast.error('Employer profile not found.');
-        navigate('/employer/register');
+      console.log('=== Fetching Employer Profile ===');
+      console.log('Employer ID:', id);
+      console.log('User Type: employer');
+      
+      // Get user type from localStorage to determine access level
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userType = user.type || 'guest';
+      
+      const response = await fetch(`http://localhost:5000/api/employers/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-type': userType, // Send user type header for proper data access
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`Failed to fetch employer profile: ${response.status} ${response.statusText}`);
       }
+      
+      const data = await response.json();
+      console.log('✅ Employer profile fetched successfully:', {
+        id: data._id,
+        name: data.name,
+        hasFullData: !!data.phone // Check if we got full data
+      });
+      
+      setEmployerData(data);
+      
+      // Store the correct ID format in localStorage
+      localStorage.setItem('employerId', data._id || data.id);
+      localStorage.setItem('employer', JSON.stringify(data));
+      
     } catch (error) {
-      console.error('Error fetching employer data:', error);
-      localStorage.removeItem('employerId');
-      localStorage.removeItem('employer');
-      toast.error('Failed to load employer profile. Please login again.');
-      navigate('/employer/register');
+      console.error('❌ Error fetching employer profile:', error);
+      setError(`Failed to load profile: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    // Check for employer ID in localStorage
-    const employerId = JSON.parse(localStorage.getItem('employerId'));
-    if (employerId) {
-      fetchEmployerData(employerId);
-    } else {
-      // If no ID found, redirect to registration
-      navigate('/employer/register');
-    }
-  }, [navigate, fetchEmployerData]); // Added fetchEmployerData to dependency array
+  const getInitials = (name) => {
+    if (!name) return 'ER';
+    return name.split(' ').map(word => word[0]).join('').toUpperCase();
+  };
 
-  const handleLogout = () => {
-    if (employer) {
-      // Update login status in localStorage
-      const updatedData = {
-        ...employer,
-        isLoggedIn: 0,
-        lastLogin: new Date().toISOString()
-      };
-      localStorage.setItem('employer', JSON.stringify(updatedData));
-      
-      // Try to update server
-      employerService.updateProfile(updatedData).catch(error => {
-        console.error('Failed to update server:', error);
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Recently';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', { 
+        month: 'long', 
+        year: 'numeric' 
       });
+    } catch {
+      return 'Recently';
     }
-    
-    // Clear employer data
-    localStorage.removeItem('employer');
-    navigate('/');
-  };
-
-  const handleImageUploadComplete = async (imageUrl) => {
-    if (imageUrl) {
-      try {
-        // Update profile with new image
-        const updatedData = {
-          ...employer,
-          profileImage: imageUrl
-        };
-        
-        // Update localStorage
-        localStorage.setItem('employer', JSON.stringify(updatedData));
-        
-        // Try to update server
-        await employerService.updateProfile(updatedData);
-        
-        setEmployer(updatedData);
-        toast.success('Profile image updated successfully');
-      } catch (error) {
-        console.error('Error updating profile image:', error);
-        toast.error('Failed to update profile image');
-      }
-    }
-    setShowImageUpload(false);
-  };
-
-  const handlePostJob = () => {
-    navigate('/employer/post-job');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!employer) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Profile not found</h2>
-          <p className="text-gray-600 mt-2">Please try logging in again</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-6"
+          >
+            {/* Header skeleton */}
+            <div className="bg-white rounded-2xl shadow-sm p-8">
+              <div className="flex items-start gap-6">
+                <div className="w-32 h-32 bg-gray-200 rounded-2xl animate-pulse"></div>
+                <div className="flex-1 space-y-4">
+                  <div className="h-8 bg-gray-200 rounded w-1/3 animate-pulse"></div>
+                  <div className="h-6 bg-gray-200 rounded w-1/4 animate-pulse"></div>
+                  <div className="flex gap-2">
+                    <div className="h-8 bg-gray-200 rounded-full w-24 animate-pulse"></div>
+                    <div className="h-8 bg-gray-200 rounded-full w-20 animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Content skeleton */}
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="bg-white rounded-2xl shadow-sm p-6">
+                    <div className="h-6 bg-gray-200 rounded w-1/4 mb-4 animate-pulse"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+                      <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-6">
+                {[1, 2].map(i => (
+                  <div key={i} className="bg-white rounded-2xl shadow-sm p-6">
+                    <div className="h-6 bg-gray-200 rounded w-1/3 mb-4 animate-pulse"></div>
+                    <div className="space-y-3">
+                      <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+                      <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <AnimatePresence>
-          {showSuccess && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="mb-8 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative"
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md mx-4"
+        >
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Profile Not Found</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="space-y-3">
+            <button 
+              onClick={() => {
+                const id = extractEmployerId(employerId) || 
+                           extractEmployerId(localStorage.getItem('employerId'));
+                if (id) fetchEmployerProfile(id);
+              }}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
-              <strong className="font-bold">Success!</strong>
-              <span className="block sm:inline"> Your registration is complete.</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {showImageUpload && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <ProfileImageUpload onUploadComplete={handleImageUploadComplete} />
+              Try Again
+            </button>
+            <button 
+              onClick={() => window.location.href = '/employer/register'}
+              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+            >
+              Register New Account
+            </button>
           </div>
-        )}
+        </motion.div>
+      </div>
+    );
+  }
 
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: User },
+    { id: 'jobs', label: 'Job Posts', icon: Briefcase },
+    { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+    { id: 'settings', label: 'Settings', icon: Settings }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-xl overflow-hidden"
+          className="bg-white rounded-2xl shadow-sm p-8 mb-6 relative overflow-hidden"
         >
-          {/* Profile Header */}
-          <div className="relative h-48 bg-gradient-to-r from-blue-600 to-indigo-600">
-            <div className="absolute -bottom-16 left-8">
-              <div className="relative">
-                <div className="w-32 h-32 rounded-full border-4 border-white overflow-hidden bg-gray-100">
-                  {employer.profileImage ? (
-                    <img
-                      src={employer.profileImage}
-                      alt={employer.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                {!employer.profileImage && (
-                  <button
-                    onClick={() => setShowImageUpload(true)}
-                    className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="absolute top-4 right-4">
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+          {/* Background Pattern */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-full transform translate-x-32 -translate-y-32"></div>
+          
+          <div className="relative">
+            <div className="flex flex-col lg:flex-row items-start gap-8">
+              {/* Profile Picture */}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="relative"
               >
-                Logout
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-20 pb-8 px-8">
-            {/* Personal Information */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Personal Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-sm text-gray-500">Full Name</label>
-                  <p className="text-gray-900 text-lg font-medium">{employer.name}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Email</label>
-                  <p className="text-gray-900 text-lg">{employer.email}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Phone</label>
-                  <p className="text-gray-900 text-lg">{employer.phone}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Registration Date</label>
-                  <p className="text-gray-900 text-lg">
-                    {new Date(employer.registrationDate).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Company Information */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Company Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-sm text-gray-500">Business Name</label>
-                  <p className="text-gray-900 text-lg font-medium">{employer.company?.name}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Business Type</label>
-                  <p className="text-gray-900 text-lg">{employer.company?.type}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Industry</label>
-                  <p className="text-gray-900 text-lg">{employer.company?.industry}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Business Description</label>
-                  <p className="text-gray-900 text-lg">{employer.company?.description}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Location Information */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Location Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-sm text-gray-500">Village/Town</label>
-                  <p className="text-gray-900 text-lg">{employer.location?.village}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">District</label>
-                  <p className="text-gray-900 text-lg">{employer.location?.district}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">State</label>
-                  <p className="text-gray-900 text-lg">{employer.location?.state}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Pincode</label>
-                  <p className="text-gray-900 text-lg">{employer.location?.pincode}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Verification Information */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Verification Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-sm text-gray-500">Aadhar Number</label>
-                  <p className="text-gray-900 text-lg">{employer.verificationDocuments?.aadharNumber}</p>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
-                    Verified
+                <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-3xl">
+                    {getInitials(employerData?.name)}
                   </span>
                 </div>
-                <div>
-                  <label className="text-sm text-gray-500">Verification Status</label>
-                  <p className="text-gray-900 text-lg capitalize">{employer.verificationStatus}</p>
+                <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <label className="text-sm text-gray-500">Last Login</label>
-                  <p className="text-gray-900 text-lg">
-                    {new Date(employer.lastLogin).toLocaleString()}
+              </motion.div>
+              
+              {/* Profile Info */}
+              <div className="flex-1">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    {employerData?.name}
+                  </h1>
+                  <p className="text-xl text-blue-600 font-medium mb-3">
+                    {employerData?.company?.name}
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
+                      {employerData?.company?.type}
+                    </span>
+                    <span className="px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium">
+                      {employerData?.company?.industry}
+                    </span>
+                    <span className="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium flex items-center">
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Verified
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center text-gray-600 mb-4">
+                    <MapPin className="w-5 h-5 mr-2" />
+                    <span>
+                      {employerData?.location?.village}, {employerData?.location?.district}, {employerData?.location?.state}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center text-gray-500 text-sm">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    <span>Member since {formatDate(employerData?.registrationDate)}</span>
+                  </div>
+                </motion.div>
+              </div>
+              
+              {/* Action Buttons */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+                className="flex gap-3"
+              >
+                <button className="p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+                  <Edit className="w-5 h-5 text-gray-600" />
+                </button>
+                <button className="p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+                  <Settings className="w-5 h-5 text-gray-600" />
+                </button>
+                <button className="p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+                  <MoreHorizontal className="w-5 h-5 text-gray-600" />
+                </button>
+              </motion.div>
+            </div>
+            
+            {/* Quick Stats */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 pt-8 border-t border-gray-100"
+            >
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">0</div>
+                <div className="text-sm text-gray-500">Jobs Posted</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">0</div>
+                <div className="text-sm text-gray-500">Active Hires</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">
+                  {employerData?.rating?.average || 'New'}
+                </div>
+                <div className="text-sm text-gray-500">Rating</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">
+                  {employerData?.rating?.count || 0}
+                </div>
+                <div className="text-sm text-gray-500">Reviews</div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Navigation Tabs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-white rounded-2xl shadow-sm mb-6"
+        >
+          <div className="flex overflow-x-auto">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="w-5 h-5 mr-2" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {activeTab === 'overview' && (
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Main Content */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Business Information */}
+                  <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                      <Building className="w-6 h-6 mr-3 text-blue-600" />
+                      Business Information
+                    </h2>
+                    <p className="text-gray-700 leading-relaxed">
+                      {employerData?.businessDescription || 'No business description provided yet.'}
+                    </p>
+                  </div>
+
+                  {/* Recent Activity */}
+                  <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                      <Clock className="w-6 h-6 mr-3 text-green-600" />
+                      Recent Activity
+                    </h2>
+                    <div className="text-center py-12">
+                      <Briefcase className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No recent activity</h3>
+                      <p className="text-gray-500 mb-6">Start by posting your first job to see activity here</p>
+                      <button className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                        <Plus className="w-5 h-5 mr-2" />
+                        Post Your First Job
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Location Details */}
+                  <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                      <MapPin className="w-6 h-6 mr-3 text-purple-600" />
+                      Location & Coverage Area
+                    </h2>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <div className="font-medium text-gray-900 mb-1">Primary Location</div>
+                        <div className="text-gray-600">
+                          {employerData?.location?.village}, {employerData?.location?.district}
+                        </div>
+                        <div className="text-gray-500 text-sm">
+                          {employerData?.location?.state} - {employerData?.location?.pincode}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sidebar */}
+                <div className="space-y-6">
+                  {/* Contact Information */}
+                  <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <Mail className="w-5 h-5 mr-2 text-blue-600" />
+                      Contact Information
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                        <Phone className="w-5 h-5 mr-3 text-gray-500" />
+                        <span className="text-gray-700">{employerData?.phone}</span>
+                      </div>
+                      <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                        <Mail className="w-5 h-5 mr-3 text-gray-500" />
+                        <span className="text-gray-700">{employerData?.email}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                    <div className="space-y-3">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <span className="flex items-center">
+                          <Plus className="w-5 h-5 mr-2" />
+                          Post New Job
+                        </span>
+                        <ChevronRight className="w-5 h-5" />
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        <span className="flex items-center">
+                          <Eye className="w-5 h-5 mr-2" />
+                          View Applications
+                        </span>
+                        <ChevronRight className="w-5 h-5" />
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        <span className="flex items-center">
+                          <Briefcase className="w-5 h-5 mr-2" />
+                          Manage Jobs
+                        </span>
+                        <ChevronRight className="w-5 h-5" />
+                      </motion.button>
+                    </div>
+                  </div>
+
+                  {/* Account Status */}
+                  <div className="bg-white rounded-2xl shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <Award className="w-5 h-5 mr-2 text-orange-600" />
+                      Account Status
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Email Verified</span>
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Phone Verified</span>
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Aadhar Verified</span>
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Profile Complete</span>
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'jobs' && (
+              <div className="bg-white rounded-2xl shadow-sm p-8">
+                <div className="text-center py-16">
+                  <Briefcase className="w-20 h-20 mx-auto mb-6 text-gray-300" />
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-4">No Job Posts Yet</h3>
+                  <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                    Start connecting with skilled workers by posting your first job. It's quick and easy!
+                  </p>
+                  <button className="inline-flex items-center px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    <Plus className="w-5 h-5 mr-2" />
+                    Create Your First Job Post
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'analytics' && (
+              <div className="bg-white rounded-2xl shadow-sm p-8">
+                <div className="text-center py-16">
+                  <TrendingUp className="w-20 h-20 mx-auto mb-6 text-gray-300" />
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-4">Analytics Coming Soon</h3>
+                  <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                    Track your hiring performance, view application analytics, and optimize your job posts.
                   </p>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handlePostJob}
-                className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors"
-              >
-                Post a Job
-              </motion.button>
-            </div>
-          </div>
-        </motion.div>
+            {activeTab === 'settings' && (
+              <div className="bg-white rounded-2xl shadow-sm p-8">
+                <div className="text-center py-16">
+                  <Settings className="w-20 h-20 mx-auto mb-6 text-gray-300" />
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-4">Settings</h3>
+                  <p className="text-gray-500 mb-8 max-w-md mx-auto">
+                    Manage your account preferences, notification settings, and privacy options.
+                  </p>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
 };
 
-export default EmployerProfile; 
+export default EmployerProfile;

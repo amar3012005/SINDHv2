@@ -27,7 +27,7 @@ const UnifiedRegistration = () => {
         className="max-w-4xl w-full space-y-8 bg-white p-8 rounded-xl shadow-lg"
       >
         <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-gray-900">Welcome to SINDH</h2>
+          <h2 className="text-3xl font-extrabold text-gray-900">Welcome to I N D U S</h2>
           <p className="mt-2 text-lg text-gray-600">
             Choose how you want to register with our platform
           </p>

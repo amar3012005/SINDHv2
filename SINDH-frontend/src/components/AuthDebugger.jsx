@@ -1,57 +1,31 @@
 import React from 'react';
 import { useUser } from '../context/UserContext';
-import { isAuthenticated, getUserType, isWorker, isEmployer } from '../utils/authUtils';
+import { getCurrentUser, getUserType, isWorker, isEmployer } from '../utils/authUtils';
 
-/**
- * A debugging component to show current authentication state
- * Use this component in development to debug user context issues
- */
 const AuthDebugger = () => {
   const { user, isLoadingUser } = useUser();
-  
-  // Get data from localStorage
-  const localStorageUser = JSON.parse(localStorage.getItem('user') || 'null');
-  const localStorageUserType = localStorage.getItem('userType');
-  
-  // Get data from utility functions
-  const authenticated = isAuthenticated();
-  const userType = getUserType();
-  const worker = isWorker();
-  const employer = isEmployer();
+  const localUser = getCurrentUser();
 
-  if (process.env.NODE_ENV !== 'development') {
-    return null; // Only show in development mode
-  }
+  const debugInfo = {
+    'Context User': `ID: ${user?.id || user?._id || 'undefined'}, Type: ${user?.type || 'undefined'}`,
+    'isLoadingUser': isLoadingUser.toString(),
+    'localStorage[user]': `ID: ${localUser?.id || localUser?._id || 'undefined'}, Type: ${localUser?.type || 'undefined'}`,
+    'localStorage[userType]': localStorage.getItem('userType') || 'undefined',
+    'isAuthenticated()': Boolean(user || localUser).toString(),
+    'getUserType()': getUserType() || 'undefined',
+    'isWorker()': isWorker().toString(),
+    'isEmployer()': isEmployer().toString()
+  };
 
   return (
-    <div className="bg-yellow-100 p-4 mt-4 rounded border border-yellow-400 text-xs">
-      <h3 className="font-bold text-sm">Auth Debugger</h3>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <div>
-          <strong>Context User:</strong> {user ? `ID: ${user.id}, Type: ${user.type}` : 'null'}
+    <div className="fixed bottom-4 right-4 bg-white p-4 rounded shadow-lg text-xs z-50">
+      <h3 className="font-bold mb-2">Auth Debug Info</h3>
+      {Object.entries(debugInfo).map(([key, value]) => (
+        <div key={key} className="mb-1">
+          <span className="font-medium">{key}: </span>
+          <span className="text-gray-600">{value}</span>
         </div>
-        <div>
-          <strong>isLoadingUser:</strong> {isLoadingUser.toString()}
-        </div>
-        <div>
-          <strong>localStorage[user]:</strong> {localStorageUser ? `ID: ${localStorageUser.id}, Type: ${localStorageUser.type}` : 'null'}
-        </div>
-        <div>
-          <strong>localStorage[userType]:</strong> {localStorageUserType || 'null'}
-        </div>
-        <div>
-          <strong>isAuthenticated():</strong> {authenticated.toString()}
-        </div>
-        <div>
-          <strong>getUserType():</strong> {userType || 'null'}
-        </div>
-        <div>
-          <strong>isWorker():</strong> {worker.toString()}
-        </div>
-        <div>
-          <strong>isEmployer():</strong> {employer.toString()}
-        </div>
-      </div>
+      ))}
     </div>
   );
 };

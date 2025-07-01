@@ -29,7 +29,7 @@ const sendOTP = async (phoneNumber, otp) => {
 
   try {
     await twilioClient.messages.create({
-      body: `Your SINDH verification code is: ${otp}. Valid for 10 minutes.`,
+      body: `Your I N D U S verification code is: ${otp}. Valid for 10 minutes.`,
       to: phoneNumber,
       from: process.env.TWILIO_PHONE_NUMBER
     });

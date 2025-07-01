@@ -16,7 +16,7 @@ describe('Rating System Tests', () => {
 
   beforeAll(async () => {
     // Connect to test database
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sindh_test', {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/I N D U S_test', {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });

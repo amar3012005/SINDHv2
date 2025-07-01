@@ -1,18 +1,27 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TranslationContext } from '../context/TranslationContext';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { getCurrentUser, getUserType } from '../utils/authUtils';
+import { Phone, MapPin, Star, Users, Briefcase, TrendingUp } from 'lucide-react';
 
 function Homepage() {
-  const { translate } = useContext(TranslationContext);
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [recentJobs, setRecentJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shaktiScore, setShaktiScore] = useState(null);
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [stats, setStats] = useState({
+    totalJobs: 1250,
+    activeWorkers: 3400,
+    successfulMatches: 890,
+    averageRating: 4.6
+  });
 
   // Get user from context and fallback to localStorage if needed
   const { user: contextUser, isLoadingUser, logoutUser } = useUser();
@@ -21,7 +30,7 @@ function Homepage() {
   useEffect(() => {
     // Show welcome toast if coming from login
     if (location.state?.showWelcome && user) {
-      toast.success(`Welcome back, ${user.name}!`);
+      toast.success(`${t('home.welcomeBack')}, ${user.name}!`);
       // Clear the state after showing toast
       navigate('/', { replace: true, state: {} });
     }
@@ -81,7 +90,7 @@ function Homepage() {
 
   const handleFindWork = () => {
     if (!isAuthenticated) {
-      toast.info('Please login first to continue');
+      toast.info(t('home.loginFirst'));
       navigate('/login');
       return;
     }
@@ -90,115 +99,250 @@ function Homepage() {
 
   const handlePostJob = () => {
     if (!isAuthenticated) {
-      toast.info('Please login as an employer to post jobs');
+      toast.info(t('home.loginAsEmployer'));
       navigate('/login');
       return;
     }
-    
+
     if (user.type !== 'employer') {
-      toast.error('Only employers can post jobs');
+      toast.error(t('home.onlyEmployers'));
       return;
     }
     
     navigate('/employer/post-job');
   };
-  
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <div className="relative bg-white overflow-hidden">
-        <div className="max-w-7xl mx-auto">
-          <div className="relative z-10 pb-8 bg-white sm:pb-16 md:pb-20 lg:max-w-2xl lg:w-full lg:pb-28 xl:pb-32">
-            <main className="mt-10 mx-auto max-w-7xl px-4">
-              <div className="sm:text-center lg:text-left">
-                <AnimatePresence>
-                  {isAuthenticated ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative"
-                    >
-                      <div className="flex justify-between items-center">
-                        <strong className="font-bold">
-                          {user.name || user.company?.name}
-                        </strong>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mb-6 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative"
-                    >
-                      <div className="flex justify-between items-center">
-                        <strong className="font-bold">Welcome to S I N D H!</strong>
-                        <button
-                          onClick={() => navigate('/login')}
-                          className="text-sm text-blue-700 hover:text-blue-900 underline"
-                        >
-                          Login / Register
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
 
-                <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
-                  <span className="block xl:inline">S I N D H</span>{' '}
-                  <span className="block text-blue-600 xl:inline">Empowering Rural Workforce</span>
-                </h1>
-                <p className="mt-3 text-base text-gray-500 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
-                  Connect with employers and find daily wage work opportunities in your area. Building a stronger rural economy, one job at a time.
-                </p>
-                <div className="mt-5 sm:mt-8 sm:flex sm:justify-center lg:justify-start space-x-4">
-                  {!isAuthenticated && (
-                    <>
-                      
-                      <div className="rounded-md shadow">
-                        <button
-                          onClick={handleFindWork}
-                          className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10"
-                        >
-                          Find Work
-                        </button>
-                      </div>
-                      <div className="mt-3 sm:mt-0 sm:ml-3">
-                        <button
-                          onClick={handlePostJob}
-                          className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 md:py-4 md:text-lg md:px-10"
-                        >
-                          Post Job
-                        </button>
-                      </div>
-                    </>
-                  )}
+  const renderGrameenLinkProfile = () => {
+    if (!isAuthenticated) return null;
 
-                  {isAuthenticated && (
-                    <>
-                      <div className="rounded-md shadow">
-                        <button
-                          onClick={handleFindWork}
-                          className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10"
-                        >
-                          {user?.type === 'worker' ? 'Find Jobs' : 'Find Work'}
-                        </button>
-                      </div>
-                      <div className="mt-3 sm:mt-0 sm:ml-3">
-                        <button
-                          onClick={handlePostJob}
-                          className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 md:py-4 md:text-lg md:px-10"
-                        >
-                          {user?.type === 'employer' ? 'Post Job' : 'Hire Workers'}
-                        </button>
-                      </div>
-                    </>
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-3xl mx-auto my-12 px-4"
+      >
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-blue-100">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-white">
+                    {user?.name?.charAt(0)}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">{user?.name}</h3>
+                  <p className="text-sm text-gray-500 capitalize">{user?.type}</p>
+                  {user?.type === 'worker' && shaktiScore !== null && (
+                    <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      {t('home.shaktiScore')}: {shaktiScore}
+                    </div>
                   )}
                 </div>
               </div>
-            </main>
+              <button
+                onClick={() => navigate(`/${user.type}/profile`)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {t('home.viewProfile')}
+              </button>
+            </div>
+          </div>
+          <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <p className="text-sm text-gray-600">
+              {user?.type === 'worker'
+                ? t('home.workerMessage')
+                : t('home.employerMessage')}
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      {/* Interactive Hero Section */}
+      <div className="relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-green-600/10"></div>
+        <div className="absolute inset-0" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234F46E5' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }}></div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="pt-10 pb-16 md:pt-16 md:pb-20 lg:pt-20 lg:pb-28">
+            <div className="text-center">
+              <AnimatePresence>
+                {isAuthenticated ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mb-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                      <span className="font-semibold">
+                        {t('home.welcomeBack')}, {user.name || user.company?.name}!
+                      </span>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mb-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full shadow-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                      <span className="font-semibold">{t('home.welcome')}</span>
+                      <button
+                        onClick={() => navigate('/login')}
+                        className="ml-4 px-4 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm transition-colors"
+                      >
+                        {t('home.loginRegister')}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Main Title with Animation */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mb-8"
+              >
+                <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-4">
+                  <span className="bg-gradient-to-r from-orange-600 to-orange-600 bg-clip-text text-transparent">
+                    
+                    I N D U S
+                  </span>
+                </h1>
+                <h2 className="text-2xl md:text-3xl font-semibold text-gray-700 mb-6">
+                  {t('home.tagline')}
+                </h2>
+                <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                  {t('home.description')}
+                </p>
+              </motion.div>
+
+              {/* Interactive Stats Cards */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 max-w-4xl mx-auto"
+              >
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                >
+                  <div className="flex items-center justify-center mb-2">
+                    <Briefcase className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{stats.totalJobs.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">{t('stats.activeJobs')}</div>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                >
+                  <div className="flex items-center justify-center mb-2">
+                    <Users className="w-8 h-8 text-green-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{stats.activeWorkers.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">{t('stats.activeWorkers')}</div>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                >
+                  <div className="flex items-center justify-center mb-2">
+                    <TrendingUp className="w-8 h-8 text-purple-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{stats.successfulMatches.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">{t('stats.successfulMatches')}</div>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                >
+                  <div className="flex items-center justify-center mb-2">
+                    <Star className="w-8 h-8 text-yellow-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{stats.averageRating}</div>
+                  <div className="text-sm text-gray-600">{t('stats.averageRating')}</div>
+                </motion.div>
+              </motion.div>
+
+              {/* Large Interactive Action Buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="flex flex-col sm:flex-row gap-6 justify-center items-center max-w-2xl mx-auto"
+              >
+                <motion.button
+                  whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleFindWork}
+                  className="group relative w-full sm:w-auto px-12 py-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl shadow-xl font-bold text-lg transition-all duration-300 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-blue-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative flex items-center justify-center space-x-3">
+                    <Briefcase className="w-6 h-6" />
+                    <span>{user?.type === 'worker' ? t('home.findJobs') : t('home.findWork')}</span>
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(34, 197, 94, 0.3)" }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePostJob}
+                  className="group relative w-full sm:w-auto px-12 py-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-xl font-bold text-lg transition-all duration-300 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-green-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <div className="relative flex items-center justify-center space-x-3">
+                    <Users className="w-6 h-6" />
+                    <span>{user?.type === 'employer' ? t('home.postJob') : t('home.hireWorkers')}</span>
+                  </div>
+                </motion.button>
+              </motion.div>
+
+              {/* Quick Contact for Rural Users */}
+              {!isAuthenticated && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8 }}
+                  className="mt-12 p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/30 max-w-md mx-auto"
+                >
+                  <div className="text-center">
+                    <Phone className="w-8 h-8 text-green-600 mx-auto mb-3" />
+                    <h3 className="font-semibold text-gray-900 mb-2">{t('support.needHelp')}</h3>
+                    <p className="text-sm text-gray-600 mb-4">{t('support.callSupport')}</p>
+                    <a
+                      href="tel:+911800123456"
+                      className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"
+                    >
+                      <Phone className="w-4 h-4 mr-2" />
+                      {t('support.phoneNumber')}
+                    </a>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* GrameenLink Profile */}
+      {renderGrameenLinkProfile()}
 
       {/* Shakti Score Section (for workers) */}
       {user?.type === 'worker' && shaktiScore !== null && (
@@ -206,7 +350,7 @@ function Homepage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center">
               <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-                Your Shakti Score
+                {t('home.yourShaktiScore')}
               </h2>
               <div className="mt-8 flex justify-center">
                 <motion.div 
@@ -216,24 +360,24 @@ function Homepage() {
                   className="bg-white rounded-full p-8 shadow-xl transform hover:scale-105 transition-transform duration-300"
                 >
                   <div className="text-6xl font-bold text-purple-600">{shaktiScore}</div>
-                  <p className="mt-2 text-gray-600">Your Trust Score</p>
+                  <p className="mt-2 text-gray-600">{t('home.yourTrustScore')}</p>
                 </motion.div>
               </div>
               <p className="mt-4 text-xl text-white">
-                Higher score means better job opportunities!
+                {t('home.higherScoreMessage')}
               </p>
               <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-white">Job Priority</h3>
-                  <p className="text-white/80">Get priority access to new job postings</p>
+                  <h3 className="text-lg font-semibold text-white">{t('home.jobPriority')}</h3>
+                  <p className="text-white/80">{t('home.jobPriorityDesc')}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-white">Trust Badge</h3>
-                  <p className="text-white/80">Earn employer trust with your score</p>
+                  <h3 className="text-lg font-semibold text-white">{t('home.trustBadge')}</h3>
+                  <p className="text-white/80">{t('home.trustBadgeDesc')}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-white">Better Pay</h3>
-                  <p className="text-white/80">Access to higher-paying opportunities</p>
+                  <h3 className="text-lg font-semibold text-white">{t('home.betterPay')}</h3>
+                  <p className="text-white/80">{t('home.betterPayDesc')}</p>
                 </div>
               </div>
             </div>
@@ -246,11 +390,11 @@ function Homepage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 flex items-center justify-center gap-3">
-              <span>🧑‍🌾</span> GrameenLink
+              <span>🧑‍🌾</span> {t('grameenlink.title')}
             </h2>
             <div className="w-24 h-1 bg-green-600 mx-auto my-4"></div>
             <p className="text-xl text-gray-700 max-w-3xl mx-auto font-medium">
-              Digital Identity for India's Working Hands
+              {t('grameenlink.subtitle')}
             </p>
           </div>
           
@@ -260,35 +404,35 @@ function Homepage() {
               className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
             >
               <div className="text-green-600 mb-4 text-3xl">🎤</div>
-              <h3 className="text-xl font-semibold mb-2">Voice-First Resumes</h3>
-              <p className="text-gray-600">Record your skills in local dialects, making it accessible to everyone regardless of literacy.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.voiceResumes')}</h3>
+              <p className="text-gray-600">{t('grameenlink.voiceResumesDesc')}</p>
             </motion.div>
-            
+
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
             >
               <div className="text-green-600 mb-4 text-3xl">🏷️</div>
-              <h3 className="text-xl font-semibold mb-2">Skill Tagging</h3>
-              <p className="text-gray-600">Simple skill identification without the need for formal education or documentation.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.skillTagging')}</h3>
+              <p className="text-gray-600">{t('grameenlink.skillTaggingDesc')}</p>
             </motion.div>
-            
+
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
             >
               <div className="text-green-600 mb-4 text-3xl">✅</div>
-              <h3 className="text-xl font-semibold mb-2">Local Verification</h3>
-              <p className="text-gray-600">Verified by trusted Panchayats and Self-Help Groups in your community.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.localVerification')}</h3>
+              <p className="text-gray-600">{t('grameenlink.localVerificationDesc')}</p>
             </motion.div>
-            
+
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
             >
               <div className="text-green-600 mb-4 text-3xl">🌟</div>
-              <h3 className="text-xl font-semibold mb-2">Local Pride</h3>
-              <p className="text-gray-600">Celebrate and showcase your local skills and traditional knowledge.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.localPride')}</h3>
+              <p className="text-gray-600">{t('grameenlink.localPrideDesc')}</p>
             </motion.div>
           </div>
         </div>
@@ -299,11 +443,11 @@ function Homepage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 flex items-center justify-center gap-3">
-              <span>📢</span> ShramSaathi
+              <span>📢</span> {t('shramSaathi.title')}
             </h2>
             <div className="w-24 h-1 bg-blue-600 mx-auto my-4"></div>
             <p className="text-xl text-gray-700 max-w-3xl mx-auto font-medium">
-              Local Work, Locally Found
+              {t('shramSaathi.subtitle')}
             </p>
           </div>
           
@@ -313,35 +457,35 @@ function Homepage() {
               className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
             >
               <div className="text-blue-600 mb-4 text-3xl">🏘️</div>
-              <h3 className="text-xl font-semibold mb-2">Hyperlocal Matching</h3>
-              <p className="text-gray-600">Find work opportunities right in your village or block, no need to travel far.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.hyperlocalMatching')}</h3>
+              <p className="text-gray-600">{t('shramSaathi.hyperlocalMatchingDesc')}</p>
             </motion.div>
-            
+
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
             >
               <div className="text-blue-600 mb-4 text-3xl">🤝</div>
-              <h3 className="text-xl font-semibold mb-2">Direct Connection</h3>
-              <p className="text-gray-600">Connect directly with employers, eliminating the need for middlemen.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.directConnection')}</h3>
+              <p className="text-gray-600">{t('shramSaathi.directConnectionDesc')}</p>
             </motion.div>
-            
+
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
             >
               <div className="text-blue-600 mb-4 text-3xl">💼</div>
-              <h3 className="text-xl font-semibold mb-2">Local Hiring</h3>
-              <p className="text-gray-600">Employers can easily find and hire workers from their own community.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.localHiring')}</h3>
+              <p className="text-gray-600">{t('shramSaathi.localHiringDesc')}</p>
             </motion.div>
-            
+
             <motion.div
               whileHover={{ scale: 1.05 }}
               className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
             >
               <div className="text-blue-600 mb-4 text-3xl">🌱</div>
-              <h3 className="text-xl font-semibold mb-2">Community Growth</h3>
-              <p className="text-gray-600">Strengthen your local economy by keeping work within the community.</p>
+              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.communityGrowth')}</h3>
+              <p className="text-gray-600">{t('shramSaathi.communityGrowthDesc')}</p>
             </motion.div>
           </div>
         </div>
@@ -352,10 +496,10 @@ function Homepage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-              {translate('Recent Job Opportunities')}
+              {t('recentJobs.title')}
             </h2>
             <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-              {translate('Check out the latest job postings in your area')}
+              {t('recentJobs.subtitle')}
             </p>
           </div>
 
@@ -389,7 +533,7 @@ function Homepage() {
                         }}
                         className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                       >
-                        View Details
+                        {t('recentJobs.viewDetails')}
                       </button>
                     </div>
                   </div>
@@ -398,7 +542,7 @@ function Homepage() {
             </div>
           ) : (
             <div className="mt-10 text-center">
-              <p className="text-gray-500">No recent jobs available at the moment.</p>
+              <p className="text-gray-500">{t('recentJobs.noJobs')}</p>
             </div>
           )}
         </div>

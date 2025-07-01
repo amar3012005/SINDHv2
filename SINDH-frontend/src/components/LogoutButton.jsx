@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useLogout } from '../hooks/useLogout';
-import { clearAllJobApplications } from '../utils/jobApplicationUtils';
+import { useUser } from '../context/UserContext';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 /**
  * A reusable logout button component that handles logout consistently
@@ -17,20 +18,36 @@ const LogoutButton = ({
   onLogoutComplete = null,
   variant = 'default' // 'default', 'text', 'icon'
 }) => {
-  const { logoutAndRefresh } = useLogout();
+  const { logoutUser } = useUser();
+  const navigate = useNavigate();
 
-  const handleLogout = () => {
-    // Clear job applications before logout
-    clearAllJobApplications();
-
-    // Execute any UI-related callbacks before logout
-    if (onLogoutComplete) {
-      onLogoutComplete();
+  const handleLogout = async () => {
+    try {
+      // Clear all local storage
+      localStorage.removeItem('user');
+      localStorage.removeItem('userType');
+      localStorage.removeItem('lastUserSync');
+      localStorage.removeItem('employerId');
+      localStorage.removeItem('worker');
+      localStorage.removeItem('employer');
+      
+      // Call context logout
+      await logoutUser();
+      
+      // Show success message
+      toast.success('Logged out successfully');
+      
+      // Navigate to home
+      navigate('/', { replace: true });
+      
+      // Call completion callback if provided
+      if (onLogoutComplete) {
+        onLogoutComplete();
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Error logging out');
     }
-    
-    // Use our custom hook to handle complete logout with page refresh
-    // This ensures the app starts completely fresh with no remnants of user data
-    logoutAndRefresh();
   };
 
   // Button styling based on variant

@@ -13,7 +13,7 @@ const jobSchema = new mongoose.Schema({
   },
   employer: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Employer',
     required: true,
     index: true
   },
@@ -63,7 +63,7 @@ const jobSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'closed', 'draft'],
+    enum: ['active', 'in-progress', 'completed', 'cancelled', 'draft'],
     default: 'active'
   },
   employerName: {
@@ -74,6 +74,22 @@ const jobSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  assignedWorker: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Worker'
+  },
+  workerDetails: {
+    name: String,
+    phone: String,
+    skills: [String],
+    rating: Number,
+    location: {
+      state: String,
+      city: String
+    }
+  },
+  jobStartDate: Date,
+  jobEndDate: Date,
   createdAt: {
     type: Date,
     default: Date.now
@@ -84,7 +100,7 @@ const jobSchema = new mongoose.Schema({
   }
 });
 
-// Index for text search
+// Text search index
 jobSchema.index({
   title: 'text',
   description: 'text',
@@ -93,4 +109,4 @@ jobSchema.index({
 
 const Job = mongoose.model('Job', jobSchema);
 
-module.exports = Job; 
+module.exports = Job;

@@ -1,5 +1,6 @@
 const Worker = require('../models/Worker');
 const Job = require('../models/Job');
+const JobApplication = require('../models/JobApplication');
 const NotificationService = require('./NotificationService');
 
 class JobMatchingService {
@@ -116,6 +117,104 @@ class JobMatchingService {
       throw error;
     }
   }
+
+  /**
+   * Accept a job and create job application
+   * @param {string} jobId - The ID of the job
+   * @param {string} workerId - The ID of the worker
+   * @returns {Promise<Object>} The created job application
+   */
+  async acceptJob(jobId, workerId) {
+    try {
+      // Get the job details
+      const job = await Job.findById(jobId);
+      if (!job) {
+        throw new Error('Job not found');
+      }
+
+      // Check if worker already applied
+      const existingApplication = await JobApplication.findOne({
+        job: jobId,
+        worker: workerId
+      });
+
+      if (existingApplication) {
+        throw new Error('Already applied to this job');
+      }
+
+      // Create new job application
+      const jobApplication = new JobApplication({
+        job: jobId,
+        worker: workerId,
+        employer: job.employerId,
+        status: 'accepted',
+        appliedAt: new Date()
+      });
+
+      await jobApplication.save();
+
+      // Notify employer
+      await NotificationService.notifyEmployer(job.employerId, {
+        type: 'JOB_APPLICATION',
+        message: `A worker has accepted your job posting: ${job.title}`,
+        jobId: jobId,
+        workerId: workerId
+      });
+
+      return jobApplication;
+    } catch (error) {
+      console.error('Error in acceptJob:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update job application status
+   * @param {string} applicationId - The ID of the job application
+   * @param {string} status - New status (pending, accepted, completed)
+   */
+  async updateJobStatus(applicationId, status) {
+    try {
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        throw new Error('Job application not found');
+      }
+
+      application.status = status;
+      if (status === 'completed') {
+        application.completedAt = new Date();
+      }
+      
+      await application.save();
+
+      // Notify relevant parties
+      const notificationMessage = this.getStatusNotificationMessage(status);
+      await NotificationService.notifyBoth(application.employer, application.worker, {
+        type: 'JOB_STATUS_UPDATE',
+        message: notificationMessage,
+        jobId: application.job,
+        status: status
+      });
+
+      return application;
+    } catch (error) {
+      console.error('Error in updateJobStatus:', error);
+      throw error;
+    }
+  }
+
+  getStatusNotificationMessage(status) {
+    switch (status) {
+      case 'accepted':
+        return 'Your job application has been accepted';
+      case 'completed':
+        return 'The job has been marked as completed';
+      case 'pending':
+        return 'Your job application is pending review';
+      default:
+        return 'Your job application status has been updated';
+    }
+  }
 }
 
-module.exports = new JobMatchingService(); 
+module.exports = new JobMatchingService();

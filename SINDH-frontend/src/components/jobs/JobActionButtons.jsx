@@ -1,134 +1,143 @@
 // Standalone component for job action buttons
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { ArrowRight, Check, Clock, X } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
-import { isWorker, getCurrentUser } from '../../utils/authUtils';
-import { hasAppliedForJob, saveJobApplication } from '../../utils/jobApplicationUtils';
 
-const JobActionButtons = ({ job, onAccept, onViewDetails, acceptedJobs }) => {
-  // Get both sources of user info
+const JobActionButtons = ({ job = {}, onStatusChange }) => {
+  const navigate = useNavigate();
   const { user } = useUser();
-  const localStorageUserType = localStorage.getItem('userType');
-  const localUser = JSON.parse(localStorage.getItem('user') || 'null');
-  
-  // Local state to track if job is applied for
-  const [jobApplied, setJobApplied] = useState(false);
-  
-  // Check if job is already accepted from the backend data
-  const isJobAcceptedFromBackend = Array.isArray(acceptedJobs) 
-    ? acceptedJobs.some(app => app.job?._id === job._id) 
-    : acceptedJobs[job._id];
-    
-  // Combined check - job is accepted if it's in backend data OR localStorage
-  const isJobAccepted = isJobAcceptedFromBackend || jobApplied;
-  
-  // Check localStorage on component mount
+  const [loading, setLoading] = useState(false);
+  const [acceptedJobs, setAcceptedJobs] = useState([]);
+
   useEffect(() => {
-    // Check if this job has been applied for in localStorage
-    const applied = hasAppliedForJob(job._id);
-    setJobApplied(applied);
-  }, [job._id]);
-  
-  // Debug output
-  console.log('JobActionButtons rendering:', {
-    'user from context': user,
-    'user from localStorage': localUser,
-    'userType from localStorage': localStorageUserType,
-    'isWorker() result': isWorker(),
-    'job accepted from backend': isJobAcceptedFromBackend,
-    'job applied locally': jobApplied,
-    'combined job accepted': isJobAccepted
-  });
-  
-  // Check if we should show worker actions
-  const showWorkerActions = (user && user.type === 'worker') || 
-                           (localUser && localUser.type === 'worker') || 
-                           localStorageUserType === 'worker' || 
-                           isWorker();
-  
-  // Determine button label
-  const acceptButtonLabel = isJobAccepted ? 'You have already applied for this job ✓' : 'Accept Job';
-  
-  // Button style - make it visually clear when already applied
-  const acceptButtonStyle = isJobAccepted
-    ? 'bg-green-500 opacity-90 cursor-not-allowed'
-    : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800';
-    
-  // Extra class to add checkmark icon when already applied
-  const iconClass = isJobAccepted ? 'flex items-center justify-center' : '';
-    
-  // Handle clicks
-  const handleAcceptClick = () => {
-    // If already applied, don't do anything
-    if (isJobAccepted) {
-      toast.info('You have already applied for this job');
+    const fetchAcceptedJobs = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const response = await fetch(`http://localhost:5000/api/job-applications/worker/${user.id}/current`);
+        const data = await response.json();
+        setAcceptedJobs(data.filter(app => app.status === 'accepted'));
+      } catch (error) {
+        console.error('Error fetching accepted jobs:', error);
+      }
+    };
+
+    fetchAcceptedJobs();
+  }, [user?.id]);
+
+  // Guard against undefined job
+  if (!job || !job._id) {
+    return null; // Or return a loading state/placeholder
+  }
+
+  const hasAcceptedJob = acceptedJobs.length > 0;
+  const isCurrentJobAccepted = acceptedJobs.some(j => j.job._id === job._id);
+
+  const handleApply = async () => {
+    if (!user) {
+      toast.info('Please login to apply for jobs');
+      navigate('/login');
       return;
     }
-    
-    if (!user && !getCurrentUser()) {
-      toast.error('Please login as a worker to accept jobs');
+
+    if (hasAcceptedJob && !isCurrentJobAccepted) {
+      toast.warn('You already have an accepted job. Complete it before applying to new ones.');
       return;
     }
-    
-    // Save to localStorage immediately
-    saveJobApplication(job._id, {
-      title: job.title,
-      company: job.company || job.companyName,
-      salary: job.salary,
-      location: job.location,
-      category: job.category,
-      employmentType: job.employmentType,
-      appliedAt: new Date().toISOString()
-    });
-    
-    // Update local state immediately to prevent multiple clicks
-    setJobApplied(true);
-    
-    // Call the passed-in accept handler that will talk to the backend
-    onAccept(job._id);
+
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/job-applications/apply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobId: job._id,
+          workerId: user.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Application submitted successfully!');
+        onStatusChange && onStatusChange('pending');
+      } else {
+        toast.error(data.message || 'Error submitting application');
+      }
+    } catch (error) {
+      console.error('Error applying for job:', error);
+      toast.error('Failed to submit application');
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  return (
-    <div className="mt-4 space-y-3">
-      {/* Debug info */}
-      <div className="text-xs text-gray-500">
-        User: {user ? `${user.name || 'Unknown'} (${user.type || 'No type'})` : 'Not logged in'}
-        | isWorker: {isWorker() ? 'Yes' : 'No'}
-      </div>
-      
-      {showWorkerActions && (
-        <motion.button
-          whileHover={isJobAccepted ? {} : { scale: 1.05 }}
-          whileTap={isJobAccepted ? {} : { scale: 0.95 }}
-          onClick={handleAcceptClick}
-          disabled={isJobAccepted}
-          className={`w-full px-4 py-2 rounded-md text-white font-medium ${acceptButtonStyle} ${iconClass}`}
-          aria-disabled={isJobAccepted}
-        >
-          {isJobAccepted ? (
-            <>
-              <span>You have already applied for this job</span>
-              <svg className="ml-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </>
-          ) : (
-            'Accept Job'
-          )}
-        </motion.button>
-      )}
-      
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => onViewDetails(job._id)}
-        className="w-full px-4 py-2 rounded-md text-blue-600 border-2 border-blue-600 font-medium hover:bg-blue-50"
-      >
-        View Details
-      </motion.button>
-    </div>
-  );
+
+  const renderButton = () => {
+    switch (job.status) {
+      case 'pending':
+        return (
+          <button
+            className="flex items-center space-x-2 px-4 py-2 bg-yellow-100 text-yellow-700 rounded-md"
+            disabled
+          >
+            <Clock className="w-4 h-4" />
+            <span>Application Pending</span>
+          </button>
+        );
+      case 'accepted':
+        return (
+          <button
+            className="flex items-center space-x-2 px-4 py-2 bg-green-100 text-green-700 rounded-md"
+            disabled
+          >
+            <Check className="w-4 h-4" />
+            <span>Accepted</span>
+          </button>
+        );
+      case 'rejected':
+        return (
+          <button
+            className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-700 rounded-md"
+            disabled
+          >
+            <X className="w-4 h-4" />
+            <span>Not Selected</span>
+          </button>
+        );
+      default:
+        return (
+          <button
+            onClick={handleApply}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span>{loading ? 'Applying...' : 'Apply Now'}</span>
+          </button>
+        );
+    }
+  };
+
+  return <div className="flex justify-end">{renderButton()}</div>;
+};
+
+JobActionButtons.propTypes = {
+  job: PropTypes.shape({
+    _id: PropTypes.string.isRequired,
+    status: PropTypes.string,
+    title: PropTypes.string,
+  }),
+  onStatusChange: PropTypes.func,
+};
+
+JobActionButtons.defaultProps = {
+  job: {},
+  onStatusChange: () => {},
 };
 
 export default JobActionButtons;

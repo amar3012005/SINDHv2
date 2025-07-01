@@ -58,19 +58,55 @@ export const saveJobApplication = (jobId, jobData = {}) => {
     // Prepare application data with timestamp
     const applicationData = {
       appliedAt: new Date().toISOString(),
-      status: 'pending',
+      status: jobData.status || 'pending',
+      employer: jobData.employer || null,
+      job: jobData.job || null,
+      acceptedAt: jobData.status === 'accepted' ? new Date().toISOString() : null,
+      completedAt: jobData.status === 'completed' ? new Date().toISOString() : null,
       ...jobData
     };
     
-    // Store in both locations
-    applications[jobId] = applicationData;
-    currentApps[jobId] = applicationData;
+    // Store in appropriate locations based on status
+    if (applicationData.status === 'completed') {
+      const pastJobs = getPastJobs();
+      pastJobs[jobId] = applicationData;
+      localStorage.setItem(PAST_JOBS_KEY, JSON.stringify(pastJobs));
+      
+      // Remove from current applications if it exists
+      if (currentApps[jobId]) {
+        delete currentApps[jobId];
+        localStorage.setItem(CURRENT_APPLICATIONS_KEY, JSON.stringify(currentApps));
+      }
+    } else {
+      // Store in both active locations
+      applications[jobId] = applicationData;
+      currentApps[jobId] = applicationData;
+      
+      // Save to localStorage
+      localStorage.setItem(JOB_APPLICATIONS_KEY, JSON.stringify(applications));
+      localStorage.setItem(CURRENT_APPLICATIONS_KEY, JSON.stringify(currentApps));
+    }
     
-    // Save to localStorage
-    localStorage.setItem(JOB_APPLICATIONS_KEY, JSON.stringify(applications));
-    localStorage.setItem(CURRENT_APPLICATIONS_KEY, JSON.stringify(currentApps));
+    console.log(`Job application for ${jobId} saved to localStorage with status: ${applicationData.status}`);
     
-    console.log(`Job application for ${jobId} saved to localStorage`);
+    // Update user's job history in localStorage
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.id) {
+      if (!user.jobHistory) {
+        user.jobHistory = { current: [], past: [] };
+      }
+      
+      // Update job history based on status
+      if (applicationData.status === 'completed') {
+        user.jobHistory.past = user.jobHistory.past.filter(job => job._id !== jobId);
+        user.jobHistory.past.push(applicationData);
+      } else {
+        user.jobHistory.current = user.jobHistory.current.filter(job => job._id !== jobId);
+        user.jobHistory.current.push(applicationData);
+      }
+      
+      localStorage.setItem('user', JSON.stringify(user));
+    }
   } catch (e) {
     console.error('Error saving job application to localStorage:', e);
   }

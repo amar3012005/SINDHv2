@@ -1,6 +1,6 @@
-# SINDH Backend
+# I N D U S Backend
 
-A robust Node.js backend service for the SINDH platform, providing APIs for connecting daily wage workers with employers.
+A robust Node.js backend service for the I N D U S platform, providing APIs for connecting daily wage workers with employers.
 
 ## 🚀 Features
 
@@ -29,7 +29,7 @@ A robust Node.js backend service for the SINDH platform, providing APIs for conn
 1. Clone the repository:
 ```bash
 git clone [repository-url]
-cd SINDHbackend
+cd I N D U Sbackend
 ```
 
 2. Install dependencies:
@@ -54,7 +54,7 @@ npm run dev
 ## 🏗️ Project Structure
 
 ```
-SINDHbackend/
+I N D U Sbackend/
 ├── server/
 │   ├── src/
 │   │   ├── config/        # Configuration files
