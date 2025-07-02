@@ -18,22 +18,23 @@ const AvailableJobs = () => {
   const { user, acceptedJobs: acceptedJobsFromContext, setAcceptedJobs, isLoadingUser } = useUser();
   const { t } = useTranslation();
   const { userType, isLoggedIn, employerId, jobCounts, setJobCounts, activeJobs, setActiveJobs, updateJobStats } = useGlobalState();
-  
-  // State variables for controlling the component
+  // Backend-first state management - similar to MyApplications.jsx
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState([]);
   const [error, setError] = useState(null);
+  const [applications, setApplications] = useState([]);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [cancellingJobIds, setCancellingJobIds] = useState(new Set());
+  const [acceptingJobIds, setAcceptingJobIds] = useState(new Set());
+  
+  // Legacy state variables for compatibility
   const [applyingToJobId, setApplyingToJobId] = useState(null);
   const [pollingInterval, setPollingInterval] = useState(null);
   const [jobApplications, setJobApplications] = useState({});
-  const [applications, setApplications] = useState([]);
   const [applicationId, setApplicationId] = useState(null);
   const [isCancelling, setIsCancelling] = useState(false);
-  
-  // Add missing state variables
   const [acceptedJobIds, setAcceptedJobIds] = useState(new Set());
-  const [acceptingJobIds, setAcceptingJobIds] = useState(new Set());
-  const [cancellingJobIds, setCancellingJobIds] = useState(new Set());
   const [filters, setFilters] = useState(() => {
     const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
     // Only set location filter from user profile, leave others empty
@@ -52,158 +53,263 @@ const AvailableJobs = () => {
     return saved ? JSON.parse(saved) : {};
   });
 
-  // DEBUGGING: Set initial test jobs
-  const [testMode, setTestMode] = useState(false);
-
   // State for editing jobs
   const [editingJobId, setEditingJobId] = useState(null);
   const [editJobData, setEditJobData] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Add new state for job details modal
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [showJobDetails, setShowJobDetails] = useState(false);
-
-  // Enhanced fetchJobs function that integrates with job application database
+  // Backend-first fetchJobs function with location-based filtering
   const fetchJobs = useCallback(async () => {
     try {
-      // First try to load jobs from localStorage to show immediately
-      const localJobs = JSON.parse(localStorage.getItem('availableJobs') || '[]');
-      if (Array.isArray(localJobs) && localJobs.length > 0) {
-        console.log('Loaded jobs from localStorage:', localJobs.length);
-        setJobs(localJobs);
-        
-        // Apply local filtering
-        if (user?.type === 'worker' && user?.location?.state) {
-          const userLocation = user.location.state.toLowerCase();
-          const locationJobs = localJobs.filter(job =>
-            job.location?.state?.toLowerCase().includes(userLocation)
-          );
-          const otherJobs = localJobs.filter(job =>
-            !job.location?.state?.toLowerCase().includes(userLocation)
-          );
-          setLocationBasedJobs(locationJobs);
-          setOtherLocationJobs(otherJobs);
-        } else {
-          setLocationBasedJobs(localJobs);
-          setOtherLocationJobs([]);
-        }
-        
-        // Continue with network fetch in the background
-        setLoading(false);
-      } else {
-        setLoading(true);
+      setLoading(true);
+      setError(null);
+      
+      const workerId = user?.id || JSON.parse(localStorage.getItem('user'))?.id;
+      const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      console.log('=== FRONTEND: Starting backend-first job fetch ===');
+      console.log('FRONTEND: User ID:', workerId);
+      console.log('FRONTEND: User location:', userProfile?.location);
+      
+      // Build URL with query parameters including location filter
+      let jobsUrl = getApiUrl('/api/jobs');
+      const queryParams = new URLSearchParams();
+      
+      if (workerId) {
+        queryParams.append('workerId', workerId);
       }
       
-      // Prepare for database fetches
-      const userId = user?.id || JSON.parse(localStorage.getItem('user'))?.id;
-      
-      // Fetch jobs and applications in parallel for better performance
-      const [jobResponse, applicationResponse] = await Promise.all([
-        // Fetch available jobs
-        fetch(`${getApiUrl('/api/jobs')}?${new URLSearchParams(filters).toString()}`),
-        
-        // Fetch user's current applications if user is logged in
-        userId ? fetch(getApiUrl(`/api/job-applications/worker/${userId}/current`)) : Promise.resolve(null)
-      ]);
-
-      if (!jobResponse.ok) {
-        console.error('Server response not ok:', jobResponse.status, jobResponse.statusText);
-        throw new Error(`Server error: ${jobResponse.status}`);
+      // Add location filter from user profile or filters
+      const userLocation = filters.location || userProfile?.location?.state;
+      if (userLocation) {
+        queryParams.append('location', userLocation);
       }
-
-      // Process job data
-      const jobData = await jobResponse.json();
-      console.log('Fetched jobs with filters:', jobData.length);
-      console.log('Raw job data:', jobData);
-
-      // Process application data if available
-      let applications = [];
-      if (applicationResponse && applicationResponse.ok) {
-        applications = await applicationResponse.json();
-        console.log('Fetched current applications:', applications.length);
-        
-        // Update job applications state with fetched data
-        const formattedApplications = applications.reduce((acc, app) => {
-          if (app.job && app.job._id) {
-            acc[app.job._id] = app;
-          }
-          return acc;
-        }, {});
-        
-        setJobApplications(formattedApplications);
-        
-        // Update accepted jobs with fetched applications
-        if (applications.length > 0) {
-          setAcceptedJobs(applications.map(app => ({
-            _id: app._id,
-            job: app.job,
-            status: app.status,
-            applicationId: app._id,
-            appliedAt: app.appliedAt || app.createdAt
-          })));
-          
-          // Update accepted job IDs set
-          const jobIds = new Set(applications.map(app => app.job?._id).filter(Boolean));
-          setAcceptedJobIds(jobIds);
-        }
-      }
-
-      // Filter and enrich jobs with application status
-      let filteredJobs = jobData.filter(job => ['active', 'in-progress'].includes(job.status));
-      console.log('Filtered jobs after status filter:', filteredJobs.length);
-      console.log('Filtered jobs data:', filteredJobs);
       
-      // Enrich jobs with application data
-      filteredJobs = filteredJobs.map(job => {
-        const matchingApp = applications.find(app => app.job?._id === job._id);
-        if (matchingApp) {
-          return {
-            ...job,
-            application: matchingApp,
-            applicationStatus: matchingApp.status,
-            hasApplied: true
-          };
+      // Add other filters
+      if (filters.category) queryParams.append('category', filters.category);
+      if (filters.salary) queryParams.append('minSalary', filters.salary);
+      if (filters.employmentType) queryParams.append('employmentType', filters.employmentType);
+      
+      if (queryParams.toString()) {
+        jobsUrl += `?${queryParams.toString()}`;
+      }
+      
+      console.log('FRONTEND: Fetching jobs from URL:', jobsUrl);
+      
+      // Fetch jobs from backend
+      const jobsResponse = await fetch(jobsUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
-        return job;
       });
-      
-      // Deduplicate jobs before setting state
-      filteredJobs = deduplicateJobs(filteredJobs);
-      console.log('Jobs after deduplication:', filteredJobs.length);
-      setJobs(filteredJobs);
-      console.log('Jobs set in state:', filteredJobs);
-      
-      // Save to localStorage for offline access
-      localStorage.setItem('availableJobs', JSON.stringify(filteredJobs));
 
-      if (user?.type === 'worker' && user?.location?.state) {
-        const userLocation = user.location.state.toLowerCase();
-        const locationJobs = filteredJobs.filter(job =>
-          job.location?.state?.toLowerCase().includes(userLocation)
-        );
-        
-        const otherJobs = filteredJobs.filter(job =>
-          !job.location?.state?.toLowerCase().includes(userLocation)
-        );
-        
-        // Set deduplicated job lists
-        setLocationBasedJobs(deduplicateJobs(locationJobs));
-        setOtherLocationJobs(deduplicateJobs(otherJobs));
-      } else {
-        setLocationBasedJobs(deduplicateJobs(filteredJobs));
-        setOtherLocationJobs([]);
+      if (!jobsResponse.ok) {
+        const errorText = await jobsResponse.text();
+        console.error('FRONTEND: Jobs fetch error:', errorText);
+        throw new Error(`Failed to fetch jobs: ${jobsResponse.status}`);
       }
+
+      const jobsData = await jobsResponse.json();
+      console.log('FRONTEND: Raw jobs response:', jobsData);
+      
+      // Handle different response formats
+      let jobsArray = [];
+      if (jobsData.success && Array.isArray(jobsData.data)) {
+        jobsArray = jobsData.data;
+      } else if (Array.isArray(jobsData)) {
+        jobsArray = jobsData;
+      } else if (jobsData.data && Array.isArray(jobsData.data)) {
+        jobsArray = jobsData.data;
+      }
+      
+      console.log('FRONTEND: Processed jobs array:', jobsArray.length);
+
+      // Fetch current applications if user is authenticated
+      let applicationsArray = [];
+      if (workerId) {
+        try {
+          console.log('FRONTEND: Fetching applications for worker:', workerId);
+          
+          const applicationsResponse = await fetch(getApiUrl(`/api/job-applications/worker/${workerId}/current`), {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (applicationsResponse.ok) {
+            const applicationsData = await applicationsResponse.json();
+            console.log('FRONTEND: Raw applications response:', applicationsData);
+            
+            // Handle different response formats
+            if (applicationsData.success && Array.isArray(applicationsData.data)) {
+              applicationsArray = applicationsData.data;
+            } else if (Array.isArray(applicationsData)) {
+              applicationsArray = applicationsData;
+            } else if (applicationsData.data && Array.isArray(applicationsData.data)) {
+              applicationsArray = applicationsData.data;
+            }
+            
+            console.log('FRONTEND: Processed applications array:', applicationsArray.length);
+          } else {
+            console.warn('FRONTEND: Failed to fetch applications:', applicationsResponse.status);
+          }
+        } catch (error) {
+          console.error('FRONTEND: Error fetching applications:', error);
+          // Continue without applications data
+        }
+      }
+
+      // Process applications
+      const processedApplications = applicationsArray.map((app, index) => {
+        return {
+          _id: app._id || `app-${index}`,
+          status: app.status || 'pending',
+          appliedAt: app.appliedAt || app.createdAt || new Date().toISOString(),
+          job: {
+            _id: app.job?._id || `job-${index}`,
+            title: app.job?.title || 'Job Title Not Available',
+            companyName: app.job?.companyName || app.job?.company || 'Company Not Available',
+            location: {
+              city: app.job?.location?.city || 'City Not Available',
+              state: app.job?.location?.state || 'State Not Available'
+            },
+            salary: app.job?.salary || 'Salary Not Specified',
+            category: app.job?.category || 'General',
+            employmentType: app.job?.employmentType || 'Full-time'
+          },
+          worker: app.worker || null,
+          employer: app.employer || null
+        };
+      });
+
+      // Update applications state
+      setApplications(processedApplications);
+      setAcceptedJobs(processedApplications);
+      
+      // Create applications map for quick lookup
+      const applicationsMap = processedApplications.reduce((acc, app) => {
+        if (app.job && app.job._id) {
+          acc[app.job._id] = app;
+        }
+        return acc;
+      }, {});
+      setJobApplications(applicationsMap);
+      
+      // Update accepted job IDs
+      const acceptedJobIds = new Set(processedApplications.map(app => app.job?._id).filter(Boolean));
+      setAcceptedJobIds(acceptedJobIds);
+
+      // Process jobs data
+      const processedJobs = jobsArray.map((job, index) => {
+        // Find matching application
+        const matchingApp = processedApplications.find(app => app.job?._id === job._id);
+        
+        return {
+          _id: job._id || `job-${index}`,
+          title: job.title || 'Job Title Not Available',
+          companyName: job.companyName || job.company || 'Company Not Available',
+          location: {
+            city: job.location?.city || 'City Not Available',
+            state: job.location?.state || 'State Not Available',
+            street: job.location?.street || '',
+            pincode: job.location?.pincode || '',
+            type: job.location?.type || 'onsite'
+          },
+          salary: job.salary || 'Salary Not Specified',
+          category: job.category || 'General',
+          employmentType: job.employmentType || 'Full-time',
+          status: job.status || 'active',
+          description: job.description || 'No description available',
+          requirements: job.requirements || '',
+          skillsRequired: job.skillsRequired || [],
+          createdAt: job.createdAt || new Date().toISOString(),
+          urgency: job.urgency || 'Normal',
+          // Include application data if exists
+          application: matchingApp || null,
+          applicationStatus: matchingApp?.status || null,
+          hasApplied: !!matchingApp,
+          applicationId: matchingApp?._id || null
+        };
+      });
+
+      console.log('FRONTEND: Final processed jobs:', processedJobs);
+
+      // Filter only active jobs
+      const activeJobs = processedJobs.filter(job => job.status === 'active');
+      console.log('FRONTEND: Active jobs:', activeJobs.length);
+
+      // Location-based job categorization
+      if (user?.type === 'worker' && userProfile?.location?.state) {
+        const userState = userProfile.location.state.toLowerCase();
+        const userCity = userProfile.location.city?.toLowerCase();
+        
+        console.log('FRONTEND: User location for filtering:', { state: userState, city: userCity });
+        
+        // Categorize jobs by location proximity
+        const sameStateJobs = [];
+        const sameCityJobs = [];
+        const otherLocationJobs = [];
+        
+        activeJobs.forEach(job => {
+          const jobState = job.location?.state?.toLowerCase() || '';
+          const jobCity = job.location?.city?.toLowerCase() || '';
+          
+          if (userCity && jobCity === userCity && jobState === userState) {
+            // Same city jobs (highest priority)
+            sameCityJobs.push(job);
+          } else if (jobState === userState) {
+            // Same state but different city
+            sameStateJobs.push(job);
+          } else {
+            // Different state
+            otherLocationJobs.push(job);
+          }
+        });
+        
+        console.log('FRONTEND: Location-based job categorization:', {
+          sameCity: sameCityJobs.length,
+          sameState: sameStateJobs.length,
+          otherLocations: otherLocationJobs.length
+        });
+        
+        // Combine prioritized jobs: same city first, then same state, then others
+        const prioritizedJobs = [
+          ...sameCityJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+          ...sameStateJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+          ...otherLocationJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        ];
+        
+        // Set location-based job lists
+        setLocationBasedJobs([...sameCityJobs, ...sameStateJobs]);
+        setOtherLocationJobs(otherLocationJobs);
+        setJobs(prioritizedJobs);
+        
+      } else {
+        // For non-workers or users without location, show all jobs
+        const sortedJobs = activeJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setLocationBasedJobs(sortedJobs);
+        setOtherLocationJobs([]);
+        setJobs(sortedJobs);
+      }
+
+      setError(null);
+      setLastUpdated(new Date());
+      
+      console.log('FRONTEND: Jobs state updated successfully');
+      
     } catch (error) {
-      console.error('Error fetching jobs:', error);
-      toast.error('Failed to load jobs. Please try again.');
-      setJobs([]);
-      setLocationBasedJobs([]);
-      setOtherLocationJobs([]);
+      console.error('FRONTEND: Error fetching jobs:', error);
+      setError(error.message || 'Failed to load jobs. Please try again later.');
+      // Don't clear existing data on error to maintain last known good state
     } finally {
       setLoading(false);
+      setIsRetrying(false);
     }
-  }, [filters, user]);
+  }, [user, filters]);
 
   // We no longer need a separate fetchJobApplications function as it's integrated in fetchJobs
   const fetchJobApplications = useCallback(async () => {
@@ -256,24 +362,20 @@ const AvailableJobs = () => {
     }
   }, [user?.id, fetchJobs]);
 
-  // Set up polling with integrated fetch approach
+  // Backend-first polling setup similar to MyApplications.jsx
   useEffect(() => {
-    // Initial fetch
     fetchJobs();
     
-    // Set up polling with longer intervals (10 seconds) to reduce chances of race conditions
-    const jobsInterval = setInterval(() => {
-      console.log('Running scheduled job fetch with application integration');
-      fetchJobs();
-    }, 10000);
+    // Set up polling to refresh jobs every 30 seconds
+    const interval = setInterval(fetchJobs, 30000);
     
-    setPollingInterval(jobsInterval);
-
-    // Cleanup on unmount
-    return () => {
-      clearInterval(jobsInterval);
-    };
+    return () => clearInterval(interval);
   }, [fetchJobs]);
+
+  const handleRetry = () => {
+    setIsRetrying(true);
+    fetchJobs();
+  };
 
   // Replace the existing useEffect for setting default filters with this simpler version
   useEffect(() => {
@@ -300,155 +402,28 @@ const AvailableJobs = () => {
   console.log('AvailableJobs: Rendering with user:', user, 'isLoadingUser:', isLoadingUser);
   console.log('AvailableJobs: user type =', user?.type);
   console.log('AvailableJobs: localStorage user =', JSON.parse(localStorage.getItem('user') || '{}'));
-  console.log('AvailableJobs: Current jobs state =', jobs);
-  console.log('AvailableJobs: Jobs length =', jobs.length);
-  console.log('AvailableJobs: Loading state =', loading);
-  console.log('AvailableJobs: Error state =', error);
-
-  // Add an alert for debugging
-  if (jobs.length > 0) {
-    console.log('JOBS FOUND:', jobs.length);
-  }
   console.log('AvailableJobs: Should show Accept button =', Boolean(user && user.type === 'worker'));
 
   // fetchJobs already has filters in its closure via useCallback
   useEffect(() => {
     console.log('AvailableJobs useEffect: user changed, fetching jobs.', { user, isLoadingUser });
     fetchJobs();
-    
-    // Add a simple test to set jobs directly
-    setTimeout(() => {
-      console.log('Setting test job after 2 seconds...');
-      setJobs([{
-        _id: 'test-job-1',
-        title: 'Test Job',
-        companyName: 'Test Company',
-        status: 'active',
-        salary: 1000,
-        location: { city: 'Test City', state: 'Test State' },
-        description: 'This is a test job to verify the UI is working'
-      }]);
-    }, 2000);
   }, [fetchJobs]);
   
-  // Helper function to save job application to local storage
-  const saveJobApplication = (jobId, application) => {
-    try {
-      const existingApplications = JSON.parse(localStorage.getItem('jobApplications') || '{}');
-      existingApplications[jobId] = application;
-      localStorage.setItem('jobApplications', JSON.stringify(existingApplications));
-      console.log('Saved job application to local storage:', { jobId, application });
-    } catch (error) {
-      console.error('Error saving job application to local storage:', error);
-    }
-  };
   
-  // Helper function to get job application from local storage
-  const getJobApplication = (jobId) => {
-    try {
-      const existingApplications = JSON.parse(localStorage.getItem('jobApplications') || '{}');
-      return existingApplications[jobId];
-    } catch (error) {
-      console.error('Error getting job application from local storage:', error);
-      return null;
-    }
-  };
+
   
-  // Helper function to remove job application from local storage
-  const removeJobApplication = (jobId) => {
+
+  // Backend-first cancel application function similar to MyApplications.jsx
+  const handleCancelApplication = async (application) => {
     try {
-      const existingApplications = JSON.parse(localStorage.getItem('jobApplications') || '{}');
-      if (existingApplications[jobId]) {
-        delete existingApplications[jobId];
-        localStorage.setItem('jobApplications', JSON.stringify(existingApplications));
-        console.log('Removed job application from local storage:', jobId);
-      }
-    } catch (error) {
-      console.error('Error removing job application from local storage:', error);
-    }
-  };
-
-  // Load local job applications from localStorage
-  useEffect(() => {
-    try {
-      // Load job applications from localStorage
-      const localApplications = getJobApplications();
-      console.log('Loaded local job applications:', localApplications);
+      const applicationId = application._id;
+      const jobId = application.job._id;
       
-      // If we already have backend data, don't override it
-      if (!acceptedJobsFromContext || Object.keys(acceptedJobsFromContext).length === 0) {
-        const formattedApplications = {};
-        
-        // Convert to the format expected by components
-        Object.keys(localApplications).forEach(jobId => {
-          formattedApplications[jobId] = true;
-        });
-        
-        // Only set if we have data to avoid overriding backend data
-        if (Object.keys(formattedApplications).length > 0) {
-          setAcceptedJobs(prev => {
-            // If previous is an array, merge with array structure
-            if (Array.isArray(prev)) {
-              const newApps = Object.keys(formattedApplications).map(jobId => ({
-                job: { _id: jobId },
-                status: 'pending',
-                appliedLocally: true
-              }));
-              
-              // Filter out duplicates
-              const existingIds = prev.map(app => app.job?._id);
-              const uniqueNewApps = newApps.filter(app => !existingIds.includes(app.job._id));
-              
-              return [...prev, ...uniqueNewApps];
-            }
-            
-            // Otherwise merge as object
-            return { ...prev, ...formattedApplications };
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error loading localStorage job applications:', error);
-    }
-  }, []);
-
-  // Function to cancel a job application
-  const handleCancelApplication = async (job) => {
-    setCancellingJobIds(prev => new Set([...prev, job._id]));
-    
-    try {
-      console.log('Attempting to cancel application for job:', job);
+      setCancellingJobIds(prev => new Set([...prev, jobId]));
       
-      // First, check if job has the application ID directly
-      let applicationId = job.applicationId;
+      console.log('Cancelling application:', applicationId);
       
-      // If not, check fetched applications from database
-      if (!applicationId) {
-        const applicationFromState = jobApplications[job._id];
-        applicationId = applicationFromState?._id;
-        console.log('Found application ID in database data:', applicationId);
-      }
-      
-      // If still not found, try localStorage (fallback)
-      if (!applicationId) {
-        const applications = JSON.parse(localStorage.getItem('jobApplications') || '{}');
-        const application = applications[job._id];
-        applicationId = application?.applicationId;
-        console.log('Fallback - found application in localStorage:', applicationId);
-      }
-
-      if (!applicationId) {
-        console.error('Application ID not found for job:', job._id);
-        toast.error('Unable to find application details');
-        setCancellingJobIds(prev => {
-          const newSet = new Set([...prev]);
-          newSet.delete(job._id);
-          return newSet;
-        });
-        return;
-      }
-
-      console.log('Cancelling application with ID:', applicationId);
       const response = await fetch(getApiUrl(`/api/job-applications/${applicationId}`), {
         method: 'DELETE',
         headers: {
@@ -456,88 +431,15 @@ const AvailableJobs = () => {
         }
       });
 
-      // Check for errors in the response
       if (!response.ok) {
-        let errorMessage = 'Failed to cancel application';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          // If the response isn't JSON, just use the default message
-        }
-        throw new Error(errorMessage);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to cancel application');
       }
 
-      // Parse the successful response
-      const responseData = await response.json();
-      console.log('Cancel response data:', responseData);
-
-      // COMPREHENSIVE RESET OF APPLICATION STATE
-      // 1. Remove from local storage
-      removeJobApplication(job._id);
-      
-      // 2. Remove from acceptedJobs context state
-      setAcceptedJobs(prev => 
-        Array.isArray(prev) 
-          ? prev.filter(app => app.job?._id !== job._id) 
-          : prev
-      );
-      
-      // 3. Remove from acceptedJobIds set
-      setAcceptedJobIds(prev => {
-        const newSet = new Set([...prev]);
-        newSet.delete(job._id);
-        return newSet;
-      });
-      
-      // 4. Update all local job state collections
-      const resetJobState = (jobObj) => ({
-        ...jobObj,
-        status: 'active',
-        isPending: false,
-        isInProgress: false,
-        isApplied: false,
-        hasApplied: false,
-        applicationId: null,
-        application: null
-      });
-      
-      // Update main jobs list
-      setJobs(prevJobs => prevJobs.map(j => 
-        j._id === job._id ? resetJobState(j) : j
-      ));
-      
-      // Update location-based job lists
-      setLocationBasedJobs(prev => prev.map(j => 
-        j._id === job._id ? resetJobState(j) : j
-      ));
-      
-      setOtherLocationJobs(prev => prev.map(j => 
-        j._id === job._id ? resetJobState(j) : j
-      ));
-      
-      // 5. Clean up any pending job records
-      setPendingJobs(prev => {
-        const updated = { ...prev };
-        delete updated[job._id];
-        localStorage.setItem('pendingJobs', JSON.stringify(updated));
-        return updated;
-      });
-
-      // 6. Remove from job applications state
-      setJobApplications(prev => {
-        const newJobApps = { ...prev };
-        delete newJobApps[job._id];
-        return newJobApps;
-      });
-      
       toast.success('Application cancelled successfully');
       
-      // 7. Fetch updated job list to ensure UI reflects server state
-      setTimeout(() => {
-        fetchJobs();
-        fetchJobApplications();
-      }, 500);
+      // Refresh data after a short delay similar to MyApplications.jsx
+      setTimeout(fetchJobs, 1000);
       
     } catch (error) {
       console.error('Error cancelling application:', error);
@@ -545,7 +447,7 @@ const AvailableJobs = () => {
     } finally {
       setCancellingJobIds(prev => {
         const newSet = new Set([...prev]);
-        newSet.delete(job._id);
+        newSet.delete(application.job._id);
         return newSet;
       });
     }
@@ -575,7 +477,7 @@ const AvailableJobs = () => {
     return applications.find(app => app.job?._id === jobId);
   };
 
-  // Update the handleApplyForJob function - fix server communication
+  // Update the handleApplyForJob function - fix acceptedJobs references
   const handleApplyForJob = async (job) => {
     // Add job to accepting state
     setAcceptingJobIds(prev => new Set([...prev, job._id]));
@@ -590,7 +492,7 @@ const AvailableJobs = () => {
         return;
       }
 
-      // Prepare data for server first
+      // Prepare data for server with proper structure
       const applicationData = {
         jobId: job._id,
         workerId: userData.id,
@@ -598,16 +500,18 @@ const AvailableJobs = () => {
         workerDetails: {
           name: userData.name,
           phone: userData.phone,
+          email: userData.email || '',
           skills: userData.skills || [],
           experience: userData.experience || '',
           location: userData.location || {},
+          // Fix rating - send only the number, not the object
           rating: userData.rating?.average || 0
         }
       };
 
       console.log('Sending job application to server:', applicationData);
       
-      // Send to server FIRST before updating UI
+      // Send to server FIRST and wait for response before updating UI
       const response = await fetch(getApiUrl('/api/job-applications/apply'), {
         method: 'POST',
         headers: {
@@ -623,6 +527,7 @@ const AvailableJobs = () => {
         let errorMessage = 'Failed to submit application';
         try {
           const errorData = await response.json();
+          console.error('Server error response:', errorData);
           errorMessage = errorData.message || errorData.error || errorMessage;
         } catch (e) {
           // If response isn't JSON, use status text
@@ -643,6 +548,9 @@ const AvailableJobs = () => {
         throw new Error('Server did not return application ID');
       }
 
+      // Only update UI state AFTER successful server response
+      console.log('Application created successfully, updating UI state');
+      
       // Create local application record with server data
       const localApplication = {
         _id: applicationId,
@@ -654,59 +562,9 @@ const AvailableJobs = () => {
         applicationId: applicationId
       };
       
-      // Save to local storage
-      saveJobApplication(job._id, localApplication);
-      
-      // Update UI state with server data
-      setAcceptedJobs(prev => {
-        const newApplication = {
-          _id: applicationId,
-          job: { _id: job._id, ...job },
-          status: serverApplication.status || 'pending',
-          appliedAt: serverApplication.appliedAt || new Date().toISOString(),
-          applicationId: applicationId
-        };
-        return Array.isArray(prev) ? [...prev, newApplication] : [newApplication];
-      });
-      
-      // Add to job applications state
-      setJobApplications(prev => ({
-        ...prev,
-        [job._id]: localApplication
-      }));
-      
-      // Add job ID to accepted jobs set
-      setAcceptedJobIds(prev => new Set([...prev, job._id]));
-      
-      // Update the specific job in jobs list
-      setJobs(prevJobs => prevJobs.map(j => {
-        if (j._id === job._id) {
-          return { 
-            ...j, 
-            hasApplied: true,
-            application: localApplication,
-            applicationStatus: serverApplication.status || 'pending'
-          };
-        }
-        return j;
-      }));
-      
-      // Update location-based jobs
-      setLocationBasedJobs(prev => prev.map(j => 
-        j._id === job._id 
-          ? { ...j, hasApplied: true, application: localApplication } 
-          : j
-      ));
-      
-      setOtherLocationJobs(prev => prev.map(j => 
-        j._id === job._id 
-          ? { ...j, hasApplied: true, application: localApplication } 
-          : j
-      ));
-      
       toast.success('Application submitted successfully! The employer will review your application.');
       
-      // Refresh data after a short delay
+      // Refresh data after a short delay to sync with backend
       setTimeout(() => {
         fetchJobs();
         fetchJobApplications();
@@ -715,22 +573,6 @@ const AvailableJobs = () => {
     } catch (error) {
       console.error('Application error:', error);
       
-      // Remove from local storage if it was saved
-      removeJobApplication(job._id);
-      
-      // Reset UI state
-      setAcceptedJobs(prev => 
-        Array.isArray(prev) 
-          ? prev.filter(app => app.job?._id !== job._id) 
-          : prev
-      );
-      
-      setAcceptedJobIds(prev => {
-        const newSet = new Set([...prev]);
-        newSet.delete(job._id);
-        return newSet;
-      });
-      
       // Show appropriate error message
       if (error.message.includes('already applied')) {
         toast.error('You have already applied for this job');
@@ -738,6 +580,8 @@ const AvailableJobs = () => {
         toast.error('Job not found or no longer available');
       } else if (error.message.includes('network') || error.message.includes('fetch')) {
         toast.error('Network error. Please check your connection and try again.');
+      } else if (error.message.includes('validation failed')) {
+        toast.error('Application data is invalid. Please try again.');
       } else {
         toast.error(error.message || 'Failed to submit application. Please try again.');
       }
@@ -788,6 +632,9 @@ const AvailableJobs = () => {
 
   const handleApplyFilter = (e) => {
     e.preventDefault();
+    console.log('Applying filters:', filters);
+    // Trigger fetchJobs with new filters
+    fetchJobs();
   };
 
   const handleJobClick = (jobId) => {
@@ -806,7 +653,7 @@ const AvailableJobs = () => {
     });
   };
 
-  // Handler for edit form changes
+  // Handler for editing jobs
   const handleEditChange = (e) => {
     const { name, value } = e.target;
     setEditJobData(prev => ({ ...prev, [name]: value }));
@@ -927,227 +774,6 @@ const AvailableJobs = () => {
     };
   }, [fetchJobs, pollingInterval]);
 
-  // Function to open job details modal
-  const handleViewJobDetails = (job) => {
-    setSelectedJob(job);
-    setShowJobDetails(true);
-  };
-
-  // Function to close job details modal
-  const closeJobDetails = () => {
-    setSelectedJob(null);
-    setShowJobDetails(false);
-  };
-
-  // Job Details Modal Component
-  const JobDetailsModal = ({ job, isOpen, onClose }) => {
-    if (!isOpen || !job) return null;
-
-    return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">{job.title}</h2>
-                  <p className="text-blue-100 text-lg">{job.companyName}</p>
-                  <div className="flex items-center mt-2">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-blue-100">{job.location?.city}, {job.location?.state}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="text-white hover:text-gray-200 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-6">
-              {/* Job Overview */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">₹{job.salary || 'Negotiable'}</div>
-                  <div className="text-sm text-blue-700">Salary</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-lg font-semibold text-green-600">{job.employmentType}</div>
-                  <div className="text-sm text-green-700">Type</div>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <div className="text-lg font-semibold text-purple-600">{job.category}</div>
-                  <div className="text-sm text-purple-700">Category</div>
-                </div>
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <div className="text-lg font-semibold text-yellow-600">{job.urgency || 'Normal'}</div>
-                  <div className="text-sm text-yellow-700">Priority</div>
-                </div>
-              </div>
-
-              {/* Job Description */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Job Description</h3>
-                <p className="text-gray-700 leading-relaxed">
-                  {job.description || 'No detailed description provided for this position.'}
-                </p>
-              </div>
-
-              {/* Requirements */}
-              {job.requirements && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Requirements</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-gray-700">{job.requirements}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Skills Required */}
-              {job.skillsRequired && job.skillsRequired.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Skills Required</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {job.skillsRequired.map((skill, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Work Details */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Work Details</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Duration:</span>
-                      <span className="font-medium">{job.duration || 'Not specified'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Start Date:</span>
-                      <span className="font-medium">{job.startDate ? formatDate(job.startDate) : 'Immediate'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Working Hours:</span>
-                      <span className="font-medium">{job.workingHours || '8 hours/day'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Experience Level:</span>
-                      <span className="font-medium">{job.experienceLevel || 'Entry Level'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Employer Details</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Company:</span>
-                      <span className="font-medium">{job.companyName}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Industry:</span>
-                      <span className="font-medium">{job.industry || 'Not specified'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Contact:</span>
-                      <span className="font-medium">{job.contactPhone || 'Via platform'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Posted:</span>
-                      <span className="font-medium">{formatDate(job.createdAt)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Benefits */}
-              {job.benefits && job.benefits.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Benefits & Perks</h3>
-                  <div className="grid md:grid-cols-2 gap-2">
-                    {job.benefits.map((benefit, index) => (
-                      <div key={index} className="flex items-center">
-                        <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-gray-700">{benefit}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Application Instructions */}
-              {job.applicationInstructions && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Application Instructions</h3>
-                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                    <p className="text-yellow-800">{job.applicationInstructions}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer with Actions */}
-            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl">
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-500">
-                  Job ID: #{job._id?.substring(0, 8) || 'N/A'}
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={onClose}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    Close
-                  </button>
-                  {user && user.type === 'worker' && !isJobAccepted(job._id) && (
-                    <button
-                      onClick={() => {
-                        onClose();
-                        handleApplyForJob(job);
-                      }}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      Apply Now
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
-    );
-  };
-
   const renderJobCard = (job) => {
     const application = jobApplications[job._id] || getApplicationForJob(job._id);
     const hasApplied = isJobAccepted(job._id) || !!application;
@@ -1159,13 +785,13 @@ const AvailableJobs = () => {
         key={job._id}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`bg-white rounded-xl shadow-md overflow-hidden border 
-          ${hasApplied ? 'border-green-300' : 'border-gray-200'} 
+        className={`w-full h-auto min-h-[400px] bg-white rounded-lg shadow-md overflow-hidden border 
+          ${hasApplied ? 'border-green-300' : 'border-gray-100'} 
           ${jobIsInProgress ? 'bg-blue-50' : isApplicationAccepted ? 'bg-green-50' : ''}
-          hover:shadow-lg transition-all duration-300`}
+          hover:shadow-lg transition-shadow duration-300 flex flex-col`}
         whileHover={{ scale: 1.02 }}
       >
-        {/* Status Banner */}
+        {/* Status banner */}
         {hasApplied && (
           <div className={`px-4 py-2 text-sm font-medium ${
             jobIsInProgress ? 'bg-blue-100 text-blue-800' : 
@@ -1176,150 +802,169 @@ const AvailableJobs = () => {
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              {jobIsInProgress ? 'Job In Progress' : 
-               isApplicationAccepted ? 'Application Accepted' : 
-               'Application Submitted'}
+              <span className="text-xs">
+                {jobIsInProgress ? 'Job In Progress' : 
+                 isApplicationAccepted ? 'Application Accepted' : 
+                 'Application Submitted'}
+              </span>
             </div>
           </div>
         )}
         
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xl font-bold text-gray-900 mb-1 truncate">{job.title}</h3>
-              <p className="text-lg font-medium text-blue-600 mb-2">{job.companyName}</p>
+        <div className="p-4 flex-1 flex flex-col">
+          {/* Header section */}
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-gray-800 mb-1 line-clamp-2">{job.title}</h3>
+            <p className="text-sm font-medium text-blue-600 mb-3 line-clamp-1">{job.companyName}</p>
+            
+            {/* Job details grid - compact layout */}
+            <div className="grid grid-cols-1 gap-2 text-xs text-gray-600">
+              <div className="flex items-center">
+                <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                <span className="truncate">{job.location.city}, {job.location.state}</span>
+              </div>
               
-              {/* Quick Info Grid */}
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div className="flex items-center text-gray-600 text-sm">
-                  <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  </svg>
-                  <span className="truncate">{job.location?.city}, {job.location?.state}</span>
-                </div>
-                <div className="flex items-center text-gray-600 text-sm">
-                  <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                  <span>₹{job.salary || 'Negotiable'}</span>
-                </div>
-                <div className="flex items-center text-gray-600 text-sm">
-                  <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <span>{job.employmentType}</span>
-                </div>
-                <div className="flex items-center text-gray-600 text-sm">
-                  <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex items-center">
+                <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="font-medium text-green-600">₹{job.salary || 'Negotiable'}</span>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                   </svg>
-                  <span>{job.category}</span>
+                  <span className="truncate">{job.category}</span>
+                </div>
+                
+                <div className="flex items-center">
+                  <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-xs">{job.employmentType}</span>
                 </div>
               </div>
             </div>
-            
-            {/* Urgency Badge */}
-            {job.urgency && job.urgency !== 'Normal' && (
-              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                job.urgency === 'Urgent' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {job.urgency}
-              </span>
-            )}
           </div>
           
-          {/* Job Preview */}
-          {job.description && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600 line-clamp-2">
-                {job.description.length > 100 
-                  ? `${job.description.substring(0, 100)}...` 
-                  : job.description}
-              </p>
+          {/* Requirements section - collapsible */}
+          {job.requirements && (
+            <div className="mb-3 flex-1">
+              <div className="text-xs text-gray-600 border-t pt-2">
+                <span className="font-semibold">Requirements:</span>
+                <p className="mt-1 line-clamp-2">{job.requirements}</p>
+              </div>
             </div>
           )}
-
-          {/* Skills Required Preview */}
-          {job.skillsRequired && job.skillsRequired.length > 0 && (
-            <div className="mb-4">
-              <p className="text-xs font-medium text-gray-700 mb-2">Skills Required:</p>
-              <div className="flex flex-wrap gap-1">
-                {job.skillsRequired.slice(0, 3).map((skill, index) => (
-                  <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                    {skill}
-                  </span>
-                ))}
-                {job.skillsRequired.length > 3 && (
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                    +{job.skillsRequired.length - 3} more
-                  </span>
+          
+          {/* Application info */}
+          {application && (
+            <div className="mb-3 text-xs text-gray-500">
+              <div className="bg-gray-50 rounded p-2">
+                <div>Applied: {formatDate(application.appliedAt || application.createdAt)}</div>
+                {application._id && (
+                  <div className="mt-1">ID: #{application._id.substring(0, 8)}</div>
                 )}
               </div>
             </div>
           )}
           
-          {/* Application Info */}
-          {application && (
-            <div className="mb-4 text-xs text-gray-500 bg-gray-50 p-2 rounded">
-              Applied: {formatDate(application.appliedAt || application.createdAt)}
-              {application.applicationId && <span className="ml-2">ID: #{application.applicationId.substring(0, 6)}</span>}
+          {/* Edit form - compact */}
+          {editingJobId === job._id && (
+            <div className="mb-3 bg-gray-50 p-3 rounded border border-blue-200">
+              <div className="space-y-2">
+                <input 
+                  name="title" 
+                  value={editJobData.title} 
+                  onChange={handleEditChange} 
+                  className="w-full text-xs border rounded p-1" 
+                  placeholder="Title" 
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input 
+                    name="salary" 
+                    value={editJobData.salary} 
+                    onChange={handleEditChange} 
+                    className="text-xs border rounded p-1" 
+                    placeholder="Salary" 
+                    type="number" 
+                  />
+                  <input 
+                    name="category" 
+                    value={editJobData.category} 
+                    onChange={handleEditChange} 
+                    className="text-xs border rounded p-1" 
+                    placeholder="Category" 
+                  />
+                </div>
+                <input 
+                  name="requirements" 
+                  value={editJobData.requirements} 
+                  onChange={handleEditChange} 
+                  className="w-full text-xs border rounded p-1" 
+                  placeholder="Requirements" 
+                />
+              </div>
+              <div className="mt-2 flex gap-1">
+                <button 
+                  onClick={() => handleSaveEdit(job._id)} 
+                  disabled={savingEdit} 
+                  className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingEdit ? 'Saving...' : 'Save'}
+                </button>
+                <button 
+                  onClick={() => setEditingJobId(null)} 
+                  className="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
           
-          {/* Action Area */}
-          <div className="border-t pt-4">
+          {/* Status and Action Area - fixed at bottom */}
+          <div className="mt-auto border-t pt-3">
             <div className="flex justify-between items-center">
               {/* Status Display */}
-              <div className="flex flex-col">
-                {hasApplied ? (
+              <div className="flex flex-col flex-1">
+                {isPending(application?.status) || isAccepted(application?.status) || isInProgress(application?.status) ? (
                   <>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       isPending(application?.status) ? 'bg-yellow-100 text-yellow-800' : 
                       isInProgress(application?.status) ? 'bg-blue-100 text-blue-800' : 
                       'bg-green-100 text-green-800'
                     }`}>
-                      {application?.status ? application.status.charAt(0).toUpperCase() + application.status.slice(1) : 'Applied'}
+                      {application?.status ? application.status.charAt(0).toUpperCase() + application.status.slice(1) : 'Pending'}
                     </span>
+                    
                     <span className="text-xs text-gray-500 mt-1">
-                      {isPending(application?.status) ? 'Waiting for employer response' : 
-                       isAccepted(application?.status) ? 'Ready to start work' : 
+                      {isPending(application?.status) ? 'Awaiting response' : 
+                       isAccepted(application?.status) ? 'Ready to start' : 
                        'Work in progress'}
                     </span>
                   </>
                 ) : (
-                  <div className="flex items-center text-gray-500 text-sm">
+                  <div className="flex items-center text-gray-500 text-xs">
                     <span>Ready to apply</span>
                   </div>
                 )}
               </div>
               
               {/* Action Buttons */}
-              <div className="flex space-x-2">
-                {/* View Details Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleViewJobDetails(job);
-                  }}
-                  className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors flex items-center"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  Details
-                </button>
-                
-                {/* Main Action Button */}
+              <div className="flex flex-col gap-1 ml-2">
                 {hasApplied ? (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleCancelApplication(application?.applicationId ? {...job, applicationId: application.applicationId} : job);
+                      handleCancelApplication(application || job);
                     }}
                     disabled={cancellingJobIds.has(job._id)}
-                    className={`px-4 py-2 rounded-md text-sm font-medium ${
+                    className={`px-3 py-1.5 rounded text-xs font-medium ${
                       cancellingJobIds.has(job._id) 
                         ? 'bg-gray-300 text-gray-500 cursor-wait' 
                         : 'bg-red-500 text-white hover:bg-red-600'
@@ -1329,18 +974,25 @@ const AvailableJobs = () => {
                   </button>
                 ) : (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleApplyForJob(job);
-                    }}
+                    onClick={() => handleApplyForJob(job)}
                     disabled={acceptingJobIds.has(job._id)}
-                    className={`px-4 py-2 rounded-md text-sm font-medium ${
+                    className={`px-3 py-1.5 rounded text-xs font-medium ${
                       acceptingJobIds.has(job._id) 
                         ? 'bg-green-500 text-white cursor-wait' 
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     } transition-colors`}
                   >
                     {acceptingJobIds.has(job._id) ? 'Applying...' : 'Apply Now'}
+                  </button>
+                )}
+                
+                {/* Edit button for employers */}
+                {user && (user.type === 'employer' || user.type === 'admin') && editingJobId !== job._id && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditJob(job); }}
+                    className="px-2 py-1 rounded text-xs font-medium bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
+                  >
+                    Edit
                   </button>
                 )}
               </div>
@@ -1456,40 +1108,6 @@ const AvailableJobs = () => {
         >
           Debug: Force Worker Type & Reload
         </button>
-        <button
-          className="px-4 py-2 bg-green-500 text-white rounded ml-2"
-          onClick={() => {
-            console.log('Test mode button clicked');
-            setTestMode(true);
-            setJobs([
-              {
-                _id: 'test-job-1',
-                title: 'Test Job 1',
-                companyName: 'Test Company 1',
-                status: 'active',
-                salary: 1000,
-                location: { city: 'Test City', state: 'Test State' },
-                description: 'This is a test job to verify the UI is working',
-                category: 'Test',
-                employmentType: 'full-time'
-              },
-              {
-                _id: 'test-job-2',
-                title: 'Test Job 2 (In Progress)',
-                companyName: 'Test Company 2',
-                status: 'in-progress',
-                salary: 1500,
-                location: { city: 'Test City 2', state: 'Test State 2' },
-                description: 'This is another test job',
-                category: 'Test',
-                employmentType: 'part-time'
-              }
-            ]);
-            setLoading(false);
-          }}
-        >
-          Test Mode: Set Test Jobs
-        </button>
       </div>
       <AnimatePresence>
         {showSuccessAnimation && (
@@ -1509,16 +1127,51 @@ const AvailableJobs = () => {
         )}
       </AnimatePresence>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-            {t('jobs.title')}
-          </h1>
-          <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-            {user && user.type === 'worker' && user.location?.state
-              ? `${t('jobs.findInLocation')} ${user.location.state}`
-              : t('jobs.findPerfectJob')}
-          </p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+              {t('jobs.title')}
+            </h1>
+            <p className="mt-3 max-w-2xl text-xl text-gray-500">
+              {user && user.type === 'worker' && user.location?.state
+                ? `Find jobs in ${user.location.state} and nearby areas`
+                : 'Find your perfect job opportunity'}
+            </p>
+          </div>
+          
+          {/* Refresh button similar to MyApplications */}
+          <div className="flex items-center space-x-2">
+            {lastUpdated && (
+              <span className="text-sm text-gray-500">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+            <button 
+              onClick={handleRetry}
+              disabled={loading || isRetrying}
+              className="flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 transition"
+            >
+              {(loading || isRetrying) ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </>
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* Filter section - now with improved layout and instant apply */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <form onSubmit={handleApplyFilter} className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
@@ -1597,49 +1250,100 @@ const AvailableJobs = () => {
             </div>
           </form>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loading ? (
-            <div className="col-span-full text-center py-6">
-              <svg className="animate-spin h-8 w-8 mx-auto text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4zm16 0a8 8 0 01-8 8v-4a4 4 0 004-4h4z"></path>
-              </svg>
-              <p className="mt-2 text-gray-500">{t('jobs.loading')}</p>
-            </div>
-          ) : error ? (
-            <div className="col-span-full text-center py-6">
-              <p className="text-red-500 font-semibold">{t('jobs.errorLoading')}</p>
-              <button
-                onClick={fetchJobs}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                {t('jobs.retry')}
-              </button>
-            </div>
-          ) : jobs.length === 0 ? (
-            <div className="col-span-full text-center py-6">
-              <p className="text-gray-500">{t('jobs.noResults')}</p>
-              <div className="mt-2 text-xs text-gray-400">
-                Debug: jobs.length = {jobs.length}, loading = {loading.toString()}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="col-span-full text-xs text-gray-400 mb-4">
-                Debug: Rendering {jobs.length} jobs
-              </div>
-              {jobs.map(job => renderJobCard(job))}
-            </>
-          )}
-        </div>
-      </div>
 
-      {/* Job Details Modal */}
-      <JobDetailsModal 
-        job={selectedJob} 
-        isOpen={showJobDetails} 
-        onClose={closeJobDetails} 
-      />
+        {/* Job listings section with proper grid structure */}
+        {/* Location-based job sections for workers */}
+        {user?.type === 'worker' && locationBasedJobs.length > 0 ? (
+          <>
+            {/* Jobs in your area section */}
+            <div className="mb-12">
+              <div className="flex items-center mb-6">
+                <svg className="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Jobs in Your Area ({locationBasedJobs.length})
+                </h2>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {locationBasedJobs.map(job => renderJobCard(job))}
+              </div>
+            </div>
+
+            {/* Jobs in other locations section */}
+            {otherLocationJobs.length > 0 && (
+              <div className="mb-12">
+                <div className="flex items-center mb-6">
+                  <svg className="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Jobs in Other Locations ({otherLocationJobs.length})
+                  </h2>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {otherLocationJobs.map(job => renderJobCard(job))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Default job grid for non-workers or when no location-based categorization */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {loading ? (
+              <div className="col-span-full text-center py-6">
+                <svg className="animate-spin h-8 w-8 mx-auto text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4zm16 0a8 8 0 01-8 8v-4a4 4 0 004-4h4z"></path>
+                </svg>
+                <p className="mt-2 text-gray-500">Loading jobs...</p>
+              </div>
+            ) : error ? (
+              <div className="col-span-full text-center py-6">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-500 font-semibold mb-2">Error loading jobs:</p>
+                  <p className="text-red-600 text-sm mb-4">{error}</p>
+                  <button
+                    onClick={handleRetry}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="col-span-full text-center py-6">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-8">
+                  <div className="text-gray-500 space-y-2">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-lg font-medium">No jobs available</p>
+                    <p className="text-sm">Check back later for new opportunities</p>
+                    <button
+                      onClick={handleRetry}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      Refresh Jobs
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="col-span-full mb-4">
+                  <p className="text-sm text-gray-600">
+                    Found {jobs.length} job{jobs.length !== 1 ? 's' : ''} available
+                  </p>
+                </div>
+                {jobs.map(job => renderJobCard(job))}
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

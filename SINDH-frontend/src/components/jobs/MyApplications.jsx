@@ -3,12 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
-import { 
-  updateApplicationStatus, 
-  getCurrentApplications, 
-  getPastJobs, 
-  moveToPastJobs 
-} from '../../utils/jobApplicationUtils';
+import { getApiUrl } from '../../utils/apiUtils';
 
 const MyApplications = () => {
   const [applications, setApplications] = useState([]);
@@ -26,19 +21,21 @@ const MyApplications = () => {
       setLoading(true);
       setError(null);
       
-      const workerId = user?.id;
+      const workerId = user?.id || JSON.parse(localStorage.getItem('user'))?.id;
       if (!workerId) {
         throw new Error('User not authenticated. Please log in again.');
       }
 
-      // Fetch current applications from backend
       console.log(`Fetching applications for worker ID: ${workerId}`);
       
-      // Split into two requests to improve error handling
-      const [currentResponse, pastResponse] = await Promise.all([
-        fetch(`http://localhost:5000/api/job-applications/worker/${workerId}/current`),
-        fetch(`http://localhost:5000/api/job-applications/worker/${workerId}/past`)
-      ]);
+      // Fetch current applications from the correct backend endpoint
+      const currentResponse = await fetch(getApiUrl(`/api/job-applications/worker/${workerId}/current`), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       
       if (!currentResponse.ok) {
         const errorText = await currentResponse.text();
@@ -46,48 +43,59 @@ const MyApplications = () => {
         throw new Error('Failed to fetch current applications');
       }
       
-      if (!pastResponse.ok) {
-        const errorText = await pastResponse.text();
-        console.error('Error response from past applications:', errorText);
-        throw new Error('Failed to fetch past applications');
+      // Parse the response
+      const currentData = await currentResponse.json();
+      console.log('Raw response from backend:', currentData);
+      
+      // Handle both direct array and wrapped response formats
+      let applicationsArray = [];
+      if (currentData.success && Array.isArray(currentData.data)) {
+        applicationsArray = currentData.data;
+      } else if (Array.isArray(currentData)) {
+        applicationsArray = currentData;
+      } else if (currentData.data && Array.isArray(currentData.data)) {
+        applicationsArray = currentData.data;
       }
       
-      // Parse the responses
-      const currentData = await currentResponse.json();
-      const pastData = await pastResponse.json();
+      console.log('Processed applications:', applicationsArray);
+      console.log('Number of current applications:', applicationsArray.length);
+
+      // Process applications to ensure all required fields exist
+      const processedApplications = applicationsArray.map((app, index) => {
+        console.log(`Processing application ${index + 1}:`, app);
+        
+        return {
+          _id: app._id || `app-${index}`,
+          status: app.status || 'pending',
+          appliedAt: app.appliedAt || app.createdAt || new Date().toISOString(),
+          job: {
+            _id: app.job?._id || `job-${index}`,
+            title: app.job?.title || 'Job Title Not Available',
+            companyName: app.job?.companyName || app.job?.company || 'Company Not Available',
+            location: {
+              city: app.job?.location?.city || 'City Not Available',
+              state: app.job?.location?.state || 'State Not Available'
+            },
+            salary: app.job?.salary || 'Salary Not Specified',
+            category: app.job?.category || 'General',
+            employmentType: app.job?.employmentType || 'Full-time'
+          },
+          worker: app.worker || null,
+          employer: app.employer || null
+        };
+      });
+
+      console.log('Final processed applications:', processedApplications);
+
+      setApplications(processedApplications);
       
-      console.log('Current applications fetched:', currentData.length);
-      console.log('Past applications fetched:', pastData.length);
-
-      // Get local applications data for merging
-      const localCurrentApps = getCurrentApplications();
-      const localPastJobs = getPastJobs();
-
-      // Merge backend data with local data for better offline support
-      const mergedCurrentApps = currentData.map(app => {
-        const localApp = localCurrentApps[app.job?._id];
-        if (localApp) {
-          return { ...app, localData: localApp };
-        }
-        return app;
-      });
-
-      // Add any local past jobs not in the backend data
-      const mergedPastJobs = [...pastData];
-      Object.entries(localPastJobs).forEach(([jobId, jobData]) => {
-        if (!mergedPastJobs.some(app => app.job?._id === jobId)) {
-          mergedPastJobs.push({
-            job: { _id: jobId, ...jobData },
-            status: 'completed',
-            completedAt: jobData.completedAt
-          });
-        }
-      });
-
-      setApplications(mergedCurrentApps);
-      setPastJobs(mergedPastJobs);
+      // For now, set past jobs as empty array since we don't have a separate endpoint
+      // You can add a separate endpoint later for completed/rejected applications
+      setPastJobs([]);
+      
       setLastUpdated(new Date());
       setError(null);
+      
     } catch (error) {
       console.error('Error fetching applications:', error);
       setError(error.message || 'Failed to load your applications. Please try again later.');
@@ -100,6 +108,11 @@ const MyApplications = () => {
 
   useEffect(() => {
     fetchApplications();
+    
+    // Set up polling to refresh applications every 30 seconds
+    const interval = setInterval(fetchApplications, 30000);
+    
+    return () => clearInterval(interval);
   }, [fetchApplications]);
 
   const handleRetry = () => {
@@ -107,10 +120,11 @@ const MyApplications = () => {
     fetchApplications();
   };
 
-  const handleStatusUpdate = async (jobId, newStatus) => {
+  const handleStatusUpdate = async (applicationId, newStatus) => {
     try {
-      // Update in backend
-      const response = await fetch(`http://localhost:5000/api/job-applications/${jobId}/status`, {
+      console.log('Updating application status:', { applicationId, newStatus });
+      
+      const response = await fetch(getApiUrl(`/api/job-applications/${applicationId}/status`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -118,41 +132,54 @@ const MyApplications = () => {
         body: JSON.stringify({ status: newStatus }),
       });
 
-      if (!response.ok) throw new Error('Failed to update status');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update status');
+      }
 
-      // Update local storage and state
+      const result = await response.json();
+      console.log('Status update result:', result);
+
+      // Update local state
       if (newStatus === 'completed') {
-        moveToPastJobs(jobId);
-        setApplications(prev => prev.filter(app => app.job._id !== jobId));
-        setPastJobs(prev => [...prev, {
-          ...applications.find(app => app.job._id === jobId),
-          status: 'completed',
-          completedAt: new Date().toISOString()
-        }]);
+        // Move to past jobs
+        const completedApp = applications.find(app => app._id === applicationId);
+        if (completedApp) {
+          setApplications(prev => prev.filter(app => app._id !== applicationId));
+          setPastJobs(prev => [...prev, {
+            ...completedApp,
+            status: 'completed',
+            completedAt: new Date().toISOString()
+          }]);
+        }
       } else {
-        updateApplicationStatus(jobId, newStatus);
+        // Update status in current applications
         setApplications(prev => prev.map(app => 
-          app.job._id === jobId ? { ...app, status: newStatus } : app
+          app._id === applicationId ? { ...app, status: newStatus } : app
         ));
       }
 
-      toast.success(`Job status updated to ${newStatus}`);
+      toast.success(`Application status updated to ${newStatus}`);
+      
+      // Refresh data after a short delay
+      setTimeout(fetchApplications, 1000);
+      
     } catch (error) {
       console.error('Error updating status:', error);
-      toast.error('Failed to update job status');
+      toast.error(error.message || 'Failed to update application status');
     }
   };
 
   const handleCancelApplication = async (application) => {
     try {
-      const jobId = application.job._id;
       const applicationId = application._id;
+      const jobId = application.job._id;
       
       setCancellingJobIds(prev => new Set([...prev, jobId]));
       
       console.log('Cancelling application:', applicationId);
       
-      const response = await fetch(`http://localhost:5000/api/job-applications/${applicationId}`, {
+      const response = await fetch(getApiUrl(`/api/job-applications/${applicationId}`), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -160,13 +187,18 @@ const MyApplications = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to cancel application');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to cancel application');
       }
 
       // Update UI by removing the cancelled application
       setApplications(prev => prev.filter(app => app._id !== applicationId));
       
       toast.success('Application cancelled successfully');
+      
+      // Refresh data after a short delay
+      setTimeout(fetchApplications, 1000);
+      
     } catch (error) {
       console.error('Error cancelling application:', error);
       toast.error(error.message || 'Failed to cancel application');
@@ -180,15 +212,16 @@ const MyApplications = () => {
   };
 
   const getStatusColor = (status) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'accepted':
         return 'bg-green-100 text-green-800';
       case 'rejected':
         return 'bg-red-100 text-red-800';
       case 'completed':
         return 'bg-blue-100 text-blue-800';
-      case 'sent':
-        return 'bg-blue-100 text-blue-800';
+      case 'in-progress':
+        return 'bg-purple-100 text-purple-800';
+      case 'pending':
       default:
         return 'bg-yellow-100 text-yellow-800';
     }
@@ -291,7 +324,7 @@ const MyApplications = () => {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {applications.map((application) => (
                 <motion.div
-                  key={application._id || application.job?._id}
+                  key={application._id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white rounded-lg shadow-md overflow-hidden"
@@ -300,7 +333,7 @@ const MyApplications = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="text-xl font-semibold text-gray-900">{application.job.title}</h3>
-                        <p className="text-sm text-gray-500">{application.job.company}</p>
+                        <p className="text-sm text-gray-500">{application.job.companyName}</p>
                       </div>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(application.status)}`}>
                         {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
@@ -319,7 +352,7 @@ const MyApplications = () => {
                     <div className="mt-4">
                       <p className="text-sm text-gray-500">Applied on</p>
                       <p className="text-sm font-medium">
-                        {new Date(application.appliedAt || application.createdAt).toLocaleDateString()}
+                        {new Date(application.appliedAt).toLocaleDateString()}
                       </p>
                     </div>
                     
@@ -327,26 +360,43 @@ const MyApplications = () => {
                     {application.status === 'pending' && (
                       <div className="mt-2">
                         <p className="text-sm text-yellow-600 italic">
-                          Request sent to employer
+                          Waiting for employer response
+                        </p>
+                      </div>
+                    )}
+                    
+                    {application.status === 'accepted' && (
+                      <div className="mt-2">
+                        <p className="text-sm text-green-600 italic">
+                          Application accepted! Ready to start work.
                         </p>
                       </div>
                     )}
                   </div>
 
                   {/* Conditional buttons based on status */}
-                  <div className="px-6 pb-6">
-                    {application.status === 'accepted' ? (
+                  <div className="px-6 pb-6 space-y-2">
+                    <button
+                      onClick={() => handleViewJobDetails(application.job._id)}
+                      className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                    >
+                      View Job Details
+                    </button>
+                    
+                    {application.status === 'accepted' && (
                       <button
-                        onClick={() => handleStatusUpdate(application.job._id, 'completed')}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                        onClick={() => handleStatusUpdate(application._id, 'completed')}
+                        className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                       >
                         Mark as Completed
                       </button>
-                    ) : application.status === 'pending' && (
+                    )}
+                    
+                    {application.status === 'pending' && (
                       <button
                         onClick={() => handleCancelApplication(application)}
                         disabled={cancellingJobIds.has(application.job._id)}
-                        className={`w-full px-4 py-2 rounded-md text-white ${
+                        className={`w-full px-4 py-2 rounded-md text-white transition-colors ${
                           cancellingJobIds.has(application.job._id) 
                             ? 'bg-gray-400 cursor-wait' 
                             : 'bg-red-500 hover:bg-red-600'

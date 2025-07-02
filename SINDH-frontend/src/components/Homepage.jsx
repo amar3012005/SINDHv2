@@ -23,23 +23,123 @@ function Homepage() {
     averageRating: 4.6
   });
 
+  // Job notification states
+  const [jobCount, setJobCount] = useState(0);
+  const [showJobNotification, setShowJobNotification] = useState(false);
+  const [hasShownNotification, setHasShownNotification] = useState(false);
+
   // Get user from context and fallback to localStorage if needed
   const { user: contextUser, isLoadingUser, logoutUser } = useUser();
   const user = contextUser || getCurrentUser();
 
+  // Fetch job count for notifications
+  const fetchJobCount = async () => {
+    try {
+      console.log('Fetching job count for user:', user);
+      
+      let url = 'http://localhost:5000/api/jobs/count';
+      
+      // Add location filter if user has location
+      if (user?.location?.state) {
+        url += `?location=${encodeURIComponent(user.location.state)}`;
+        console.log('Adding location filter:', user.location.state);
+      }
+
+      console.log('Fetching from URL:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Job count response:', data);
+        
+        const count = data.count || 0;
+        setJobCount(count);
+        
+        // Update stats with real job count
+        setStats(prev => ({ ...prev, totalJobs: count }));
+        
+        console.log('Job count set to:', count);
+        console.log('User type:', user?.type);
+        console.log('Has shown notification:', hasShownNotification);
+        
+        // Show notification if user is a worker and hasn't seen it in this session
+        if (user?.type === 'worker' && count > 0 && !hasShownNotification) {
+          console.log('Showing notifications for worker with', count, 'jobs');
+          
+          const locationText = user.location?.state ? ` in ${user.location.state}` : '';
+          
+          // Show toast notification immediately
+          toast.success(`🎯 ${count} job${count !== 1 ? 's' : ''} available${locationText}!`, {
+            position: "top-right",
+            autoClose: 6000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          });
+          
+          console.log('Toast notification shown');
+          
+          // Show popup notification after a delay
+          setTimeout(() => {
+            console.log('Showing popup notification');
+            setShowJobNotification(true);
+            setHasShownNotification(true);
+          }, 3000);
+        } else {
+          console.log('Not showing notification:', {
+            isWorker: user?.type === 'worker',
+            hasJobs: count > 0,
+            hasShown: hasShownNotification
+          });
+        }
+        
+        return count;
+      } else {
+        console.error('Failed to fetch job count, status:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+      }
+    } catch (error) {
+      console.error('Error fetching job count:', error);
+      return 0;
+    }
+  };
+
   useEffect(() => {
+    console.log('Homepage useEffect - user changed:', user);
+    
     // Show welcome toast if coming from login
     if (location.state?.showWelcome && user) {
       toast.success(`${t('home.welcomeBack')}, ${user.name}!`);
       // Clear the state after showing toast
       navigate('/', { replace: true, state: {} });
     }
-  }, [location, user, navigate]);
+  }, [location, user, navigate, t]);
 
   useEffect(() => {
+    console.log('Homepage useEffect - fetching data');
+    
     // Fetch recent jobs
     fetchRecentJobs();
-  }, []);
+    
+    // Fetch job count for workers
+    if (user?.type === 'worker') {
+      console.log('User is worker, fetching job count');
+      fetchJobCount();
+    } else {
+      console.log('User is not worker or no user:', user?.type);
+    }
+  }, [user]);
 
   useEffect(() => {
     // Fetch Shakti score if user is a worker and is loaded
@@ -112,6 +212,15 @@ function Homepage() {
     navigate('/employer/post-job');
   };
 
+  const handleViewJobs = () => {
+    navigate('/jobs');
+    setShowJobNotification(false);
+  };
+
+  const handleCloseJobNotification = () => {
+    setShowJobNotification(false);
+  };
+
   const renderGrameenLinkProfile = () => {
     if (!isAuthenticated) return null;
 
@@ -138,14 +247,29 @@ function Homepage() {
                       {t('home.shaktiScore')}: {shaktiScore}
                     </div>
                   )}
+                  {user?.type === 'worker' && jobCount > 0 && (
+                    <p className="text-xs text-green-600 font-medium mt-1">
+                      {jobCount} job{jobCount !== 1 ? 's' : ''} available
+                    </p>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={() => navigate(`/${user.type}/profile`)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                {t('home.viewProfile')}
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => navigate(`/${user.type}/profile`)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  {t('home.viewProfile')}
+                </button>
+                {user.type === 'worker' && jobCount > 0 && (
+                  <button
+                    onClick={handleViewJobs}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  >
+                    View Jobs ({jobCount})
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -162,6 +286,57 @@ function Homepage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      {/* Job Count Popup Notification */}
+      <AnimatePresence>
+        {showJobNotification && user?.type === 'worker' && jobCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, x: 100 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 0.8, x: 100 }}
+            className="fixed bottom-6 right-6 z-50 max-w-sm"
+          >
+            <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-green-500 text-white p-6 rounded-xl shadow-2xl border border-white/20 backdrop-blur-sm">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
+                    <Briefcase className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">New Jobs Available!</h4>
+                    <p className="text-sm text-white/90">
+                      {jobCount} job{jobCount !== 1 ? 's' : ''} {user.location?.state ? `in ${user.location.state}` : 'waiting for you'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCloseJobNotification}
+                  className="text-white/70 hover:text-white transition-colors p-1"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={handleViewJobs}
+                  className="flex-1 bg-white text-blue-600 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-100 transition-colors shadow-md"
+                >
+                  View All Jobs
+                </button>
+                <button
+                  onClick={handleCloseJobNotification}
+                  className="px-4 py-2.5 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors backdrop-blur-sm"
+                >
+                  Later
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Interactive Hero Section */}
       <div className="relative overflow-hidden">
         {/* Background Pattern */}
@@ -185,6 +360,11 @@ function Homepage() {
                       <span className="font-semibold">
                         {t('home.welcomeBack')}, {user.name || user.company?.name}!
                       </span>
+                      {user?.type === 'worker' && jobCount > 0 && (
+                        <div className="ml-3 px-3 py-1 bg-white/20 rounded-full text-sm">
+                          {jobCount} jobs available
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ) : (
@@ -228,7 +408,7 @@ function Homepage() {
                 </p>
               </motion.div>
 
-              {/* Interactive Stats Cards */}
+              {/* Interactive Stats Cards - now with real job count */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -242,8 +422,11 @@ function Homepage() {
                   <div className="flex items-center justify-center mb-2">
                     <Briefcase className="w-8 h-8 text-blue-600" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.totalJobs.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-gray-900">{jobCount || stats.totalJobs}</div>
                   <div className="text-sm text-gray-600">{t('stats.activeJobs')}</div>
+                  {user?.type === 'worker' && jobCount > 0 && (
+                    <div className="mt-1 text-xs text-green-600 font-medium">Available now!</div>
+                  )}
                 </motion.div>
 
                 <motion.div
@@ -280,7 +463,7 @@ function Homepage() {
                 </motion.div>
               </motion.div>
 
-              {/* Large Interactive Action Buttons */}
+              {/* Large Interactive Action Buttons - enhanced for workers */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -297,6 +480,11 @@ function Homepage() {
                   <div className="relative flex items-center justify-center space-x-3">
                     <Briefcase className="w-6 h-6" />
                     <span>{user?.type === 'worker' ? t('home.findJobs') : t('home.findWork')}</span>
+                    {user?.type === 'worker' && jobCount > 0 && (
+                      <span className="ml-2 px-2 py-1 bg-white/20 rounded-full text-sm">
+                        {jobCount}
+                      </span>
+                    )}
                   </div>
                 </motion.button>
 
@@ -341,7 +529,7 @@ function Homepage() {
         </div>
       </div>
 
-      {/* GrameenLink Profile */}
+      {/* GrameenLink Profile - now shows job count */}
       {renderGrameenLinkProfile()}
 
       {/* Shakti Score Section (for workers) */}

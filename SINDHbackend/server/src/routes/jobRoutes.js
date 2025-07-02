@@ -127,55 +127,212 @@ router.post('/create', async (req, res) => {
 
 // Get all jobs (with filters)
 router.get('/', async (req, res) => {
-  console.log('=== Available Jobs Page Accessed ===');
-  console.log('Query Parameters:', req.query);
-  console.log('Request Headers:', req.headers);
+  console.log('=== BACKEND: Available Jobs Page Accessed ===');
+  console.log('BACKEND: Query Parameters:', req.query);
   
   try {
-    const { status, location, skills } = req.query;
+    const { status, location, skills, workerId, category, minSalary, employmentType } = req.query;
     const query = {};
 
-    if (status) query.status = status;
+    // Status filter
+    if (status) {
+      query.status = status;
+    } else {
+      // Default to active jobs only
+      query.status = 'active';
+    }
+
+    // Skills filter
     if (skills) {
       query.requiredSkills = {
         $in: skills.split(',')
       };
     }
 
+    // Category filter
+    if (category) {
+      query.category = { $regex: category, $options: 'i' };
+    }
+
+    // Employment type filter
+    if (employmentType) {
+      query.employmentType = { $regex: employmentType, $options: 'i' };
+    }
+
+    // Salary filter
+    if (minSalary) {
+      query.salary = { $gte: parseInt(minSalary) };
+    }
+
+    // Location filter - enhanced for better matching
     if (location) {
-      // Assume location is a text string (e.g., state or city name)
-      // Perform a case-insensitive text search on location.state or location.city
+      console.log('BACKEND: Applying location filter for:', location);
+      query.$or = [
+        { 'location.state': { $regex: location, $options: 'i' } },
+        { 'location.city': { $regex: location, $options: 'i' } },
+        { 'location.street': { $regex: location, $options: 'i' } }
+      ];
+    }
+
+    console.log('BACKEND: MongoDB Query:', JSON.stringify(query, null, 2));
+
+    // Fetch worker applications if workerId is provided
+    let workerApplications = [];
+    if (workerId) {
+      console.log('BACKEND: Fetching applications for worker:', workerId);
+      try {
+        const applications = await JobApplication.find({ 
+          worker: workerId,
+          status: { $in: ['pending', 'accepted', 'in-progress'] }
+        }).populate('job');
+        
+        workerApplications = applications;
+        console.log(`BACKEND: Found ${workerApplications.length} current applications`);
+      } catch (appError) {
+        console.error('BACKEND: Error fetching applications:', appError);
+      }
+    }
+
+    // Fetch jobs with sorting by creation date (newest first)
+    let jobs = await Job.find(query)
+      .populate({
+        path: 'employer',
+        model: 'Employer',
+        select: 'name company companyName rating contact'
+      })
+      .sort({ createdAt: -1 }) // Sort by newest first
+      .lean();
+      
+    console.log(`BACKEND: Found ${jobs.length} jobs matching the criteria`);
+    
+    if (jobs.length > 0) {
+      console.log('BACKEND: First job raw data:', jobs[0]);
+      
+      // Log location distribution for debugging
+      const locationStats = jobs.reduce((acc, job) => {
+        const state = job.location?.state || 'Unknown';
+        const city = job.location?.city || 'Unknown';
+        const key = `${state} - ${city}`;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('BACKEND: Job location distribution:', locationStats);
+    }
+    
+    // Process jobs to ensure all required fields are present
+    const processedJobs = jobs.map((job, index) => {
+      console.log(`BACKEND: Processing job ${index + 1}: ${job.title}`);
+      
+      // Find if worker has applied for this job
+      const workerApplication = workerApplications.find(app => 
+        app.job && app.job._id.toString() === job._id.toString()
+      );
+
+      // Create a properly formatted job object
+      const processedJob = {
+        _id: job._id,
+        id: job._id,
+        title: job.title || `Job Opportunity ${index + 1}`,
+        companyName: job.companyName || 
+                    job.company?.name || 
+                    job.employer?.company?.name || 
+                    job.employer?.companyName ||
+                    job.employer?.name ||
+                    'Local Employer',
+        description: job.description || 
+                    job.jobDescription || 
+                    `Work opportunity available in ${job.location?.city || 'the area'}. Contact employer for more details about this position.`,
+        salary: job.salary || 
+               job.pay || 
+               job.wage || 
+               15000, // Default numeric value for better filtering
+        location: {
+          city: job.location?.city || 'Not specified',
+          state: job.location?.state || 'Not specified',
+          street: job.location?.street || '',
+          pincode: job.location?.pincode || '',
+          type: job.location?.type || 'onsite'
+        },
+        category: job.category || 'General Work',
+        employmentType: job.employmentType || 'Full-time',
+        skillsRequired: job.skillsRequired || [],
+        requirements: job.requirements || 'Basic requirements apply',
+        status: job.status || 'active',
+        urgency: job.urgency || 'Normal',
+        createdAt: job.createdAt || new Date().toISOString(),
+        updatedAt: job.updatedAt || new Date().toISOString(),
+        employer: job.employer || null,
+        // Application status if worker has applied
+        hasApplied: !!workerApplication,
+        application: workerApplication || null,
+        applicationStatus: workerApplication?.status || null
+      };
+
+      return processedJob;
+    });
+    
+    console.log('BACKEND: Sending response with', processedJobs.length, 'processed jobs');
+    
+    // Send clean response
+    res.status(200).json(processedJobs);
+    
+  } catch (error) {
+    console.error('BACKEND: Error fetching available jobs:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch jobs',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      data: []
+    });
+  }
+});
+
+// Get job count (lightweight endpoint) - MUST be before /:id route
+router.get('/count', async (req, res) => {
+  try {
+    const { location, category, minSalary, employmentType } = req.query;
+    const query = { status: 'active' }; // Only count active jobs
+
+    console.log('BACKEND: Job count request with filters:', req.query);
+
+    // Apply filters
+    if (category) {
+      query.category = { $regex: category, $options: 'i' };
+    }
+
+    if (employmentType) {
+      query.employmentType = { $regex: employmentType, $options: 'i' };
+    }
+
+    if (minSalary) {
+      query.salary = { $gte: parseInt(minSalary) };
+    }
+
+    if (location) {
       query.$or = [
         { 'location.state': { $regex: location, $options: 'i' } },
         { 'location.city': { $regex: location, $options: 'i' } }
       ];
     }
 
-    console.log('MongoDB Query:', JSON.stringify(query, null, 2));
-
-    const jobs = await Job.find(query)
-      .populate({
-        path: 'employer',
-        model: 'Employer',
-        select: 'company.name rating'
-      });
-      
-    console.log(`Found ${jobs.length} jobs matching the criteria`);
-    console.log('First job sample:', jobs.length > 0 ? {
-      id: jobs[0]._id,
-      title: jobs[0].title,
-      status: jobs[0].status,
-      location: jobs[0].location,
-      employer: jobs[0].employer ? {
-        companyName: jobs[0].employer.company.name,
-        rating: jobs[0].employer.rating
-      } : null
-    } : 'No jobs found');
-
-    res.json(jobs);
+    const count = await Job.countDocuments(query);
+    
+    console.log('BACKEND: Job count result:', { query, count });
+    
+    res.json({
+      success: true,
+      count: count,
+      filters: req.query
+    });
+    
   } catch (error) {
-    console.error('Error fetching available jobs:', error);
-    res.status(500).json({ message: error.message });
+    console.error('BACKEND: Error getting job count:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to get job count',
+      count: 0,
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 });
 
