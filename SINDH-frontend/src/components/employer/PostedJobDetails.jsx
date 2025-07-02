@@ -18,7 +18,7 @@ const PostedJobDetails = () => {
         setLoading(true);
         
         // Fetch job details
-        const jobResponse = await fetch(`http://localhost:5000/api/jobs/${jobId}`);
+        const jobResponse = await fetch(`https://sindh-backend.onrender.comapi/jobs/${jobId}`);
         
         if (!jobResponse.ok) {
           throw new Error('Failed to fetch job details');
@@ -28,7 +28,7 @@ const PostedJobDetails = () => {
         setJob(jobData);
         
         // Fetch applications for this job
-        const applicationsResponse = await fetch(`http://localhost:5000/api/jobs/${jobId}/applications`);
+        const applicationsResponse = await fetch(`https://sindh-backend.onrender.comapi/jobs/${jobId}/applications`);
         
         if (!applicationsResponse.ok) {
           throw new Error('Failed to fetch applications');
@@ -51,7 +51,7 @@ const PostedJobDetails = () => {
     try {
       setProcessingAction(applicationId);
       
-      const response = await fetch(`http://localhost:5000/api/job-applications/${applicationId}/final-selection`, {
+      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/final-selection`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

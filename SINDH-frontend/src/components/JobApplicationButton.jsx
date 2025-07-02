@@ -9,7 +9,7 @@ const JobApplicationButton = ({ jobId, workerId, onApplicationSubmit }) => {
   const handleApply = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:5000/api/job-applications/apply', {
+      const response = await fetch('https://sindh-backend.onrender.comapi/job-applications/apply', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

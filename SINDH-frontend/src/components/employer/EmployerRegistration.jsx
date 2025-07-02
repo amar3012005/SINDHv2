@@ -210,7 +210,7 @@ const EnhancedEmployerRegistration = () => {
       setSubmitting(true);
       
       // Make actual API call to register employer
-      const response = await fetch('http://localhost:5000/api/employers/register', {
+      const response = await fetch('https://sindh-backend.onrender.comapi/employers/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

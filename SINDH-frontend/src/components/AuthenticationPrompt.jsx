@@ -6,7 +6,7 @@ import { useUser } from '../context/UserContext';
 import { synchronizeUserData } from '../utils/authSyncUtils';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://sindh-backend.onrender.comapi';
 
 const AuthenticationPrompt = ({ isOpen, onClose, onAuthenticationSuccess, from }) => {
   const [phoneNumber, setPhoneNumber] = useState('');

@@ -71,7 +71,7 @@ const Login = () => {
 
       // Make API call to verify OTP and login
       const endpoint = userType === 'worker' ? '/workers/login' : '/employers/login';
-      const response = await fetch(`http://localhost:5000/api/auth${endpoint}`, {
+      const response = await fetch(`https://sindh-backend.onrender.comapi/auth${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber, otp }),

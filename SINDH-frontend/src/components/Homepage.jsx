@@ -37,7 +37,7 @@ function Homepage() {
     try {
       console.log('Fetching job count for user:', user);
       
-      let url = 'http://localhost:5000/api/jobs/count';
+      let url = 'https://sindh-backend.onrender.comapi/jobs/count';
       
       // Add location filter if user has location
       if (user?.location?.state) {
@@ -152,7 +152,7 @@ function Homepage() {
 
   const fetchShaktiScore = async (workerId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/workers/${workerId}/shakti-score`);
+      const response = await fetch(`https://sindh-backend.onrender.comapi/workers/${workerId}/shakti-score`);
       if (!response.ok) {
         throw new Error('Failed to fetch Shakti score');
       }
@@ -166,7 +166,7 @@ function Homepage() {
 
   const fetchRecentJobs = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/jobs/recent');
+      const response = await fetch('https://sindh-backend.onrender.comapi/jobs/recent');
       if (!response.ok) {
         throw new Error('Failed to fetch recent jobs');
       }
