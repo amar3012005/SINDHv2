@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { getCurrentUser, getUserType } from '../utils/authUtils';
 import { Phone, MapPin, Star, Users, Briefcase, TrendingUp } from 'lucide-react';
+import { getApiUrl } from '../utils/apiUtils';
 
 function Homepage() {
   const { t } = useTranslation();
@@ -37,7 +38,7 @@ function Homepage() {
     try {
       console.log('Fetching job count for user:', user);
       
-      let url = 'https://sindh-backend.onrender.comapi/jobs/count';
+      let url = getApiUrl('/api/jobs/count'); // Use getApiUrl instead of hardcoded localhost
       
       // Add location filter if user has location
       if (user?.location?.state) {
@@ -152,7 +153,7 @@ function Homepage() {
 
   const fetchShaktiScore = async (workerId) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/workers/${workerId}/shakti-score`);
+      const response = await fetch(getApiUrl(`/api/workers/${workerId}/shakti-score`)); // Use getApiUrl
       if (!response.ok) {
         throw new Error('Failed to fetch Shakti score');
       }
@@ -166,7 +167,7 @@ function Homepage() {
 
   const fetchRecentJobs = async () => {
     try {
-      const response = await fetch('https://sindh-backend.onrender.comapi/jobs/recent');
+      const response = await fetch(getApiUrl('/api/jobs/recent')); // Use getApiUrl
       if (!response.ok) {
         throw new Error('Failed to fetch recent jobs');
       }

@@ -25,7 +25,7 @@ const EmployerPostJob = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('https://sindh-backend.onrender.comapi/jobs', {
+      const response = await fetch('http://localhost:5000/api/jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -22,7 +22,7 @@ function ShopifyAuth() {
       const token = await getSessionToken(app);
       
       // Use token for authentication in API request
-      const response = await fetch('https://sindh-backend.onrender.comapi/products', {
+      const response = await fetch('http://localhost:5000/api/products', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

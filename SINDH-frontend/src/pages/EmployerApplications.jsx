@@ -18,7 +18,7 @@ const EmployerApplications = () => {
 
   const fetchApplications = async (id) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/employer/${id}`);
+      const response = await fetch(`http://localhost:5000/api/job-applications/employer/${id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch applications');
       }
@@ -34,7 +34,7 @@ const EmployerApplications = () => {
 
   const handleStatusUpdate = async (applicationId, newStatus) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/status`, {
+      const response = await fetch(`http://localhost:5000/api/job-applications/${applicationId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

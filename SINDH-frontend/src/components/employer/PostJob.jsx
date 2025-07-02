@@ -124,7 +124,7 @@ const PostJob = () => {
         const user = JSON.parse(localUser || '{}');
         if (user.id && user.type === 'employer') {
           try {
-            const response = await fetch(`https://sindh-backend.onrender.comapi/employers/${user.id}`);
+            const response = await fetch(`http://localhost:5000/api/employers/${user.id}`);
             if (response.ok) {
               const profile = await response.json();
               setEmployerProfile(profile);
@@ -358,7 +358,7 @@ const PostJob = () => {
       console.log('Submitting job data:', jobData);
 
       // Submit to backend
-      const response = await fetch('https://sindh-backend.onrender.comapi/jobs', {
+      const response = await fetch('http://localhost:5000/api/jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

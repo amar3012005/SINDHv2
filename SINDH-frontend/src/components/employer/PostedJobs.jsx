@@ -116,7 +116,7 @@ const PostedJobs = () => {
       console.log('Fetching posted jobs for employer ID:', employerId);
       
       // Fetch jobs from API
-      const response = await fetch(`https://sindh-backend.onrender.comapi/jobs/employer/${employerId}`, {
+      const response = await fetch(`http://localhost:5000/api/jobs/employer/${employerId}`, {
         headers: {
           'Content-Type': 'application/json',
           'User-Type': 'employer',
@@ -137,7 +137,7 @@ const PostedJobs = () => {
       // Fetch applications for each job
       const applicationsPromises = jobs.map(async (job) => {
         try {
-          const appResponse = await fetch(`https://sindh-backend.onrender.comapi/job-applications/job/${job._id}`, {
+          const appResponse = await fetch(`http://localhost:5000/api/job-applications/job/${job._id}`, {
             headers: {
               'Content-Type': 'application/json',
               'User-Type': 'employer',
@@ -749,7 +749,7 @@ const PostedJobs = () => {
         return;
       }
 
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/status`, {
+      const response = await fetch(`http://localhost:5000/api/job-applications/${applicationId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

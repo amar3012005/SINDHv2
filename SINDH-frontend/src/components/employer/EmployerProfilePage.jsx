@@ -68,7 +68,7 @@ const EmployerProfilePage = () => {
       console.log('Fetching employer profile for ID:', employerId);
       
       // Add user type headers for proper authentication
-      const response = await fetch(`https://sindh-backend.onrender.comapi/employers/${employerId}`, {
+      const response = await fetch(`http://localhost:5000/api/employers/${employerId}`, {
         headers: {
           'Content-Type': 'application/json',
           'User-Type': 'employer',
@@ -113,7 +113,7 @@ const EmployerProfilePage = () => {
   // Fetch posted jobs
   const fetchPostedJobs = async (employerId) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/jobs/employer/${employerId}`, {
+      const response = await fetch(`http://localhost:5000/api/jobs/employer/${employerId}`, {
         headers: {
           'Content-Type': 'application/json',
           'User-Type': 'employer',
@@ -134,7 +134,7 @@ const EmployerProfilePage = () => {
   // Fetch employer statistics
   const fetchEmployerStats = async (employerId) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/employers/${employerId}/stats`, {
+      const response = await fetch(`http://localhost:5000/api/employers/${employerId}/stats`, {
         headers: {
           'Content-Type': 'application/json',
           'User-Type': 'employer',

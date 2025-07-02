@@ -117,8 +117,8 @@ import LanguageSwitcher from './components/LanguageSwitcher';
 ## 🔗 Demo URLs
 
 - **Homepage**: http://localhost:3000
-- **Translation Demo**: https://splendid-travesseiro-45ebea.netlify.app/translation-demo
-- **Login Page**: https://splendid-travesseiro-45ebea.netlify.app/login
+- **Translation Demo**: http://localhost:3000/translation-demo
+- **Login Page**: http://localhost:3000/login
 
 ## 📝 Next Steps
 

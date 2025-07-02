@@ -88,7 +88,7 @@ export const loginWithPhone = async (phoneNumber, userType) => {
     const endpoint = userType === 'worker' ? 'workers' : 'employers';
     
     // Make the login request
-    const response = await fetch(`https://sindh-backend.onrender.comapi/auth/${endpoint}/login`, {
+    const response = await fetch(`http://localhost:5000/api/auth/${endpoint}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

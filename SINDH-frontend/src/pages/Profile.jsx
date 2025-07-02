@@ -50,7 +50,7 @@ const Profile = () => {
         workerId = JSON.parse(workerData).id;
       }
 
-      const response = await fetch(`https://sindh-backend.onrender.comapi/workers/${workerId}`);
+      const response = await fetch(`http://localhost:5000/api/workers/${workerId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch worker details');
@@ -111,7 +111,7 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/workers/${worker._id}`, {
+      const response = await fetch(`http://localhost:5000/api/workers/${worker._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
