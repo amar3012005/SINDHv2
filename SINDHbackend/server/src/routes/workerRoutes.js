@@ -347,4 +347,246 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Get worker balance and earnings
+router.get('/:id/balance', async (req, res) => {
+  try {
+    const worker = await Worker.findById(req.params.id).select('balance earnings name');
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker not found' });
+    }
+    
+    console.log('Fetching balance for worker:', worker.name, 'Balance:', worker.balance);
+    
+    res.json({
+      balance: worker.balance || 0,
+      earnings: worker.earnings || []
+    });
+  } catch (error) {
+    console.error('Error fetching worker balance:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Manually process payment for completed job
+router.post('/:workerId/process-payment/:applicationId', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    
+    const worker = await Worker.findById(workerId);
+    if (worker) {
+      // Add to balance immediately
+      worker.balance += amount;
+      worker.earnings.push({
+        jobId: application.job._id,
+        amount: amount,
+        description: `Payment for: ${application.job.title}`,
+        date: new Date()
+      });
+      await worker.save();
+    }
+    
+    // Update application payment status
+    application.paymentStatus = 'paid';
+    application.paymentAmount = amount;
+    application.paymentDate = new Date();
+    await application.save();
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Recalculate and sync worker balance based on completed jobs
+router.post('/:id/sync-balance', async (req, res) => {
+  try {
+    const workerId = req.params.id;
+    
+    console.log('Syncing balance for worker:', workerId);
+    
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker not found' });
+    }
+    
+    // Find all completed paid applications for this worker
+    const JobApplication = require('../models/JobApplication');
+    const completedApplications = await JobApplication.find({
+      worker: workerId,
+      status: 'completed',
+      paymentStatus: 'paid'
+    }).populate('job');
+    
+    console.log(`Found ${completedApplications.length} completed paid jobs`);
+    
+    // Calculate total using the same logic as frontend
+    const totalEarned = completedApplications.reduce((sum, app) => {
+      const amount = app.paymentAmount || app.job?.salary || 0;
+      return sum + amount;
+    }, 0);
+    
+    console.log(`Calculated total earnings: ₹${totalEarned}`);
+    
+    // Update worker balance
+    worker.balance = totalEarned;
+    
+    // Rebuild earnings array from completed applications
+    worker.earnings = completedApplications.map(app => ({
+      jobId: app.job._id,
+      amount: app.paymentAmount || app.job?.salary || 0,
+      description: `Payment for: ${app.job?.title || 'Job'}`,
+      date: app.paymentDate || app.updatedAt || new Date()
+    }));
+    
+    await worker.save();
+    
+    console.log(`Balance synced successfully: ₹${worker.balance}`);
+    
+    res.json({
+      success: true,
+      message: 'Balance synchronized successfully',
+      worker: {
+        name: worker.name,
+        balance: worker.balance,
+        earningsCount: worker.earnings.length,
+        totalEarned: totalEarned
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error syncing worker balance:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+});
+
+// Get worker wallet data
+router.get('/:id/wallet', async (req, res) => {
+  try {
+    const workerId = req.params.id;
+    
+    console.log('Fetching wallet data for worker:', workerId);
+    
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker not found' });
+    }
+    
+    // Get all completed job applications for earnings
+    const JobApplication = require('../models/JobApplication');
+    const completedApplications = await JobApplication.find({
+      worker: workerId,
+      status: 'completed',
+      paymentStatus: 'paid'
+    }).populate('job');
+    
+    console.log(`Found ${completedApplications.length} completed paid applications`);
+    
+    // Calculate totals
+    const totalEarned = completedApplications.reduce((sum, app) => {
+      return sum + (app.paymentAmount || app.job?.salary || 0);
+    }, 0);
+    
+    // Get withdrawal history
+    const withdrawals = worker.withdrawals || [];
+    const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, 0);
+    
+    // Create transaction history
+    const transactions = [
+      // Earnings from completed jobs
+      ...completedApplications.map(app => ({
+        id: app._id.toString(),
+        type: 'earning',
+        amount: app.paymentAmount || app.job?.salary || 0,
+        description: `Payment for: ${app.job?.title || 'Job'}`,
+        date: app.paymentDate || app.updatedAt,
+        status: 'completed',
+        jobTitle: app.job?.title
+      })),
+      // Withdrawals
+      ...withdrawals.map((w, index) => ({
+        id: w._id ? w._id.toString() : `withdrawal_${index}`,
+        type: 'withdrawal',
+        amount: w.amount,
+        description: `Withdrawal to ${w.method || 'bank account'}`,
+        date: w.date,
+        status: w.status || 'completed'
+      }))
+    ].sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    // Ensure worker balance matches calculated balance
+    const currentBalance = totalEarned - totalWithdrawn;
+    if (worker.balance !== currentBalance) {
+      worker.balance = currentBalance;
+      await worker.save();
+      console.log(`Updated worker balance from ₹${worker.balance} to ₹${currentBalance}`);
+    }
+    
+    res.json({
+      balance: currentBalance,
+      totalEarned: totalEarned,
+      totalSpent: totalWithdrawn,
+      transactions: transactions
+    });
+    
+  } catch (error) {
+    console.error('Error fetching wallet data:', error);
+    res.status(500).json({ 
+      message: error.message,
+      balance: 0,
+      totalEarned: 0,
+      totalSpent: 0,
+      transactions: []
+    });
+  }
+});
+
+// Process withdrawal request
+router.post('/:id/withdraw', async (req, res) => {
+  try {
+    const workerId = req.params.id;
+    const { amount, method } = req.body;
+    
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker not found' });
+    }
+    
+    if (amount > worker.balance) {
+      return res.status(400).json({ message: 'Insufficient balance' });
+    }
+    
+    // Initialize withdrawals array if it doesn't exist
+    if (!Array.isArray(worker.withdrawals)) {
+      worker.withdrawals = [];
+    }
+    
+    // Add withdrawal record
+    const withdrawal = {
+      amount: amount,
+      method: method || 'bank_transfer',
+      date: new Date(),
+      status: 'pending'
+    };
+    
+    worker.withdrawals.push(withdrawal);
+    worker.balance -= amount;
+    
+    await worker.save();
+    
+    console.log(`Withdrawal processed: ${worker.name} - ₹${amount}`);
+    
+    res.json({
+      success: true,
+      message: 'Withdrawal request submitted successfully',
+      newBalance: worker.balance
+    });
+    
+  } catch (error) {
+    console.error('Error processing withdrawal:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;

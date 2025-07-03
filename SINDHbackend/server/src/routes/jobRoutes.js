@@ -134,12 +134,12 @@ router.get('/', async (req, res) => {
     const { status, location, skills, workerId, category, minSalary, employmentType } = req.query;
     const query = {};
 
-    // Status filter
-    if (status) {
+    // Status filter - show all active and in-progress jobs
+    if (status && status !== 'active,in-progress') {
       query.status = status;
     } else {
-      // Default to active jobs only
-      query.status = 'active';
+      // Default to active and in-progress jobs
+      query.status = { $in: ['active', 'in-progress'] };
     }
 
     // Skills filter
@@ -178,16 +178,27 @@ router.get('/', async (req, res) => {
 
     // Fetch worker applications if workerId is provided
     let workerApplications = [];
+    let completedJobIds = [];
+    
     if (workerId) {
       console.log('BACKEND: Fetching applications for worker:', workerId);
       try {
-        const applications = await JobApplication.find({ 
-          worker: workerId,
-          status: { $in: ['pending', 'accepted', 'in-progress'] }
+        // Fetch ALL applications for this worker (including completed)
+        const allApplications = await JobApplication.find({ 
+          worker: workerId
         }).populate('job');
         
-        workerApplications = applications;
-        console.log(`BACKEND: Found ${workerApplications.length} current applications`);
+        // Separate completed applications to exclude those jobs
+        const completedApplications = allApplications.filter(app => app.status === 'completed');
+        completedJobIds = completedApplications.map(app => app.job?._id?.toString()).filter(Boolean);
+        
+        // Active applications (not completed)
+        workerApplications = allApplications.filter(app => 
+          app.status && ['pending', 'accepted', 'in-progress'].includes(app.status)
+        );
+        
+        console.log(`BACKEND: Found ${workerApplications.length} active applications`);
+        console.log(`BACKEND: Found ${completedApplications.length} completed applications to exclude`);
       } catch (appError) {
         console.error('BACKEND: Error fetching applications:', appError);
       }
@@ -200,30 +211,22 @@ router.get('/', async (req, res) => {
         model: 'Employer',
         select: 'name company companyName rating contact'
       })
-      .sort({ createdAt: -1 }) // Sort by newest first
+      .sort({ createdAt: -1 })
       .lean();
       
-    console.log(`BACKEND: Found ${jobs.length} jobs matching the criteria`);
+    console.log(`BACKEND: Found ${jobs.length} total jobs matching criteria`);
     
-    if (jobs.length > 0) {
-      console.log('BACKEND: First job raw data:', jobs[0]);
-      
-      // Log location distribution for debugging
-      const locationStats = jobs.reduce((acc, job) => {
-        const state = job.location?.state || 'Unknown';
-        const city = job.location?.city || 'Unknown';
-        const key = `${state} - ${city}`;
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      }, {});
-      console.log('BACKEND: Job location distribution:', locationStats);
+    // Filter out jobs that this specific worker has completed
+    if (completedJobIds.length > 0) {
+      jobs = jobs.filter(job => !completedJobIds.includes(job._id.toString()));
+      console.log(`BACKEND: After filtering worker's completed jobs: ${jobs.length} jobs remaining`);
     }
     
     // Process jobs to ensure all required fields are present
     const processedJobs = jobs.map((job, index) => {
       console.log(`BACKEND: Processing job ${index + 1}: ${job.title}`);
       
-      // Find if worker has applied for this job
+      // Find if worker has applied for this job (but not completed)
       const workerApplication = workerApplications.find(app => 
         app.job && app.job._id.toString() === job._id.toString()
       );
@@ -262,7 +265,7 @@ router.get('/', async (req, res) => {
         createdAt: job.createdAt || new Date().toISOString(),
         updatedAt: job.updatedAt || new Date().toISOString(),
         employer: job.employer || null,
-        // Application status if worker has applied
+        // Application status if worker has applied (but not completed)
         hasApplied: !!workerApplication,
         application: workerApplication || null,
         applicationStatus: workerApplication?.status || null
@@ -273,7 +276,6 @@ router.get('/', async (req, res) => {
     
     console.log('BACKEND: Sending response with', processedJobs.length, 'processed jobs');
     
-    // Send clean response
     res.status(200).json(processedJobs);
     
   } catch (error) {
@@ -287,15 +289,110 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Get completed jobs for a worker (Past Jobs) - FIXED
+router.get('/worker/:workerId/completed', async (req, res) => {
+  try {
+    const { workerId } = req.params;
+    
+    console.log('BACKEND: Fetching completed jobs for worker:', workerId);
+    
+    // Find all completed applications for this worker
+    // First try by worker field, then by phone number match
+    let completedApplications = await JobApplication.find({
+      worker: workerId,
+      status: 'completed'
+    })
+    .populate('job')
+    .populate('employer', 'name company companyName')
+    .sort({ updatedAt: -1 });
+    
+    // If no results found by worker ID, try to find by phone number
+    if (completedApplications.length === 0) {
+      console.log('BACKEND: No results by worker ID, trying phone number match...');
+      
+      const worker = await Worker.findById(workerId);
+      if (worker && worker.phone) {
+        console.log('BACKEND: Searching by phone number:', worker.phone);
+        
+        // Find applications where workerDetails.phone matches
+        completedApplications = await JobApplication.find({
+          'workerDetails.phone': worker.phone,
+          status: 'completed'
+        })
+        .populate('job')
+        .populate('employer', 'name company companyName')
+        .sort({ updatedAt: -1 });
+        
+        // Fix the worker IDs in these applications
+        for (const app of completedApplications) {
+          if (app.worker.toString() !== workerId) {
+            console.log(`BACKEND: Fixing worker ID in application ${app._id}`);
+            app.worker = workerId;
+            app.workerDetails.name = worker.name; // Fix the name too
+            await app.save();
+          }
+        }
+      }
+    }
+    
+    console.log(`BACKEND: Found ${completedApplications.length} completed jobs`);
+    
+    // Format the response with job and payment details
+    const completedJobs = completedApplications.map(app => ({
+      _id: app._id,
+      job: {
+        _id: app.job._id,
+        title: app.job.title,
+        companyName: app.job.companyName,
+        location: app.job.location,
+        salary: app.job.salary,
+        category: app.job.category,
+        description: app.job.description
+      },
+      application: {
+        status: app.status,
+        appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
+        completedAt: app.jobCompletedDate || app.updatedAt,
+        paymentStatus: app.paymentStatus || 'pending',
+        paymentAmount: app.paymentAmount || app.job.salary,
+        paymentDate: app.paymentDate
+      },
+      employer: app.employer
+    }));
+    
+    res.json({
+      success: true,
+      count: completedJobs.length,
+      data: completedJobs
+    });
+    
+  } catch (error) {
+    console.error('BACKEND: Error fetching completed jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch completed jobs',
+      data: []
+    });
+  }
+});
+
 // Get job count (lightweight endpoint) - MUST be before /:id route
 router.get('/count', async (req, res) => {
   try {
-    const { location, category, minSalary, employmentType } = req.query;
-    const query = { status: 'active' }; // Only count active jobs
+    const { location, category, minSalary, employmentType, workerId, status } = req.query;
+    let query = {};
 
     console.log('BACKEND: Job count request with filters:', req.query);
 
-    // Apply filters
+    // Status filter - use the same logic as main jobs endpoint
+    if (status && status !== 'active,in-progress') {
+      query.status = status;
+    } else {
+      // Default to active and in-progress jobs (same as AvailableJobs)
+      query.status = { $in: ['active', 'in-progress'] };
+    }
+
+    // Apply other filters
     if (category) {
       query.category = { $regex: category, $options: 'i' };
     }
@@ -315,7 +412,33 @@ router.get('/count', async (req, res) => {
       ];
     }
 
-    const count = await Job.countDocuments(query);
+    let count = await Job.countDocuments(query);
+
+    // If workerId is provided, exclude jobs that this worker has completed (same as AvailableJobs)
+    if (workerId) {
+      try {
+        console.log('BACKEND: Excluding completed jobs for worker:', workerId);
+        
+        // Find completed applications to exclude those jobs
+        const completedApplications = await JobApplication.find({
+          worker: workerId,
+          status: 'completed'
+        }).select('job');
+        
+        const completedJobIds = completedApplications.map(app => app.job.toString());
+        
+        if (completedJobIds.length > 0) {
+          const excludeCompletedQuery = {
+            ...query,
+            _id: { $nin: completedJobIds }
+          };
+          count = await Job.countDocuments(excludeCompletedQuery);
+          console.log(`BACKEND: Excluded ${completedJobIds.length} completed jobs, final count: ${count}`);
+        }
+      } catch (error) {
+        console.error('BACKEND: Error filtering completed jobs from count:', error);
+      }
+    }
     
     console.log('BACKEND: Job count result:', { query, count });
     
@@ -430,7 +553,7 @@ router.patch('/:id/applications/:applicationId', async (req, res) => {
   }
 });
 
-// Complete a job
+// Complete a job - Enhanced
 router.patch('/:id/complete', async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
@@ -440,10 +563,20 @@ router.patch('/:id/complete', async (req, res) => {
     }
 
     job.status = 'completed';
+    job.completedAt = new Date();
+    job.updatedAt = new Date();
+    
     await job.save();
+    
+    console.log(`Job ${job.title} manually marked as completed`);
 
-    res.json(job);
+    res.json({
+      success: true,
+      message: 'Job marked as completed',
+      job: job
+    });
   } catch (error) {
+    console.error('Error completing job:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -628,6 +761,54 @@ router.get('/employer/:employerId', async (req, res) => {
       message: 'Failed to fetch jobs',
       data: [], // Return empty array on error
       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Delete job
+router.delete('/:id', async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    
+    console.log('Deleting job:', jobId);
+    
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+    
+    // Check if there are any applications for this job
+    const applications = await JobApplication.find({ job: jobId });
+    
+    if (applications.length > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete job with existing applications. Please contact workers first.' 
+      });
+    }
+    
+    // Remove job from employer's postedJobs array
+    if (job.employer) {
+      await Employer.findByIdAndUpdate(
+        job.employer,
+        { $pull: { postedJobs: jobId } }
+      );
+    }
+    
+    // Delete the job
+    await Job.findByIdAndDelete(jobId);
+    
+    console.log('Job deleted successfully:', jobId);
+    
+    res.json({
+      success: true,
+      message: 'Job deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message 
     });
   }
 });

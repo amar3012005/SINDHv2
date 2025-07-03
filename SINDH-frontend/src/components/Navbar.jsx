@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, DollarSign } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import { toast } from 'react-toastify';
 import LogoutButton from './LogoutButton';
 import { getCurrentUser, getUserType, isLoggedIn } from '../utils/authUtils';
 import LanguageSwitcher from './LanguageSwitcher';
+import { getApiUrl } from '../utils/apiUtils';
 
 const Navbar = () => {
   const location = useLocation();
@@ -18,6 +19,7 @@ const Navbar = () => {
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [workerBalance, setWorkerBalance] = useState(0);
   
   // Simplified authentication checks using utility functions
   const hasUser = isLoggedIn();
@@ -34,6 +36,28 @@ const Navbar = () => {
     else if (path.includes('/jobs/available') || path.includes('/worker/register')) setActiveSection('find-work');
     else if (path.includes('/my-applications')) setActiveSection('applications');
   }, [location]);
+
+  useEffect(() => {
+    const fetchWorkerBalance = async () => {
+      if (user?.type === 'worker' && user?.id) {
+        try {
+          const response = await fetch(getApiUrl(`/api/workers/${user.id}/balance`));
+          if (response.ok) {
+            const data = await response.json();
+            setWorkerBalance(data.balance || 0);
+          }
+        } catch (error) {
+          console.error('Error fetching worker balance:', error);
+        }
+      }
+    };
+
+    fetchWorkerBalance();
+    
+    // Refresh balance every 30 seconds
+    const interval = setInterval(fetchWorkerBalance, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const isAuthenticated = contextUser && hasUser;
 

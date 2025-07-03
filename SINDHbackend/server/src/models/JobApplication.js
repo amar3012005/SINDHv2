@@ -49,10 +49,21 @@ const jobApplicationSchema = new mongoose.Schema({
   notes: {
     type: String
   },
+  paymentAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   paymentStatus: {
     type: String,
-    enum: ['pending', 'partial', 'completed'],
+    enum: ['pending', 'paid', 'cancelled'],
     default: 'pending'
+  },
+  paymentDate: {
+    type: Date
+  },
+  jobCompletedDate: {
+    type: Date
   },
   workerDetails: {
     name: String,
@@ -80,6 +91,8 @@ const jobApplicationSchema = new mongoose.Schema({
     },
     note: String
   }]
+}, {
+  timestamps: true
 });
 
 // Update the updatedAt timestamp before saving

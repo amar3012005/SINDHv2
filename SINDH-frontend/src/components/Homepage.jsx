@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
-import { getCurrentUser, getUserType } from '../utils/authUtils';
-import { Phone, MapPin, Star, Users, Briefcase, TrendingUp } from 'lucide-react';
+import { getCurrentUser } from '../utils/authUtils';
+import { Phone, Star, Users, Briefcase, TrendingUp } from 'lucide-react';
 import { getApiUrl } from '../utils/apiUtils';
 
 function Homepage() {
@@ -15,8 +15,6 @@ function Homepage() {
   const [recentJobs, setRecentJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shaktiScore, setShaktiScore] = useState(null);
-  const [activeFeature, setActiveFeature] = useState(0);
-  const [showQuickActions, setShowQuickActions] = useState(false);
   const [stats, setStats] = useState({
     totalJobs: 1250,
     activeWorkers: 3400,
@@ -29,6 +27,10 @@ function Homepage() {
   const [showJobNotification, setShowJobNotification] = useState(false);
   const [hasShownNotification, setHasShownNotification] = useState(false);
 
+  // Add missing worker financial states
+  const [workerBalance, setWorkerBalance] = useState(0);
+  const [recentEarnings, setRecentEarnings] = useState([]);
+
   // Get user from context and fallback to localStorage if needed
   const { user: contextUser, isLoadingUser, logoutUser } = useUser();
   const user = contextUser || getCurrentUser();
@@ -38,14 +40,23 @@ function Homepage() {
     try {
       console.log('Fetching job count for user:', user);
       
-      let url = getApiUrl('/api/jobs/count'); // Use getApiUrl instead of hardcoded localhost
+      const queryParams = new URLSearchParams();
+      
+      // Add user-specific parameter for application status (same as AvailableJobs)
+      if (user?.id && user?.type === 'worker') {
+        queryParams.append('workerId', user.id);
+      }
+      
+      // Use the same filtering logic as AvailableJobs - only active and in-progress jobs
+      queryParams.append('status', 'active,in-progress');
       
       // Add location filter if user has location
       if (user?.location?.state) {
-        url += `?location=${encodeURIComponent(user.location.state)}`;
+        queryParams.append('location', user.location.state);
         console.log('Adding location filter:', user.location.state);
       }
 
+      const url = getApiUrl(`/api/jobs/count?${queryParams.toString()}`);
       console.log('Fetching from URL:', url);
 
       const response = await fetch(url, {
@@ -64,21 +75,13 @@ function Homepage() {
         
         const count = data.count || 0;
         setJobCount(count);
-        
-        // Update stats with real job count
         setStats(prev => ({ ...prev, totalJobs: count }));
         
-        console.log('Job count set to:', count);
-        console.log('User type:', user?.type);
-        console.log('Has shown notification:', hasShownNotification);
-        
-        // Show notification if user is a worker and hasn't seen it in this session
         if (user?.type === 'worker' && count > 0 && !hasShownNotification) {
           console.log('Showing notifications for worker with', count, 'jobs');
           
           const locationText = user.location?.state ? ` in ${user.location.state}` : '';
           
-          // Show toast notification immediately
           toast.success(`🎯 ${count} job${count !== 1 ? 's' : ''} available${locationText}!`, {
             position: "top-right",
             autoClose: 6000,
@@ -88,27 +91,13 @@ function Homepage() {
             draggable: true,
           });
           
-          console.log('Toast notification shown');
-          
-          // Show popup notification after a delay
           setTimeout(() => {
-            console.log('Showing popup notification');
             setShowJobNotification(true);
             setHasShownNotification(true);
           }, 3000);
-        } else {
-          console.log('Not showing notification:', {
-            isWorker: user?.type === 'worker',
-            hasJobs: count > 0,
-            hasShown: hasShownNotification
-          });
         }
         
         return count;
-      } else {
-        console.error('Failed to fetch job count, status:', response.status);
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
       }
     } catch (error) {
       console.error('Error fetching job count:', error);
@@ -116,13 +105,129 @@ function Homepage() {
     }
   };
 
+  // Fetch worker balance and earnings
+  const fetchWorkerFinancials = async () => {
+    if (user?.type === 'worker' && user?.id) {
+      try {
+        const response = await fetch(getApiUrl(`/api/workers/${user.id}/balance`));
+        if (response.ok) {
+          const data = await response.json();
+          setWorkerBalance(data.balance || 0);
+          setRecentEarnings(data.earnings?.slice(-5) || []);
+        }
+      } catch (error) {
+        console.error('Error fetching worker financials:', error);
+      }
+    }
+  };
+
+  // Fetch job statistics with same filtering as AvailableJobs
+  const fetchJobStats = useCallback(async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const queryParams = new URLSearchParams();
+      
+      // Add user-specific parameter for application status (same as AvailableJobs)
+      if (user.id && user.type === 'worker') {
+        queryParams.append('workerId', user.id);
+      }
+      
+      // Use the same filtering logic as AvailableJobs - only active and in-progress jobs
+      queryParams.append('status', 'active,in-progress');
+      
+      console.log('Fetching job count with params:', queryParams.toString());
+      
+      const response = await fetch(getApiUrl(`/api/jobs/count?${queryParams.toString()}`));
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Job count response:', data);
+        setStats(prev => ({
+          ...prev,
+          totalJobs: data.count || 0
+        }));
+      } else {
+        console.warn('Failed to fetch job count:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching job stats:', error);
+    }
+  }, []);
+
+  // Fetch category-wise job counts (excluding completed jobs for workers)
+  const fetchCategoryStats = useCallback(async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const categories = ['Construction', 'Agriculture', 'Household', 'Transportation', 'Manufacturing'];
+      const categoryPromises = categories.map(async (category) => {
+        const queryParams = new URLSearchParams();
+        queryParams.append('category', category);
+        queryParams.append('status', 'active,in-progress'); // Same filtering as AvailableJobs
+        
+        // Add worker-specific filtering
+        if (user.id && user.type === 'worker') {
+          queryParams.append('workerId', user.id);
+        }
+        
+        const response = await fetch(getApiUrl(`/api/jobs/count?${queryParams.toString()}`));
+        if (response.ok) {
+          const data = await response.json();
+          return { category, count: data.count || 0 };
+        }
+        return { category, count: 0 };
+      });
+      
+      const categoryResults = await Promise.all(categoryPromises);
+      const categoryData = {};
+      categoryResults.forEach(({ category, count }) => {
+        categoryData[category] = count;
+      });
+      
+      setStats(prev => ({
+        ...prev,
+        categories: categoryData
+      }));
+    } catch (error) {
+      console.error('Error fetching category stats:', error);
+    }
+  }, []);
+
+  // Fetch latest jobs with same filtering as AvailableJobs
+  const fetchLatestJobs = useCallback(async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const queryParams = new URLSearchParams();
+      
+      // Add user-specific parameter (same as AvailableJobs)
+      if (user.id && user.type === 'worker') {
+        queryParams.append('workerId', user.id);
+      }
+      
+      // Only show active and in-progress jobs (same as AvailableJobs)
+      queryParams.append('status', 'active,in-progress');
+      
+      const response = await fetch(getApiUrl(`/api/jobs?${queryParams.toString()}`));
+      
+      if (response.ok) {
+        const jobsData = await response.json();
+        const jobsArray = Array.isArray(jobsData) ? jobsData : [];
+        
+        // Show only the latest 6 jobs for homepage
+        setRecentJobs(jobsArray.slice(0, 6));
+        
+        console.log(`Homepage: Showing ${jobsArray.slice(0, 6).length} latest jobs (filtered same as AvailableJobs)`);
+      }
+    } catch (error) {
+      console.error('Error fetching latest jobs:', error);
+      setRecentJobs([]);
+    }
+  }, []);
+
   useEffect(() => {
     console.log('Homepage useEffect - user changed:', user);
     
-    // Show welcome toast if coming from login
     if (location.state?.showWelcome && user) {
       toast.success(`${t('home.welcomeBack')}, ${user.name}!`);
-      // Clear the state after showing toast
       navigate('/', { replace: true, state: {} });
     }
   }, [location, user, navigate, t]);
@@ -130,30 +235,20 @@ function Homepage() {
   useEffect(() => {
     console.log('Homepage useEffect - fetching data');
     
-    // Fetch recent jobs
     fetchRecentJobs();
     
-    // Fetch job count for workers
     if (user?.type === 'worker') {
       console.log('User is worker, fetching job count');
       fetchJobCount();
+      fetchWorkerFinancials();
     } else {
       console.log('User is not worker or no user:', user?.type);
     }
   }, [user]);
 
-  useEffect(() => {
-    // Fetch Shakti score if user is a worker and is loaded
-    if (!isLoadingUser && user && user.type === 'worker') {
-      fetchShaktiScore(user.id);
-    } else if (!isLoadingUser && (!user || user.type !== 'worker')) {
-      setShaktiScore(null);
-    }
-  }, [user, isLoadingUser]);
-
   const fetchShaktiScore = async (workerId) => {
     try {
-      const response = await fetch(getApiUrl(`/api/workers/${workerId}/shakti-score`)); // Use getApiUrl
+      const response = await fetch(getApiUrl(`/api/workers/${workerId}/shakti-score`));
       if (!response.ok) {
         throw new Error('Failed to fetch Shakti score');
       }
@@ -167,25 +262,27 @@ function Homepage() {
 
   const fetchRecentJobs = async () => {
     try {
-      const response = await fetch(getApiUrl('/api/jobs/recent')); // Use getApiUrl
+      const response = await fetch(getApiUrl('/api/jobs/recent'));
       if (!response.ok) {
         throw new Error('Failed to fetch recent jobs');
       }
       const data = await response.json();
-      setRecentJobs(data.slice(0, 3)); // Get only 3 most recent jobs
+      setRecentJobs(data.slice(0, 3));
     } catch (error) {
       console.error('Error fetching recent jobs:', error);
-      setRecentJobs([]); // Set empty array on error
+      setRecentJobs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    logoutUser();
-    localStorage.clear(); // Clear all localStorage items
-    navigate('/login');
-  };
+  useEffect(() => {
+    if (!isLoadingUser && user && user.type === 'worker') {
+      fetchShaktiScore(user.id);
+    } else if (!isLoadingUser && (!user || user.type !== 'worker')) {
+      setShaktiScore(null);
+    }
+  }, [user, isLoadingUser]);
 
   const isAuthenticated = user && contextUser;
 
@@ -243,15 +340,30 @@ function Homepage() {
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">{user?.name}</h3>
                   <p className="text-sm text-gray-500 capitalize">{user?.type}</p>
+                  
+                  {/* Worker Balance Display */}
+                  {user?.type === 'worker' && (
+                    <div className="mt-2 flex items-center space-x-4">
+                      <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                        Balance: ₹{workerBalance.toLocaleString()}
+                      </div>
+                      
+                      {jobCount > 0 && (
+                        <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                          🎯 {jobCount} job{jobCount !== 1 ? 's' : ''} 
+                          {user.location?.state && ` in ${user.location.state}`}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   {user?.type === 'worker' && shaktiScore !== null && (
                     <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       {t('home.shaktiScore')}: {shaktiScore}
                     </div>
-                  )}
-                  {user?.type === 'worker' && jobCount > 0 && (
-                    <p className="text-xs text-green-600 font-medium mt-1">
-                      {jobCount} job{jobCount !== 1 ? 's' : ''} available
-                    </p>
                   )}
                 </div>
               </div>
@@ -267,12 +379,31 @@ function Homepage() {
                     onClick={handleViewJobs}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                   >
-                    View Jobs ({jobCount})
+                    🎯 View Jobs ({jobCount})
+                    {user.location?.state && (
+                      <span className="ml-1 text-xs opacity-90">in {user.location.state}</span>
+                    )}
                   </button>
                 )}
               </div>
             </div>
           </div>
+          
+          {/* Recent Earnings Section for Workers */}
+          {user?.type === 'worker' && recentEarnings.length > 0 && (
+            <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-blue-50 border-t">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Recent Earnings</h4>
+              <div className="space-y-1">
+                {recentEarnings.map((earning, index) => (
+                  <div key={index} className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600 truncate">{earning.description}</span>
+                    <span className="font-semibold text-green-600">+₹{earning.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
             <p className="text-sm text-gray-600">
               {user?.type === 'worker'
@@ -305,7 +436,8 @@ function Homepage() {
                   <div>
                     <h4 className="font-bold text-lg">New Jobs Available!</h4>
                     <p className="text-sm text-white/90">
-                      {jobCount} job{jobCount !== 1 ? 's' : ''} {user.location?.state ? `in ${user.location.state}` : 'waiting for you'}
+                      🎯 {stats.totalJobs} job{stats.totalJobs !== 1 ? 's' : ''} 
+                      {user.location?.state ? ` available in ${user.location.state}` : ' waiting for you'}
                     </p>
                   </div>
                 </div>
@@ -361,9 +493,10 @@ function Homepage() {
                       <span className="font-semibold">
                         {t('home.welcomeBack')}, {user.name || user.company?.name}!
                       </span>
-                      {user?.type === 'worker' && jobCount > 0 && (
+                      {user?.type === 'worker' && stats.totalJobs > 0 && (
                         <div className="ml-3 px-3 py-1 bg-white/20 rounded-full text-sm">
-                          {jobCount} jobs available
+                          🎯 {stats.totalJobs} job{stats.totalJobs !== 1 ? 's' : ''} 
+                          {user.location?.state && ` in ${user.location.state}`}
                         </div>
                       )}
                     </div>
@@ -423,10 +556,12 @@ function Homepage() {
                   <div className="flex items-center justify-center mb-2">
                     <Briefcase className="w-8 h-8 text-blue-600" />
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">{jobCount || stats.totalJobs}</div>
+                  <div className="text-2xl font-bold text-gray-900">{stats.totalJobs}</div>
                   <div className="text-sm text-gray-600">{t('stats.activeJobs')}</div>
-                  {user?.type === 'worker' && jobCount > 0 && (
-                    <div className="mt-1 text-xs text-green-600 font-medium">Available now!</div>
+                  {user?.type === 'worker' && stats.totalJobs > 0 && (
+                    <div className="mt-1 text-xs text-green-600 font-medium">
+                      {user.location?.state ? `Available in ${user.location.state}` : 'Available now!'}
+                    </div>
                   )}
                 </motion.div>
 
@@ -481,9 +616,9 @@ function Homepage() {
                   <div className="relative flex items-center justify-center space-x-3">
                     <Briefcase className="w-6 h-6" />
                     <span>{user?.type === 'worker' ? t('home.findJobs') : t('home.findWork')}</span>
-                    {user?.type === 'worker' && jobCount > 0 && (
+                    {user?.type === 'worker' && stats.totalJobs > 0 && (
                       <span className="ml-2 px-2 py-1 bg-white/20 rounded-full text-sm">
-                        {jobCount}
+                        🎯 {stats.totalJobs}
                       </span>
                     )}
                   </div>

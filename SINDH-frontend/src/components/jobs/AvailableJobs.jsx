@@ -12,6 +12,7 @@ import AuthDebugger from '../AuthDebugger';
 import JobActionButtons from './JobActionButtons';
 import JobApplicationStatus from './JobApplicationStatus';
 import { useGlobalState } from '../../context/GlobalStateContext';
+import { Building, MapPin, Briefcase, Clock, AlertCircle, CheckCircle, DollarSign } from 'lucide-react';
 
 const AvailableJobs = () => {
   const navigate = useNavigate();
@@ -35,281 +36,86 @@ const AvailableJobs = () => {
   const [applicationId, setApplicationId] = useState(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [acceptedJobIds, setAcceptedJobIds] = useState(new Set());
-  const [filters, setFilters] = useState(() => {
-    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
-    // Only set location filter from user profile, leave others empty
-    return {
-      location: userProfile?.location?.state || '',
-      category: '',
-      salary: '',
-      employmentType: ''
-    };
+  const [filters, setFilters] = useState({
+    location: '',
+    category: '',
+    minSalary: '',
+    employmentType: ''
   });
+  const [showFilters, setShowFilters] = useState(false);
+  const [applyingJobs, setApplyingJobs] = useState(new Set());
+  const [selectedJob, setSelectedJob] = useState(null);
   const [locationBasedJobs, setLocationBasedJobs] = useState([]);
   const [otherLocationJobs, setOtherLocationJobs] = useState([]);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
-  const [pendingJobs, setPendingJobs] = useState(() => {
-    const saved = localStorage.getItem('pendingJobs');
-    return saved ? JSON.parse(saved) : {};
-  });
 
   // State for editing jobs
   const [editingJobId, setEditingJobId] = useState(null);
   const [editJobData, setEditJobData] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Backend-first fetchJobs function with location-based filtering
+  // Backend-first fetchJobs function with corrected filtering
   const fetchJobs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const workerId = user?.id || JSON.parse(localStorage.getItem('user'))?.id;
-      const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
-      
-      console.log('=== FRONTEND: Starting backend-first job fetch ===');
-      console.log('FRONTEND: User ID:', workerId);
-      console.log('FRONTEND: User location:', userProfile?.location);
-      
-      // Build URL with query parameters including location filter
-      let jobsUrl = getApiUrl('/api/jobs');
+
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
       const queryParams = new URLSearchParams();
-      
-      if (workerId) {
-        queryParams.append('workerId', workerId);
+
+      // Add user-specific parameter for application status
+      if (user.id && user.type === 'worker') {
+        queryParams.append('workerId', user.id);
       }
-      
-      // Add location filter from user profile or filters
-      const userLocation = filters.location || userProfile?.location?.state;
-      if (userLocation) {
-        queryParams.append('location', userLocation);
-      }
-      
-      // Add other filters
-      if (filters.category) queryParams.append('category', filters.category);
-      if (filters.salary) queryParams.append('minSalary', filters.salary);
-      if (filters.employmentType) queryParams.append('employmentType', filters.employmentType);
-      
-      if (queryParams.toString()) {
-        jobsUrl += `?${queryParams.toString()}`;
-      }
-      
-      console.log('FRONTEND: Fetching jobs from URL:', jobsUrl);
-      
-      // Fetch jobs from backend
-      const jobsResponse = await fetch(jobsUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+
+      // Add filters
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && value.trim() !== '') {
+          queryParams.append(key, value.trim());
         }
       });
 
-      if (!jobsResponse.ok) {
-        const errorText = await jobsResponse.text();
-        console.error('FRONTEND: Jobs fetch error:', errorText);
-        throw new Error(`Failed to fetch jobs: ${jobsResponse.status}`);
+      console.log('Fetching jobs with params:', queryParams.toString());
+
+      const response = await fetch(getApiUrl(`/api/jobs?${queryParams.toString()}`));
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch jobs: ${response.status}`);
       }
 
-      const jobsData = await jobsResponse.json();
-      console.log('FRONTEND: Raw jobs response:', jobsData);
+      const jobsData = await response.json();
+      console.log('Received jobs data:', jobsData);
       
-      // Handle different response formats
-      let jobsArray = [];
-      if (jobsData.success && Array.isArray(jobsData.data)) {
-        jobsArray = jobsData.data;
-      } else if (Array.isArray(jobsData)) {
-        jobsArray = jobsData;
-      } else if (jobsData.data && Array.isArray(jobsData.data)) {
-        jobsArray = jobsData.data;
-      }
-      
-      console.log('FRONTEND: Processed jobs array:', jobsArray.length);
+      const jobsArray = Array.isArray(jobsData) ? jobsData : [];
+      setJobs(jobsArray);
 
-      // Fetch current applications if user is authenticated
-      let applicationsArray = [];
-      if (workerId) {
-        try {
-          console.log('FRONTEND: Fetching applications for worker:', workerId);
-          
-          const applicationsResponse = await fetch(getApiUrl(`/api/job-applications/worker/${workerId}/current`), {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-          });
-          
-          if (applicationsResponse.ok) {
-            const applicationsData = await applicationsResponse.json();
-            console.log('FRONTEND: Raw applications response:', applicationsData);
-            
-            // Handle different response formats
-            if (applicationsData.success && Array.isArray(applicationsData.data)) {
-              applicationsArray = applicationsData.data;
-            } else if (Array.isArray(applicationsData)) {
-              applicationsArray = applicationsData;
-            } else if (applicationsData.data && Array.isArray(applicationsData.data)) {
-              applicationsArray = applicationsData.data;
-            }
-            
-            console.log('FRONTEND: Processed applications array:', applicationsArray.length);
-          } else {
-            console.warn('FRONTEND: Failed to fetch applications:', applicationsResponse.status);
-          }
-        } catch (error) {
-          console.error('FRONTEND: Error fetching applications:', error);
-          // Continue without applications data
-        }
-      }
-
-      // Process applications
-      const processedApplications = applicationsArray.map((app, index) => {
-        return {
-          _id: app._id || `app-${index}`,
-          status: app.status || 'pending',
-          appliedAt: app.appliedAt || app.createdAt || new Date().toISOString(),
-          job: {
-            _id: app.job?._id || `job-${index}`,
-            title: app.job?.title || 'Job Title Not Available',
-            companyName: app.job?.companyName || app.job?.company || 'Company Not Available',
-            location: {
-              city: app.job?.location?.city || 'City Not Available',
-              state: app.job?.location?.state || 'State Not Available'
-            },
-            salary: app.job?.salary || 'Salary Not Specified',
-            category: app.job?.category || 'General',
-            employmentType: app.job?.employmentType || 'Full-time'
-          },
-          worker: app.worker || null,
-          employer: app.employer || null
-        };
-      });
-
-      // Update applications state
-      setApplications(processedApplications);
-      setAcceptedJobs(processedApplications);
-      
-      // Create applications map for quick lookup
-      const applicationsMap = processedApplications.reduce((acc, app) => {
-        if (app.job && app.job._id) {
-          acc[app.job._id] = app;
-        }
-        return acc;
-      }, {});
-      setJobApplications(applicationsMap);
-      
-      // Update accepted job IDs
-      const acceptedJobIds = new Set(processedApplications.map(app => app.job?._id).filter(Boolean));
-      setAcceptedJobIds(acceptedJobIds);
-
-      // Process jobs data
-      const processedJobs = jobsArray.map((job, index) => {
-        // Find matching application
-        const matchingApp = processedApplications.find(app => app.job?._id === job._id);
+      // Separate jobs by location if user has location preference
+      if (user.location && user.location.city) {
+        const userCity = user.location.city.toLowerCase();
+        const locationBased = jobsArray.filter(job => 
+          job.location?.city?.toLowerCase().includes(userCity)
+        );
+        const otherLocations = jobsArray.filter(job => 
+          !job.location?.city?.toLowerCase().includes(userCity)
+        );
         
-        return {
-          _id: job._id || `job-${index}`,
-          title: job.title || 'Job Title Not Available',
-          companyName: job.companyName || job.company || 'Company Not Available',
-          location: {
-            city: job.location?.city || 'City Not Available',
-            state: job.location?.state || 'State Not Available',
-            street: job.location?.street || '',
-            pincode: job.location?.pincode || '',
-            type: job.location?.type || 'onsite'
-          },
-          salary: job.salary || 'Salary Not Specified',
-          category: job.category || 'General',
-          employmentType: job.employmentType || 'Full-time',
-          status: job.status || 'active',
-          description: job.description || 'No description available',
-          requirements: job.requirements || '',
-          skillsRequired: job.skillsRequired || [],
-          createdAt: job.createdAt || new Date().toISOString(),
-          urgency: job.urgency || 'Normal',
-          // Include application data if exists
-          application: matchingApp || null,
-          applicationStatus: matchingApp?.status || null,
-          hasApplied: !!matchingApp,
-          applicationId: matchingApp?._id || null
-        };
-      });
-
-      console.log('FRONTEND: Final processed jobs:', processedJobs);
-
-      // Filter only active jobs
-      const activeJobs = processedJobs.filter(job => job.status === 'active');
-      console.log('FRONTEND: Active jobs:', activeJobs.length);
-
-      // Location-based job categorization
-      if (user?.type === 'worker' && userProfile?.location?.state) {
-        const userState = userProfile.location.state.toLowerCase();
-        const userCity = userProfile.location.city?.toLowerCase();
-        
-        console.log('FRONTEND: User location for filtering:', { state: userState, city: userCity });
-        
-        // Categorize jobs by location proximity
-        const sameStateJobs = [];
-        const sameCityJobs = [];
-        const otherLocationJobs = [];
-        
-        activeJobs.forEach(job => {
-          const jobState = job.location?.state?.toLowerCase() || '';
-          const jobCity = job.location?.city?.toLowerCase() || '';
-          
-          if (userCity && jobCity === userCity && jobState === userState) {
-            // Same city jobs (highest priority)
-            sameCityJobs.push(job);
-          } else if (jobState === userState) {
-            // Same state but different city
-            sameStateJobs.push(job);
-          } else {
-            // Different state
-            otherLocationJobs.push(job);
-          }
-        });
-        
-        console.log('FRONTEND: Location-based job categorization:', {
-          sameCity: sameCityJobs.length,
-          sameState: sameStateJobs.length,
-          otherLocations: otherLocationJobs.length
-        });
-        
-        // Combine prioritized jobs: same city first, then same state, then others
-        const prioritizedJobs = [
-          ...sameCityJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-          ...sameStateJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-          ...otherLocationJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        ];
-        
-        // Set location-based job lists
-        setLocationBasedJobs([...sameCityJobs, ...sameStateJobs]);
-        setOtherLocationJobs(otherLocationJobs);
-        setJobs(prioritizedJobs);
-        
+        setLocationBasedJobs(locationBased);
+        setOtherLocationJobs(otherLocations);
       } else {
-        // For non-workers or users without location, show all jobs
-        const sortedJobs = activeJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setLocationBasedJobs(sortedJobs);
-        setOtherLocationJobs([]);
-        setJobs(sortedJobs);
+        setLocationBasedJobs([]);
+        setOtherLocationJobs(jobsArray);
       }
 
-      setError(null);
-      setLastUpdated(new Date());
-      
-      console.log('FRONTEND: Jobs state updated successfully');
-      
     } catch (error) {
-      console.error('FRONTEND: Error fetching jobs:', error);
-      setError(error.message || 'Failed to load jobs. Please try again later.');
-      // Don't clear existing data on error to maintain last known good state
+      console.error('Error fetching jobs:', error);
+      setError(error.message);
+      setJobs([]);
+      setLocationBasedJobs([]);
+      setOtherLocationJobs([]);
     } finally {
       setLoading(false);
-      setIsRetrying(false);
     }
-  }, [user, filters]);
+  }, [filters]);
 
   // We no longer need a separate fetchJobApplications function as it's integrated in fetchJobs
   const fetchJobApplications = useCallback(async () => {
@@ -479,115 +285,95 @@ const AvailableJobs = () => {
 
   // Update the handleApplyForJob function - fix acceptedJobs references
   const handleApplyForJob = async (job) => {
-    // Add job to accepting state
-    setAcceptingJobIds(prev => new Set([...prev, job._id]));
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
     
+    if (!user.id || user.type !== 'worker') {
+      alert('Please log in as a worker to apply for jobs');
+      return;
+    }
+
+    if (job.hasApplied) {
+      alert('You have already applied for this job');
+      return;
+    }
+
+    setApplyingJobs(prev => new Set([...prev, job._id]));
+
     try {
-      const userData = JSON.parse(localStorage.getItem('user'));
-      console.log('Applying for job:', job._id);
-
-      if (!userData?.id) {
-        toast.error('Please login to apply for jobs');
-        navigate('/login');
-        return;
-      }
-
-      // Prepare data for server with proper structure
-      const applicationData = {
-        jobId: job._id,
-        workerId: userData.id,
-        status: 'pending', // Start with pending status
-        workerDetails: {
-          name: userData.name,
-          phone: userData.phone,
-          email: userData.email || '',
-          skills: userData.skills || [],
-          experience: userData.experience || '',
-          location: userData.location || {},
-          // Fix rating - send only the number, not the object
-          rating: userData.rating?.average || 0
-        }
-      };
-
-      console.log('Sending job application to server:', applicationData);
-      
-      // Send to server FIRST and wait for response before updating UI
-      const response = await fetch(getApiUrl('/api/job-applications/apply'), {
+      const response = await fetch(getApiUrl('/api/job-applications'), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(applicationData)
+        body: JSON.stringify({
+          job: job._id,
+          worker: user.id,
+          employer: job.employer?._id || job.employer,
+          workerDetails: {
+            name: user.name,
+            phone: user.phone,
+            skills: user.skills || [],
+            rating: user.rating?.average || 0
+          }
+        })
       });
-      
-      console.log('Server response status:', response.status);
-      
-      if (!response.ok) {
-        // Try to parse error message
-        let errorMessage = 'Failed to submit application';
-        try {
-          const errorData = await response.json();
-          console.error('Server error response:', errorData);
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (e) {
-          // If response isn't JSON, use status text
-          errorMessage = response.statusText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
 
-      // Parse successful response
-      const responseData = await response.json();
-      console.log('Server response data:', responseData);
-      
-      // Extract application data from response
-      const serverApplication = responseData.data || responseData.application || responseData;
-      const applicationId = serverApplication._id || serverApplication.applicationId;
-      
-      if (!applicationId) {
-        throw new Error('Server did not return application ID');
-      }
+      if (response.ok) {
+        // Update the job state to show as applied
+        setJobs(prevJobs => 
+          prevJobs.map(j => 
+            j._id === job._id 
+              ? { 
+                  ...j, 
+                  hasApplied: true, 
+                  applicationStatus: 'pending',
+                  application: {
+                    _id: 'temp-id',
+                    status: 'pending',
+                    appliedAt: new Date().toISOString()
+                  }
+                }
+              : j
+          )
+        );
 
-      // Only update UI state AFTER successful server response
-      console.log('Application created successfully, updating UI state');
-      
-      // Create local application record with server data
-      const localApplication = {
-        _id: applicationId,
-        jobId: job._id,
-        workerId: userData.id,
-        status: serverApplication.status || 'pending',
-        appliedAt: serverApplication.appliedAt || new Date().toISOString(),
-        job: job,
-        applicationId: applicationId
-      };
-      
-      toast.success('Application submitted successfully! The employer will review your application.');
-      
-      // Refresh data after a short delay to sync with backend
-      setTimeout(() => {
-        fetchJobs();
-        fetchJobApplications();
-      }, 1000);
+        // Update location-based arrays
+        setLocationBasedJobs(prevJobs => 
+          prevJobs.map(j => 
+            j._id === job._id 
+              ? { 
+                  ...j, 
+                  hasApplied: true, 
+                  applicationStatus: 'pending'
+                }
+              : j
+          )
+        );
 
-    } catch (error) {
-      console.error('Application error:', error);
-      
-      // Show appropriate error message
-      if (error.message.includes('already applied')) {
-        toast.error('You have already applied for this job');
-      } else if (error.message.includes('not found')) {
-        toast.error('Job not found or no longer available');
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        toast.error('Network error. Please check your connection and try again.');
-      } else if (error.message.includes('validation failed')) {
-        toast.error('Application data is invalid. Please try again.');
+        setOtherLocationJobs(prevJobs => 
+          prevJobs.map(j => 
+            j._id === job._id 
+              ? { 
+                  ...j, 
+                  hasApplied: true, 
+                  applicationStatus: 'pending'
+                }
+              : j
+          )
+        );
+        
+        setShowSuccessAnimation(true);
+        setTimeout(() => setShowSuccessAnimation(false), 3000);
+        alert('Application submitted successfully!');
       } else {
-        toast.error(error.message || 'Failed to submit application. Please try again.');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to apply for job');
       }
+    } catch (error) {
+      console.error('Error applying for job:', error);
+      alert('Failed to apply for job: ' + error.message);
     } finally {
-      // Remove from accepting state
-      setAcceptingJobIds(prev => {
+      setApplyingJobs(prev => {
         const newSet = new Set([...prev]);
         newSet.delete(job._id);
         return newSet;
@@ -774,234 +560,150 @@ const AvailableJobs = () => {
     };
   }, [fetchJobs, pollingInterval]);
 
-  const renderJobCard = (job) => {
-    const application = jobApplications[job._id] || getApplicationForJob(job._id);
-    const hasApplied = isJobAccepted(job._id) || !!application;
-    const jobIsInProgress = job.status === 'in-progress' || application?.status === 'in-progress';
-    const isApplicationAccepted = application?.status === 'accepted' || jobIsInProgress;
-    
-    return (
-      <motion.div
-        key={job._id}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`w-full h-auto min-h-[400px] bg-white rounded-lg shadow-md overflow-hidden border 
-          ${hasApplied ? 'border-green-300' : 'border-gray-100'} 
-          ${jobIsInProgress ? 'bg-blue-50' : isApplicationAccepted ? 'bg-green-50' : ''}
-          hover:shadow-lg transition-shadow duration-300 flex flex-col`}
-        whileHover={{ scale: 1.02 }}
-      >
-        {/* Status banner */}
-        {hasApplied && (
-          <div className={`px-4 py-2 text-sm font-medium ${
-            jobIsInProgress ? 'bg-blue-100 text-blue-800' : 
-            isApplicationAccepted ? 'bg-green-100 text-green-800' : 
-            'bg-yellow-100 text-yellow-800'
-          }`}>
+  const renderJobCard = (job) => (
+    <motion.div
+      key={job._id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden"
+    >
+      {/* Job Status Banner */}
+      {job.hasApplied && (
+        <div className={`px-4 py-2 text-sm font-medium ${
+          job.applicationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+          job.applicationStatus === 'accepted' ? 'bg-green-100 text-green-800' :
+          job.applicationStatus === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+          job.applicationStatus === 'completed' ? 'bg-purple-100 text-purple-800' :
+          'bg-gray-100 text-gray-800'
+        }`}>
+          Application Status: {job.applicationStatus?.charAt(0).toUpperCase() + job.applicationStatus?.slice(1)}
+        </div>
+      )}
+
+      <div className="p-6">
+        {/* Job Header */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">{job.title}</h3>
+            <div className="flex items-center text-gray-600 mb-2">
+              <Building className="w-4 h-4 mr-2" />
+              <span className="font-medium">{job.companyName}</span>
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-end">
+            <span className="text-2xl font-bold text-green-600">₹{job.salary?.toLocaleString()}</span>
+            <span className="text-sm text-gray-500">per job</span>
+          </div>
+        </div>
+
+        {/* Job Details */}
+        <div className="space-y-3 mb-4">
+          <div className="flex items-center text-gray-600">
+            <MapPin className="w-4 h-4 mr-3 text-gray-400" />
+            <span>{job.location?.city}, {job.location?.state}</span>
+          </div>
+          
+          <div className="flex items-center text-gray-600">
+            <Briefcase className="w-4 h-4 mr-3 text-gray-400" />
+            <span>{job.category}</span>
+          </div>
+          
+          <div className="flex items-center text-gray-600">
+            <Clock className="w-4 h-4 mr-3 text-gray-400" />
+            <span>{job.employmentType}</span>
+          </div>
+          
+          {job.urgency && job.urgency !== 'normal' && (
             <div className="flex items-center">
-              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-xs">
-                {jobIsInProgress ? 'Job In Progress' : 
-                 isApplicationAccepted ? 'Application Accepted' : 
-                 'Application Submitted'}
+              <AlertCircle className={`w-4 h-4 mr-3 ${
+                job.urgency === 'urgent' ? 'text-red-500' : 
+                job.urgency === 'high' ? 'text-yellow-500' : 'text-blue-500'
+              }`} />
+              <span className={`text-sm font-medium ${
+                job.urgency === 'urgent' ? 'text-red-600' : 
+                job.urgency === 'high' ? 'text-yellow-600' : 'text-blue-600'
+              }`}>
+                {job.urgency.charAt(0).toUpperCase() + job.urgency.slice(1)} Priority
               </span>
+            </div>
+          )}
+        </div>
+
+        {/* Job Description */}
+        <p className="text-gray-700 text-sm mb-4 line-clamp-3">
+          {job.description}
+        </p>
+
+        {/* Skills Required */}
+        {job.skillsRequired && job.skillsRequired.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-2">Skills Required:</h4>
+            <div className="flex flex-wrap gap-2">
+              {job.skillsRequired.slice(0, 3).map((skill, index) => (
+                <span key={index} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  {skill}
+                </span>
+              ))}
+              {job.skillsRequired.length > 3 && (
+                <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                  +{job.skillsRequired.length - 3} more
+                </span>
+              )}
             </div>
           </div>
         )}
-        
-        <div className="p-4 flex-1 flex flex-col">
-          {/* Header section */}
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-gray-800 mb-1 line-clamp-2">{job.title}</h3>
-            <p className="text-sm font-medium text-blue-600 mb-3 line-clamp-1">{job.companyName}</p>
-            
-            {/* Job details grid - compact layout */}
-            <div className="grid grid-cols-1 gap-2 text-xs text-gray-600">
-              <div className="flex items-center">
-                <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                </svg>
-                <span className="truncate">{job.location.city}, {job.location.state}</span>
-              </div>
-              
-              <div className="flex items-center">
-                <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="font-medium text-green-600">₹{job.salary || 'Negotiable'}</span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                  <span className="truncate">{job.category}</span>
-                </div>
-                
-                <div className="flex items-center">
-                  <svg className="flex-shrink-0 mr-1.5 h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-xs">{job.employmentType}</span>
-                </div>
-              </div>
-            </div>
+
+        {/* Action Button */}
+        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+          <div className="text-xs text-gray-500">
+            Posted {new Date(job.createdAt).toLocaleDateString()}
           </div>
           
-          {/* Requirements section - collapsible */}
-          {job.requirements && (
-            <div className="mb-3 flex-1">
-              <div className="text-xs text-gray-600 border-t pt-2">
-                <span className="font-semibold">Requirements:</span>
-                <p className="mt-1 line-clamp-2">{job.requirements}</p>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setSelectedJob(job)}
+              className="px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+            >
+              View Details
+            </button>
+            
+            {job.hasApplied ? (
+              <div className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center ${
+                job.applicationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                job.applicationStatus === 'accepted' ? 'bg-green-100 text-green-800' :
+                job.applicationStatus === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                job.applicationStatus === 'completed' ? 'bg-purple-100 text-purple-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Applied
               </div>
-            </div>
-          )}
-          
-          {/* Application info */}
-          {application && (
-            <div className="mb-3 text-xs text-gray-500">
-              <div className="bg-gray-50 rounded p-2">
-                <div>Applied: {formatDate(application.appliedAt || application.createdAt)}</div>
-                {application._id && (
-                  <div className="mt-1">ID: #{application._id.substring(0, 8)}</div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Edit form - compact */}
-          {editingJobId === job._id && (
-            <div className="mb-3 bg-gray-50 p-3 rounded border border-blue-200">
-              <div className="space-y-2">
-                <input 
-                  name="title" 
-                  value={editJobData.title} 
-                  onChange={handleEditChange} 
-                  className="w-full text-xs border rounded p-1" 
-                  placeholder="Title" 
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input 
-                    name="salary" 
-                    value={editJobData.salary} 
-                    onChange={handleEditChange} 
-                    className="text-xs border rounded p-1" 
-                    placeholder="Salary" 
-                    type="number" 
-                  />
-                  <input 
-                    name="category" 
-                    value={editJobData.category} 
-                    onChange={handleEditChange} 
-                    className="text-xs border rounded p-1" 
-                    placeholder="Category" 
-                  />
-                </div>
-                <input 
-                  name="requirements" 
-                  value={editJobData.requirements} 
-                  onChange={handleEditChange} 
-                  className="w-full text-xs border rounded p-1" 
-                  placeholder="Requirements" 
-                />
-              </div>
-              <div className="mt-2 flex gap-1">
-                <button 
-                  onClick={() => handleSaveEdit(job._id)} 
-                  disabled={savingEdit} 
-                  className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {savingEdit ? 'Saving...' : 'Save'}
-                </button>
-                <button 
-                  onClick={() => setEditingJobId(null)} 
-                  className="px-2 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-          
-          {/* Status and Action Area - fixed at bottom */}
-          <div className="mt-auto border-t pt-3">
-            <div className="flex justify-between items-center">
-              {/* Status Display */}
-              <div className="flex flex-col flex-1">
-                {isPending(application?.status) || isAccepted(application?.status) || isInProgress(application?.status) ? (
-                  <>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      isPending(application?.status) ? 'bg-yellow-100 text-yellow-800' : 
-                      isInProgress(application?.status) ? 'bg-blue-100 text-blue-800' : 
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {application?.status ? application.status.charAt(0).toUpperCase() + application.status.slice(1) : 'Pending'}
-                    </span>
-                    
-                    <span className="text-xs text-gray-500 mt-1">
-                      {isPending(application?.status) ? 'Awaiting response' : 
-                       isAccepted(application?.status) ? 'Ready to start' : 
-                       'Work in progress'}
-                    </span>
-                  </>
-                ) : (
-                  <div className="flex items-center text-gray-500 text-xs">
-                    <span>Ready to apply</span>
+            ) : (
+              <button
+                onClick={() => handleApplyForJob(job)}
+                disabled={applyingJobs.has(job._id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  applyingJobs.has(job._id)
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                {applyingJobs.has(job._id) ? (
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Applying...
                   </div>
-                )}
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-1 ml-2">
-                {hasApplied ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCancelApplication(application || job);
-                    }}
-                    disabled={cancellingJobIds.has(job._id)}
-                    className={`px-3 py-1.5 rounded text-xs font-medium ${
-                      cancellingJobIds.has(job._id) 
-                        ? 'bg-gray-300 text-gray-500 cursor-wait' 
-                        : 'bg-red-500 text-white hover:bg-red-600'
-                    } transition-colors`}
-                  >
-                    {cancellingJobIds.has(job._id) ? 'Cancelling...' : 'Cancel'}
-                  </button>
                 ) : (
-                  <button
-                    onClick={() => handleApplyForJob(job)}
-                    disabled={acceptingJobIds.has(job._id)}
-                    className={`px-3 py-1.5 rounded text-xs font-medium ${
-                      acceptingJobIds.has(job._id) 
-                        ? 'bg-green-500 text-white cursor-wait' 
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    } transition-colors`}
-                  >
-                    {acceptingJobIds.has(job._id) ? 'Applying...' : 'Apply Now'}
-                  </button>
+                  'Apply Now'
                 )}
-                
-                {/* Edit button for employers */}
-                {user && (user.type === 'employer' || user.type === 'admin') && editingJobId !== job._id && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleEditJob(job); }}
-                    className="px-2 py-1 rounded text-xs font-medium bg-yellow-500 text-white hover:bg-yellow-600 transition-colors"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-            </div>
+              </button>
+            )}
           </div>
         </div>
-      </motion.div>
-    );
-  };
+      </div>
+    </motion.div>
+  );
 
   // Fetch employer profile in real time and save to localStorage
   useEffect(() => {
@@ -1259,7 +961,7 @@ const AvailableJobs = () => {
             <div className="mb-12">
               <div className="flex items-center mb-6">
                 <svg className="h-6 w-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 </svg>
                 <h2 className="text-2xl font-bold text-gray-900">
                   Jobs in Your Area ({locationBasedJobs.length})
@@ -1276,7 +978,7 @@ const AvailableJobs = () => {
               <div className="mb-12">
                 <div className="flex items-center mb-6">
                   <svg className="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <h2 className="text-2xl font-bold text-gray-900">
                     Jobs in Other Locations ({otherLocationJobs.length})
@@ -1344,6 +1046,97 @@ const AvailableJobs = () => {
           </div>
         )}
       </div>
+
+      {/* Job Details Modal */}
+      <AnimatePresence>
+        {selectedJob && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setSelectedJob(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal content for job details */}
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedJob.title}</h2>
+                    <p className="text-lg text-gray-600">{selectedJob.companyName}</p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedJob(null)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="w-5 h-5 mr-3" />
+                    <span>{selectedJob.location?.city}, {selectedJob.location?.state}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <DollarSign className="w-5 h-5 mr-3" />
+                    <span className="font-semibold text-green-600">₹{selectedJob.salary?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Briefcase className="w-5 h-5 mr-3" />
+                    <span>{selectedJob.category}</span>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Job Description</h3>
+                  <p className="text-gray-700">{selectedJob.description}</p>
+                </div>
+
+                {selectedJob.skillsRequired && selectedJob.skillsRequired.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Skills Required</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedJob.skillsRequired.map((skill, index) => (
+                        <span key={index} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setSelectedJob(null)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                  {!selectedJob.hasApplied && (
+                    <button
+                      onClick={() => {
+                        handleApplyForJob(selectedJob);
+                        setSelectedJob(null);
+                      }}
+                      disabled={applyingJobs.has(selectedJob._id)}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    >
+                      {applyingJobs.has(selectedJob._id) ? 'Applying...' : 'Apply Now'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

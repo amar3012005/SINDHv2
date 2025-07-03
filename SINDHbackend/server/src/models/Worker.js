@@ -303,7 +303,33 @@ const workerSchema = new mongoose.Schema({
   otp: {
     code: String,
     expiresAt: Date
-  }
+  },
+  
+  // Balance and earnings
+  balance: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  earnings: [{
+    jobId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Job'
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    date: {
+      type: Date,
+      default: Date.now
+    },
+    description: {
+      type: String,
+      default: 'Job payment'
+    }
+  }]
 }, {
   timestamps: true
 });
