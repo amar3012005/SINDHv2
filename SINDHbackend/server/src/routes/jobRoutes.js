@@ -6,17 +6,12 @@ const NotificationService = require('../services/NotificationService');
 const Worker = require('../models/Worker');
 const Employer = require('../models/Employer');
 const JobApplication = require('../models/JobApplication');
+const logger = require('../config/logger');
 
 // Create a new job
 router.post('/', async (req, res) => {
+  logger.info('New job posting');
   try {
-    console.log('=== New Job Posting ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('\nJob Details:', JSON.stringify(req.body, null, 2));
-    
-    console.log('Validating job data...');
-    
-    // Check for duplicate job submission (within last 5 minutes)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const existingJob = await Job.findOne({
       title: req.body.title,
@@ -26,147 +21,71 @@ router.post('/', async (req, res) => {
     });
     
     if (existingJob) {
-      console.log('⚠️ Duplicate job submission detected');
+      logger.warn('Duplicate job submission detected');
       return res.status(400).json({ 
         success: false, 
         message: 'A similar job was already posted in the last 5 minutes'
       });
     }
     
-    // Create and save the job
     const job = new Job(req.body);
-    console.log('✅ Job validation successful');
     await job.save();
     
-    console.log('✅ Job saved successfully:', {
-      jobId: job._id,
-      title: job.title,
-      employer: job.employerName,
-      company: job.companyName,
-      location: job.location,
-      salary: job.salary,
-      status: job.status
-    });
-    
-    // Update the employer's postedJobs array with ONLY the job ID
     if (req.body.employer) {
       try {
-        // IMPORTANT: Only push the job ID (not a complex object)
         await Employer.findByIdAndUpdate(
           req.body.employer,
-          { $push: { postedJobs: job._id } }, // Use the ObjectId directly
+          { $push: { postedJobs: job._id } },
           { new: true }
         );
-        console.log('✅ Updated employer postedJobs with job ID');
       } catch (employerError) {
-        console.error('❌ Error updating employer:', employerError);
-        // Don't fail the whole request if the employer update fails
+        logger.error('Error updating employer after job creation', { error: employerError.message, stack: employerError.stack });
       }
     }
     
+    logger.info(`Job posted successfully: ${job.title}`);
     res.status(201).json({ 
       success: true, 
       message: 'Job posted successfully',
       job: job 
     });
   } catch (error) {
-    console.error('❌ Error posting job:', error);
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Create a job without immediately updating the employer
-router.post('/create', async (req, res) => {
-  try {
-    console.log('=== New Job Creation Request ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('\nJob Details:', JSON.stringify(req.body, null, 2));
-    
-    // Create and save the job
-    const job = new Job(req.body);
-    console.log('✅ Job validation successful');
-    await job.save();
-    
-    console.log('✅ Job saved successfully:', {
-      jobId: job._id,
-      title: job.title,
-      employer: job.employerName,
-      company: job.companyName,
-      location: job.location,
-      salary: job.salary,
-      status: job.status
-    });
-    
-    // After job is created, update the employer's postedJobs array
-    if (req.body.employer) {
-      try {
-        // IMPORTANT: Only use the job ID as string to avoid ObjectId casting issues
-        const updateResult = await Employer.findByIdAndUpdate(
-          req.body.employer,
-          { $push: { postedJobs: job._id.toString() } },
-          { new: true }
-        );
-        
-        console.log('✅ Updated employer postedJobs array:', updateResult ? 'Success' : 'Failed');
-      } catch (employerError) {
-        console.error('❌ Error updating employer:', employerError);
-        // Don't fail the whole request if employer update fails
-      }
-    }
-    
-    res.status(201).json({ 
-      success: true, 
-      message: 'Job posted successfully',
-      job: job 
-    });
-  } catch (error) {
-    console.error('❌ Error posting job:', error);
+    logger.error('Error posting job', { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
 
 // Get all jobs (with filters)
 router.get('/', async (req, res) => {
-  console.log('=== BACKEND: Available Jobs Page Accessed ===');
-  console.log('BACKEND: Query Parameters:', req.query);
-  
   try {
     const { status, location, skills, workerId, category, minSalary, employmentType } = req.query;
     const query = {};
 
-    // Status filter - show all active and in-progress jobs
     if (status && status !== 'active,in-progress') {
       query.status = status;
     } else {
-      // Default to active and in-progress jobs
       query.status = { $in: ['active', 'in-progress'] };
     }
 
-    // Skills filter
     if (skills) {
       query.requiredSkills = {
         $in: skills.split(',')
       };
     }
 
-    // Category filter
     if (category) {
       query.category = { $regex: category, $options: 'i' };
     }
 
-    // Employment type filter
     if (employmentType) {
       query.employmentType = { $regex: employmentType, $options: 'i' };
     }
 
-    // Salary filter
     if (minSalary) {
       query.salary = { $gte: parseInt(minSalary) };
     }
 
-    // Location filter - enhanced for better matching
     if (location) {
-      console.log('BACKEND: Applying location filter for:', location);
       query.$or = [
         { 'location.state': { $regex: location, $options: 'i' } },
         { 'location.city': { $regex: location, $options: 'i' } },
@@ -174,37 +93,26 @@ router.get('/', async (req, res) => {
       ];
     }
 
-    console.log('BACKEND: MongoDB Query:', JSON.stringify(query, null, 2));
-
-    // Fetch worker applications if workerId is provided
     let workerApplications = [];
     let completedJobIds = [];
     
     if (workerId) {
-      console.log('BACKEND: Fetching applications for worker:', workerId);
       try {
-        // Fetch ALL applications for this worker (including completed)
         const allApplications = await JobApplication.find({ 
           worker: workerId
         }).populate('job');
         
-        // Separate completed applications to exclude those jobs
         const completedApplications = allApplications.filter(app => app.status === 'completed');
         completedJobIds = completedApplications.map(app => app.job?._id?.toString()).filter(Boolean);
         
-        // Active applications (not completed)
         workerApplications = allApplications.filter(app => 
           app.status && ['pending', 'accepted', 'in-progress'].includes(app.status)
         );
-        
-        console.log(`BACKEND: Found ${workerApplications.length} active applications`);
-        console.log(`BACKEND: Found ${completedApplications.length} completed applications to exclude`);
       } catch (appError) {
-        console.error('BACKEND: Error fetching applications:', appError);
+        logger.error('Error fetching applications for worker', { error: appError.message, stack: appError.stack });
       }
     }
 
-    // Fetch jobs with sorting by creation date (newest first)
     let jobs = await Job.find(query)
       .populate({
         path: 'employer',
@@ -214,24 +122,15 @@ router.get('/', async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
       
-    console.log(`BACKEND: Found ${jobs.length} total jobs matching criteria`);
-    
-    // Filter out jobs that this specific worker has completed
     if (completedJobIds.length > 0) {
       jobs = jobs.filter(job => !completedJobIds.includes(job._id.toString()));
-      console.log(`BACKEND: After filtering worker's completed jobs: ${jobs.length} jobs remaining`);
     }
     
-    // Process jobs to ensure all required fields are present
     const processedJobs = jobs.map((job, index) => {
-      console.log(`BACKEND: Processing job ${index + 1}: ${job.title}`);
-      
-      // Find if worker has applied for this job (but not completed)
       const workerApplication = workerApplications.find(app => 
         app.job && app.job._id.toString() === job._id.toString()
       );
 
-      // Create a properly formatted job object
       const processedJob = {
         _id: job._id,
         id: job._id,
@@ -248,7 +147,7 @@ router.get('/', async (req, res) => {
         salary: job.salary || 
                job.pay || 
                job.wage || 
-               15000, // Default numeric value for better filtering
+               15000,
         location: {
           city: job.location?.city || 'Not specified',
           state: job.location?.state || 'Not specified',
@@ -265,7 +164,6 @@ router.get('/', async (req, res) => {
         createdAt: job.createdAt || new Date().toISOString(),
         updatedAt: job.updatedAt || new Date().toISOString(),
         employer: job.employer || null,
-        // Application status if worker has applied (but not completed)
         hasApplied: !!workerApplication,
         application: workerApplication || null,
         applicationStatus: workerApplication?.status || null
@@ -274,12 +172,10 @@ router.get('/', async (req, res) => {
       return processedJob;
     });
     
-    console.log('BACKEND: Sending response with', processedJobs.length, 'processed jobs');
-    
     res.status(200).json(processedJobs);
     
   } catch (error) {
-    console.error('BACKEND: Error fetching available jobs:', error);
+    logger.error('Error fetching available jobs', { error: error.message, stack: error.stack });
     res.status(500).json({ 
       success: false,
       message: 'Failed to fetch jobs',
@@ -294,10 +190,6 @@ router.get('/worker/:workerId/completed', async (req, res) => {
   try {
     const { workerId } = req.params;
     
-    console.log('BACKEND: Fetching completed jobs for worker:', workerId);
-    
-    // Find all completed applications for this worker
-    // First try by worker field, then by phone number match
     let completedApplications = await JobApplication.find({
       worker: workerId,
       status: 'completed'
@@ -306,15 +198,9 @@ router.get('/worker/:workerId/completed', async (req, res) => {
     .populate('employer', 'name company companyName')
     .sort({ updatedAt: -1 });
     
-    // If no results found by worker ID, try to find by phone number
     if (completedApplications.length === 0) {
-      console.log('BACKEND: No results by worker ID, trying phone number match...');
-      
       const worker = await Worker.findById(workerId);
       if (worker && worker.phone) {
-        console.log('BACKEND: Searching by phone number:', worker.phone);
-        
-        // Find applications where workerDetails.phone matches
         completedApplications = await JobApplication.find({
           'workerDetails.phone': worker.phone,
           status: 'completed'
@@ -323,21 +209,16 @@ router.get('/worker/:workerId/completed', async (req, res) => {
         .populate('employer', 'name company companyName')
         .sort({ updatedAt: -1 });
         
-        // Fix the worker IDs in these applications
         for (const app of completedApplications) {
           if (app.worker.toString() !== workerId) {
-            console.log(`BACKEND: Fixing worker ID in application ${app._id}`);
             app.worker = workerId;
-            app.workerDetails.name = worker.name; // Fix the name too
+            app.workerDetails.name = worker.name;
             await app.save();
           }
         }
       }
     }
     
-    console.log(`BACKEND: Found ${completedApplications.length} completed jobs`);
-    
-    // Format the response with job and payment details
     const completedJobs = completedApplications.map(app => ({
       _id: app._id,
       job: {
@@ -367,7 +248,7 @@ router.get('/worker/:workerId/completed', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('BACKEND: Error fetching completed jobs:', error);
+    logger.error('Error fetching completed jobs', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch completed jobs',
@@ -382,17 +263,12 @@ router.get('/count', async (req, res) => {
     const { location, category, minSalary, employmentType, workerId, status } = req.query;
     let query = {};
 
-    console.log('BACKEND: Job count request with filters:', req.query);
-
-    // Status filter - use the same logic as main jobs endpoint
     if (status && status !== 'active,in-progress') {
       query.status = status;
     } else {
-      // Default to active and in-progress jobs (same as AvailableJobs)
       query.status = { $in: ['active', 'in-progress'] };
     }
 
-    // Apply other filters
     if (category) {
       query.category = { $regex: category, $options: 'i' };
     }
@@ -414,12 +290,8 @@ router.get('/count', async (req, res) => {
 
     let count = await Job.countDocuments(query);
 
-    // If workerId is provided, exclude jobs that this worker has completed (same as AvailableJobs)
     if (workerId) {
       try {
-        console.log('BACKEND: Excluding completed jobs for worker:', workerId);
-        
-        // Find completed applications to exclude those jobs
         const completedApplications = await JobApplication.find({
           worker: workerId,
           status: 'completed'
@@ -433,14 +305,11 @@ router.get('/count', async (req, res) => {
             _id: { $nin: completedJobIds }
           };
           count = await Job.countDocuments(excludeCompletedQuery);
-          console.log(`BACKEND: Excluded ${completedJobIds.length} completed jobs, final count: ${count}`);
         }
       } catch (error) {
-        console.error('BACKEND: Error filtering completed jobs from count:', error);
+        logger.error('Error filtering completed jobs from count', { error: error.message, stack: error.stack });
       }
     }
-    
-    console.log('BACKEND: Job count result:', { query, count });
     
     res.json({
       success: true,
@@ -449,7 +318,7 @@ router.get('/count', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('BACKEND: Error getting job count:', error);
+    logger.error('Error getting job count', { error: error.message, stack: error.stack });
     res.status(500).json({ 
       success: false,
       message: 'Failed to get job count',
@@ -470,6 +339,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(job);
   } catch (error) {
+    logger.error(`Error fetching job by ID: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -484,9 +354,10 @@ router.put('/:id', async (req, res) => {
 
     Object.assign(job, req.body);
     await job.save();
-    
+    logger.info(`Job updated successfully: ${job.title}`);
     res.json(job);
   } catch (error) {
+    logger.error(`Error updating job: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
@@ -504,7 +375,6 @@ router.post('/:id/apply', async (req, res) => {
       return res.status(404).json({ message: 'Worker not found' });
     }
 
-    // Check if worker has already applied
     const existingApplication = job.applications.find(
       app => app.worker.toString() === worker._id.toString()
     );
@@ -520,13 +390,14 @@ router.post('/:id/apply', async (req, res) => {
 
     await job.save();
     
-    // Populate the worker details in the response
     const updatedJob = await Job.findById(job._id)
       .populate('employer')
       .populate('applications.worker');
     
+    logger.info(`Worker ${worker.name} applied for job: ${job.title}`);
     res.status(201).json(updatedJob);
   } catch (error) {
+    logger.error('Error applying for job', { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
@@ -546,9 +417,10 @@ router.patch('/:id/applications/:applicationId', async (req, res) => {
 
     application.status = req.body.status;
     await job.save();
-    
+    logger.info(`Application status updated for job: ${job.title}`);
     res.json(job);
   } catch (error) {
+    logger.error('Error updating application status', { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
@@ -568,7 +440,7 @@ router.patch('/:id/complete', async (req, res) => {
     
     await job.save();
     
-    console.log(`Job ${job.title} manually marked as completed`);
+    logger.info(`Job ${job.title} manually marked as completed`);
 
     res.json({
       success: true,
@@ -576,7 +448,7 @@ router.patch('/:id/complete', async (req, res) => {
       job: job
     });
   } catch (error) {
-    console.error('Error completing job:', error);
+    logger.error('Error completing job', { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
@@ -586,24 +458,20 @@ router.post('/accept', async (req, res) => {
   try {
     const { jobId, workerId } = req.body;
 
-    // Validate input
     if (!jobId || !workerId) {
       return res.status(400).json({ message: 'Job ID and Worker ID are required' });
     }
 
-    // Get job details to get employer ID
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: 'Job not found' });
     }
 
-    // Check if worker exists
     const worker = await Worker.findById(workerId);
     if (!worker) {
       return res.status(404).json({ message: 'Worker not found' });
     }
 
-    // Create job application
     const jobApplication = new JobApplication({
       jobId,
       workerId,
@@ -613,12 +481,10 @@ router.post('/accept', async (req, res) => {
 
     await jobApplication.save();
 
-    // Send notification to employer (you can implement this later)
-    // await NotificationService.sendJobApplicationNotification(job.employer, workerId, jobId);
-
+    logger.info(`Worker ${worker.name} accepted job: ${job.title}`);
     res.status(201).json({ message: 'Job application submitted successfully' });
   } catch (error) {
-    console.error('Error accepting job:', error);
+    logger.error('Error accepting job', { error: error.message, stack: error.stack });
     if (error.code === 11000) {
       return res.status(400).json({ message: 'You have already applied for this job' });
     }
@@ -638,7 +504,7 @@ router.get('/worker/:workerId/accepted-jobs', async (req, res) => {
 
     res.json(applications);
   } catch (error) {
-    console.error('Error fetching accepted jobs:', error);
+    logger.error('Error fetching accepted jobs', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -655,7 +521,7 @@ router.get('/employer/:employerId/applications', async (req, res) => {
 
     res.json(applications);
   } catch (error) {
-    console.error('Error fetching job applications:', error);
+    logger.error('Error fetching job applications', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -679,12 +545,10 @@ router.patch('/applications/:applicationId', async (req, res) => {
     if (notes) application.notes = notes;
     await application.save();
 
-    // Send notification to worker (you can implement this later)
-    // await NotificationService.sendApplicationStatusNotification(application.workerId, status);
-
+    logger.info(`Application status updated: ${applicationId}`);
     res.json({ message: 'Application status updated successfully' });
   } catch (error) {
-    console.error('Error updating application status:', error);
+    logger.error('Error updating application status', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -702,12 +566,11 @@ router.patch('/:jobId/update-status', async (req, res) => {
 
     job.status = status;
     job.assignedWorker = applicantId;
-    job.workerDetails = workerDetails; // Save worker details
+    job.workerDetails = workerDetails;
     job.updatedAt = new Date();
 
     await job.save();
 
-    // Send notification to employer
     await NotificationService.sendNotification({
       recipient: job.employer,
       type: 'worker_applied',
@@ -720,9 +583,10 @@ router.patch('/:jobId/update-status', async (req, res) => {
       }
     });
 
+    logger.info(`Job status updated: ${job.title}`);
     res.json(job);
   } catch (error) {
-    console.error('Error updating job status:', error);
+    logger.error('Error updating job status', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -732,9 +596,6 @@ router.get('/employer/:employerId', async (req, res) => {
   try {
     const { employerId } = req.params;
     
-    console.log('Fetching jobs for employer:', employerId);
-
-    // Validate employerId format
     if (!employerId.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
         success: false,
@@ -749,17 +610,14 @@ router.get('/employer/:employerId', async (req, res) => {
     .populate('employer', 'name company')
     .sort({ createdAt: -1 });
     
-    console.log(`Found ${jobs.length} jobs for employer ${employerId}`);
-    
-    // Always return array, even if empty
     res.json(jobs || []);
     
   } catch (error) {
-    console.error('Error fetching employer jobs:', error);
+    logger.error('Error fetching employer jobs', { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch jobs',
-      data: [], // Return empty array on error
+      data: [],
       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
@@ -770,14 +628,11 @@ router.delete('/:id', async (req, res) => {
   try {
     const jobId = req.params.id;
     
-    console.log('Deleting job:', jobId);
-    
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: 'Job not found' });
     }
     
-    // Check if there are any applications for this job
     const applications = await JobApplication.find({ job: jobId });
     
     if (applications.length > 0) {
@@ -786,7 +641,6 @@ router.delete('/:id', async (req, res) => {
       });
     }
     
-    // Remove job from employer's postedJobs array
     if (job.employer) {
       await Employer.findByIdAndUpdate(
         job.employer,
@@ -794,18 +648,16 @@ router.delete('/:id', async (req, res) => {
       );
     }
     
-    // Delete the job
     await Job.findByIdAndDelete(jobId);
     
-    console.log('Job deleted successfully:', jobId);
-    
+    logger.info(`Job deleted successfully: ${jobId}`);
     res.json({
       success: true,
       message: 'Job deleted successfully'
     });
     
   } catch (error) {
-    console.error('Error deleting job:', error);
+    logger.error('Error deleting job', { error: error.message, stack: error.stack });
     res.status(500).json({ 
       success: false,
       message: error.message 

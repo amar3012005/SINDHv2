@@ -3,19 +3,17 @@ const router = express.Router();
 const Worker = require('../models/Worker');
 const Employer = require('../models/Employer');
 const JobApplication = require('../models/JobApplication');
+const logger = require('../config/logger');
 
 // Worker login
 router.post('/workers/login', async (req, res) => {
   try {
-    console.log('\n=== Worker Login Attempt ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Request Body:', req.body);
-    console.log('Headers:', req.headers);
+    logger.info('Worker login attempt');
 
     const { phoneNumber } = req.body;
     
     if (!phoneNumber || phoneNumber.length !== 10) {
-      console.log('Invalid phone number:', phoneNumber);
+      logger.warn('Invalid phone number provided for worker login');
       return res.status(400).json({ 
         success: false,
         message: 'Please provide a valid 10-digit phone number' 
@@ -24,10 +22,9 @@ router.post('/workers/login', async (req, res) => {
 
     // Find worker by phone number
     const worker = await Worker.findOne({ phone: phoneNumber });
-    console.log('Result of Worker.findOne:', worker);
     
     if (!worker) {
-      console.log('Worker not found for phone number:', phoneNumber);
+      logger.info(`Worker not found with phone number: ${phoneNumber}`);
       return res.status(404).json({ 
         success: false,
         message: 'No worker account found with this phone number.',
@@ -46,29 +43,6 @@ router.post('/workers/login', async (req, res) => {
         select: 'name company'
       })
       .sort({ updatedAt: -1 });
-
-    console.log('\nJob Applications Status:');
-    console.log('Total Applications:', jobApplications.length);
-    jobApplications.forEach((app, index) => {
-      console.log(`\nApplication ${index + 1}:`);
-      console.log({
-        applicationId: app._id,
-        jobId: app.job?._id,
-        jobTitle: app.job?.title,
-        status: app.status,
-        appliedAt: app.applicationDetails?.appliedAt,
-        employer: app.employer?.name,
-        acceptButton: app.status === 'pending' ? 'Shown' : 'Hidden'
-      });
-    });
-
-    // Log session data
-    console.log('\nSession Data:', {
-      userId: worker?._id,
-      isLoggedIn: true,
-      userType: 'worker',
-      timestamp: new Date().toISOString()
-    });
 
     // Separate current and past jobs
     const currentJobs = jobApplications.filter(app => 
@@ -95,18 +69,14 @@ router.post('/workers/login', async (req, res) => {
       }
     };
 
-    console.log('Worker data with job history:', JSON.stringify(workerData, null, 2));
+    logger.info(`Worker login successful for ${worker.name}`);
     res.json({
       success: true,
       message: 'Login successful',
       data: workerData
     });
   } catch (error) {
-    console.error('\n❌ Worker Login Error:', {
-      message: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    });
+    logger.error('Worker login error', { error: error.message, stack: error.stack });
     res.status(500).json({ 
       success: false,
       message: 'Internal server error',
@@ -117,12 +87,12 @@ router.post('/workers/login', async (req, res) => {
 
 // Employer login
 router.post('/employers/login', async (req, res) => {
-  console.log('Employer login attempt:', req.body);
+  logger.info('Employer login attempt');
   try {
     const { phoneNumber } = req.body;
     
     if (!phoneNumber || phoneNumber.length !== 10) {
-      console.log('Invalid phone number:', phoneNumber);
+      logger.warn('Invalid phone number provided for employer login');
       return res.status(400).json({ 
         success: false,
         message: 'Please provide a valid 10-digit phone number' 
@@ -131,10 +101,9 @@ router.post('/employers/login', async (req, res) => {
 
     // Find employer by phone number
     const employer = await Employer.findOne({ phone: phoneNumber });
-    console.log('Result of Employer.findOne:', employer);
     
     if (!employer) {
-      console.log('Employer not found for phone number:', phoneNumber);
+      logger.info(`Employer not found with phone number: ${phoneNumber}`);
       return res.status(404).json({ 
         success: false,
         message: 'No employer account found with this phone number.',
@@ -166,19 +135,14 @@ router.post('/employers/login', async (req, res) => {
       lastLogin: employer.lastLogin
     };
 
-    console.log('Employer login successful:', {
-      id: employerData.id,
-      name: employerData.name,
-      isLoggedIn: employerData.isLoggedIn
-    });
-
+    logger.info(`Employer login successful for ${employer.name}`);
     res.json({
       success: true,
       message: 'Login successful',
       data: employerData
     });
   } catch (error) {
-    console.error('Error in employer login:', error);
+    logger.error('Error in employer login', { error: error.message, stack: error.stack });
     res.status(500).json({ 
       success: false,
       message: 'Internal server error' 

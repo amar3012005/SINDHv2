@@ -3,45 +3,17 @@ const router = express.Router();
 const Worker = require('../models/Worker');
 const JobMatchingService = require('../services/JobMatchingService');
 const JobApplication = require('../models/JobApplication');
+const logger = require('../config/logger');
 
 // Register a new worker
 router.post('/register', async (req, res) => {
-  console.log('\n=== Worker Registration Request ===');
-  console.log('Timestamp:', new Date().toISOString());
-  console.log('\nRequest Body:');
-  console.log(JSON.stringify(req.body, null, 2));
-  
+  logger.info('Worker registration request');
   try {
-    // Create new worker instance
-    console.log('\nCreating worker instance...');
     const worker = new Worker(req.body);
-    
-    // Validate worker data
-    console.log('\nValidating worker data...');
-    try {
-      await worker.validate();
-      console.log('✓ Validation successful');
-    } catch (validationError) {
-      console.error('✗ Validation failed:', {
-        errors: validationError.errors,
-        message: validationError.message
-      });
-      return res.status(400).json({ 
-        success: false,
-        message: 'Validation failed', 
-        errors: validationError.errors 
-      });
-    }
-    
-    // Save worker to database
-    console.log('\nSaving worker to database...');
+    await worker.validate();
     await worker.save();
-    console.log('✓ Worker saved successfully');
-    console.log('Worker ID:', worker._id);
-    
-    // Send response
-    console.log('\nSending response...');
-    const response = { 
+    logger.info(`Worker registered successfully: ${worker.name}`);
+    res.status(201).json({ 
       success: true,
       message: 'Worker registered successfully',
       data: {
@@ -54,42 +26,16 @@ router.post('/register', async (req, res) => {
           profileCompletionPercentage: worker.profileCompletionPercentage
         }
       }
-    };
-    console.log('Response:', JSON.stringify(response, null, 2));
-    
-    res.status(201).json(response);
-    console.log('\n=== Worker Registration Completed Successfully ===\n');
+    });
   } catch (error) {
-    console.error('\n=== Worker Registration Failed ===');
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    
-    // Handle specific errors
-    let statusCode = 500;
-    let errorMessage = error.message;
-    
+    logger.error('Worker registration failed', { error: error.message, stack: error.stack });
     if (error.code === 11000) {
-      statusCode = 409;
-      if (error.message.includes('phone')) {
-        errorMessage = 'Phone number already registered';
-      } else if (error.message.includes('aadharNumber')) {
-        errorMessage = 'Aadhar number already registered';
-      } else {
-        errorMessage = 'Account already exists';
-      }
+      res.status(409).json({ success: false, message: 'Phone number already registered' });
     } else if (error.name === 'ValidationError') {
-      statusCode = 400;
-      errorMessage = 'Invalid data provided';
+      res.status(400).json({ success: false, message: 'Invalid data provided' });
+    } else {
+      res.status(500).json({ success: false, message: 'Internal server error' });
     }
-    
-    res.status(statusCode).json({ 
-      success: false,
-      message: errorMessage,
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
   }
 });
 
@@ -99,6 +45,7 @@ router.get('/', async (req, res) => {
     const workers = await Worker.find({});
     res.json(workers);
   } catch (error) {
+    logger.error('Error fetching workers', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -112,6 +59,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(worker);
   } catch (error) {
+    logger.error(`Error fetching worker by ID: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -127,8 +75,10 @@ router.put('/:id', async (req, res) => {
     if (!worker) {
       return res.status(404).json({ message: 'Worker not found' });
     }
+    logger.info(`Worker profile updated: ${worker.name}`);
     res.json(worker);
   } catch (error) {
+    logger.error(`Error updating worker: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
@@ -140,8 +90,10 @@ router.delete('/:id', async (req, res) => {
     if (!worker) {
       return res.status(404).json({ message: 'Worker not found' });
     }
+    logger.info(`Worker deleted: ${worker.name}`);
     res.json({ message: 'Worker deleted successfully' });
   } catch (error) {
+    logger.error(`Error deleting worker: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -154,12 +106,11 @@ router.get('/:id/jobs', async (req, res) => {
       return res.status(404).json({ message: 'Worker not found' });
     }
     
-    // Log worker's ShaktiScore before job matching
-    console.log('Job matching - Worker ShaktiScore:', worker.shaktiScore);
-    
+    logger.info(`Finding matching jobs for worker: ${worker.name}`);
     const matchingJobs = await JobMatchingService.findMatchingJobs(worker);
     res.json(matchingJobs);
   } catch (error) {
+    logger.error(`Error finding matching jobs for worker: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -174,9 +125,10 @@ router.patch('/:id/availability', async (req, res) => {
     
     worker.isAvailable = req.body.isAvailable;
     await worker.save();
-    
+    logger.info(`Worker availability updated for ${worker.name}`);
     res.json(worker);
   } catch (error) {
+    logger.error(`Error updating worker availability: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
@@ -191,9 +143,10 @@ router.patch('/:id/work-radius', async (req, res) => {
     
     worker.workRadius = req.body.workRadius;
     await worker.save();
-    
+    logger.info(`Worker work radius updated for ${worker.name}`);
     res.json(worker);
   } catch (error) {
+    logger.error(`Error updating worker work radius: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
   }
 });
@@ -206,13 +159,11 @@ router.get('/:id/profile', async (req, res) => {
       return res.status(404).json({ message: 'Worker not found' });
     }
 
-    // Get job applications for the worker
     const jobApplications = await JobApplication.find({ worker: worker._id })
       .populate('job')
       .populate('employer', 'company.name')
       .sort({ updatedAt: -1 });
 
-    // Separate current and past jobs
     const currentJobs = jobApplications.filter(app => 
       ['pending', 'accepted'].includes(app.status)
     );
@@ -220,43 +171,6 @@ router.get('/:id/profile', async (req, res) => {
       app.status === 'completed'
     );
 
-    // Log detailed profile information
-    console.log('\n=== Worker Profile ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('\nWorker Details:');
-    console.log(JSON.stringify({
-      id: worker._id,
-      name: worker.name,
-      phone: worker.phone,
-      skills: worker.skills,
-      rating: worker.rating,
-      shaktiScore: worker.shaktiScore,
-      location: worker.location,
-      languages: worker.languages,
-      experience: worker.experience
-    }, null, 2));
-
-    console.log('\nCurrent Jobs:');
-    console.log(JSON.stringify(currentJobs.map(app => ({
-      jobId: app.job._id,
-      title: app.job.title,
-      employer: app.employer.company?.name,
-      status: app.status,
-      appliedAt: app.appliedAt,
-      salary: app.job.salary
-    })), null, 2));
-
-    console.log('\nJob History:');
-    console.log(JSON.stringify(pastJobs.map(app => ({
-      jobId: app.job._id,
-      title: app.job.title,
-      employer: app.employer.company?.name,
-      completedAt: app.completedAt,
-      salary: app.job.salary
-    })), null, 2));
-    console.log('\n=== End Worker Profile ===\n');
-
-    // Send response with full profile data
     res.json({
       worker: {
         ...worker.toObject(),
@@ -267,7 +181,7 @@ router.get('/:id/profile', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching worker profile:', error);
+    logger.error(`Error fetching worker profile: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -277,10 +191,6 @@ router.post('/login', async (req, res) => {
   try {
     const { phone } = req.body;
 
-    console.log('\n=== Worker Login Attempt ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Phone:', phone);
-
     if (!phone) {
       return res.status(400).json({ 
         success: false,
@@ -288,57 +198,33 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Find worker by phone number
     const worker = await Worker.findOne({ phone });
-    console.log('Worker found:', !!worker);
     
     if (!worker) {
-      console.log('✗ Login failed: Worker not found');
       return res.status(404).json({ 
         success: false,
         message: 'Worker not found. Please register first.' 
       });
     }
     
-    console.log('✓ Worker found, updating login status...');
-
-    // Update last login
     worker.lastLogin = new Date();
     worker.isLoggedIn = 1;
     await worker.save();
 
-    console.log('✓ Login successful');
-    console.log('\nWorker Profile:');
-    console.log(JSON.stringify({
-      id: worker._id,
-      name: worker.name,
-      phone: worker.phone,
-      skills: worker.skills,
-      rating: worker.rating,
-      shaktiScore: worker.shaktiScore
-    }, null, 2));
-    console.log('\n=== End Worker Login ===\n');
-
-    // Send comprehensive response
+    logger.info(`Worker login successful: ${worker.name}`);
     res.json({
       success: true,
       message: 'Login successful',
       data: {
         worker: {
           ...worker.toObject(),
-          id: worker._id, // Ensure id field is present
-          type: 'worker' // Explicitly set user type
+          id: worker._id,
+          type: 'worker'
         }
       }
     });
   } catch (error) {
-    console.error('\n=== Worker Login Failed ===');
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    
+    logger.error('Worker login failed', { error: error.message, stack: error.stack });
     res.status(500).json({ 
       success: false,
       message: 'Login failed. Please try again.',
@@ -355,14 +241,12 @@ router.get('/:id/balance', async (req, res) => {
       return res.status(404).json({ message: 'Worker not found' });
     }
     
-    console.log('Fetching balance for worker:', worker.name, 'Balance:', worker.balance);
-    
     res.json({
       balance: worker.balance || 0,
       earnings: worker.earnings || []
     });
   } catch (error) {
-    console.error('Error fetching worker balance:', error);
+    logger.error(`Error fetching worker balance: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -372,9 +256,8 @@ router.post('/:workerId/process-payment/:applicationId', async (req, res) => {
   try {
     const { amount } = req.body;
     
-    const worker = await Worker.findById(workerId);
+    const worker = await Worker.findById(req.params.workerId);
     if (worker) {
-      // Add to balance immediately
       worker.balance += amount;
       worker.earnings.push({
         jobId: application.job._id,
@@ -385,13 +268,13 @@ router.post('/:workerId/process-payment/:applicationId', async (req, res) => {
       await worker.save();
     }
     
-    // Update application payment status
     application.paymentStatus = 'paid';
     application.paymentAmount = amount;
     application.paymentDate = new Date();
     await application.save();
+    logger.info(`Payment processed for worker: ${worker.name}`);
   } catch (error) {
-    console.error('Error processing payment:', error);
+    logger.error('Error processing payment', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
@@ -401,14 +284,11 @@ router.post('/:id/sync-balance', async (req, res) => {
   try {
     const workerId = req.params.id;
     
-    console.log('Syncing balance for worker:', workerId);
-    
     const worker = await Worker.findById(workerId);
     if (!worker) {
       return res.status(404).json({ message: 'Worker not found' });
     }
     
-    // Find all completed paid applications for this worker
     const JobApplication = require('../models/JobApplication');
     const completedApplications = await JobApplication.find({
       worker: workerId,
@@ -416,20 +296,13 @@ router.post('/:id/sync-balance', async (req, res) => {
       paymentStatus: 'paid'
     }).populate('job');
     
-    console.log(`Found ${completedApplications.length} completed paid jobs`);
-    
-    // Calculate total using the same logic as frontend
     const totalEarned = completedApplications.reduce((sum, app) => {
       const amount = app.paymentAmount || app.job?.salary || 0;
       return sum + amount;
     }, 0);
     
-    console.log(`Calculated total earnings: ₹${totalEarned}`);
-    
-    // Update worker balance
     worker.balance = totalEarned;
     
-    // Rebuild earnings array from completed applications
     worker.earnings = completedApplications.map(app => ({
       jobId: app.job._id,
       amount: app.paymentAmount || app.job?.salary || 0,
@@ -439,8 +312,7 @@ router.post('/:id/sync-balance', async (req, res) => {
     
     await worker.save();
     
-    console.log(`Balance synced successfully: ₹${worker.balance}`);
-    
+    logger.info(`Balance synced successfully for worker: ${worker.name}`);
     res.json({
       success: true,
       message: 'Balance synchronized successfully',
@@ -453,7 +325,7 @@ router.post('/:id/sync-balance', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error syncing worker balance:', error);
+    logger.error(`Error syncing worker balance: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ 
       success: false, 
       message: error.message 
@@ -466,14 +338,11 @@ router.get('/:id/wallet', async (req, res) => {
   try {
     const workerId = req.params.id;
     
-    console.log('Fetching wallet data for worker:', workerId);
-    
     const worker = await Worker.findById(workerId);
     if (!worker) {
       return res.status(404).json({ message: 'Worker not found' });
     }
     
-    // Get all completed job applications for earnings
     const JobApplication = require('../models/JobApplication');
     const completedApplications = await JobApplication.find({
       worker: workerId,
@@ -481,20 +350,14 @@ router.get('/:id/wallet', async (req, res) => {
       paymentStatus: 'paid'
     }).populate('job');
     
-    console.log(`Found ${completedApplications.length} completed paid applications`);
-    
-    // Calculate totals
     const totalEarned = completedApplications.reduce((sum, app) => {
       return sum + (app.paymentAmount || app.job?.salary || 0);
     }, 0);
     
-    // Get withdrawal history
     const withdrawals = worker.withdrawals || [];
     const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, 0);
     
-    // Create transaction history
     const transactions = [
-      // Earnings from completed jobs
       ...completedApplications.map(app => ({
         id: app._id.toString(),
         type: 'earning',
@@ -504,7 +367,6 @@ router.get('/:id/wallet', async (req, res) => {
         status: 'completed',
         jobTitle: app.job?.title
       })),
-      // Withdrawals
       ...withdrawals.map((w, index) => ({
         id: w._id ? w._id.toString() : `withdrawal_${index}`,
         type: 'withdrawal',
@@ -515,12 +377,11 @@ router.get('/:id/wallet', async (req, res) => {
       }))
     ].sort((a, b) => new Date(b.date) - new Date(a.date));
     
-    // Ensure worker balance matches calculated balance
     const currentBalance = totalEarned - totalWithdrawn;
     if (worker.balance !== currentBalance) {
       worker.balance = currentBalance;
       await worker.save();
-      console.log(`Updated worker balance from ₹${worker.balance} to ₹${currentBalance}`);
+      logger.info(`Updated worker balance from ${worker.balance} to ${currentBalance}`);
     }
     
     res.json({
@@ -531,7 +392,7 @@ router.get('/:id/wallet', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching wallet data:', error);
+    logger.error(`Error fetching wallet data: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ 
       message: error.message,
       balance: 0,
@@ -557,12 +418,10 @@ router.post('/:id/withdraw', async (req, res) => {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
     
-    // Initialize withdrawals array if it doesn't exist
     if (!Array.isArray(worker.withdrawals)) {
       worker.withdrawals = [];
     }
     
-    // Add withdrawal record
     const withdrawal = {
       amount: amount,
       method: method || 'bank_transfer',
@@ -575,8 +434,7 @@ router.post('/:id/withdraw', async (req, res) => {
     
     await worker.save();
     
-    console.log(`Withdrawal processed: ${worker.name} - ₹${amount}`);
-    
+    logger.info(`Withdrawal processed: ${worker.name} - ₹${amount}`);
     res.json({
       success: true,
       message: 'Withdrawal request submitted successfully',
@@ -584,7 +442,7 @@ router.post('/:id/withdraw', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error processing withdrawal:', error);
+    logger.error(`Error processing withdrawal: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });

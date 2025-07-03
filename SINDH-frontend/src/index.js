@@ -1,35 +1,18 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-
-// Preload critical components
-const preloadComponents = () => {
-  const components = [
-    './components/FuturisticOrderConfirmation',
-    './components/PersonalInfo',
-    './components/WaitingRoom'
-  ];
-
-  components.forEach(component => {
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'script';
-    link.href = component;
-    document.head.appendChild(link);
-  });
-};
-
-// Call preload on app init
-preloadComponents();
+import './i18n';
 
 const container = document.getElementById('root');
 const root = createRoot(container);
 
 root.render(
   <React.StrictMode>
-    <App />
+    <Suspense fallback="Loading...">
+      <App />
+    </Suspense>
   </React.StrictMode>
 );
 
