@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { getCurrentUser } from '../utils/authUtils';
-import { Phone, Star, Users, Briefcase, TrendingUp } from 'lucide-react';
+import { Phone, Star, Users, Briefcase, TrendingUp, Wallet } from 'lucide-react';
 import { getApiUrl } from '../utils/apiUtils';
 
 function Homepage() {
@@ -32,11 +32,11 @@ function Homepage() {
   const [recentEarnings, setRecentEarnings] = useState([]);
 
   // Get user from context and fallback to localStorage if needed
-  const { user: contextUser, isLoadingUser, logoutUser } = useUser();
+  const { user: contextUser, isLoadingUser } = useUser();
   const user = contextUser || getCurrentUser();
 
-  // Fetch job count for notifications
-  const fetchJobCount = async () => {
+  // Fetch job count for notifications - wrapped in useCallback
+  const fetchJobCount = useCallback(async () => {
     try {
       console.log('Fetching job count for user:', user);
       
@@ -103,10 +103,10 @@ function Homepage() {
       console.error('Error fetching job count:', error);
       return 0;
     }
-  };
+  }, [user, hasShownNotification]);
 
-  // Fetch worker balance and earnings
-  const fetchWorkerFinancials = async () => {
+  // Fetch worker balance and earnings - wrapped in useCallback
+  const fetchWorkerFinancials = useCallback(async () => {
     if (user?.type === 'worker' && user?.id) {
       try {
         const response = await fetch(getApiUrl(`/api/workers/${user.id}/balance`));
@@ -119,7 +119,7 @@ function Homepage() {
         console.error('Error fetching worker financials:', error);
       }
     }
-  };
+  }, [user]);
 
   // Fetch job statistics with same filtering as AvailableJobs
   const fetchJobStats = useCallback(async () => {
@@ -236,15 +236,18 @@ function Homepage() {
     console.log('Homepage useEffect - fetching data');
     
     fetchRecentJobs();
+    fetchLatestJobs();
     
     if (user?.type === 'worker') {
       console.log('User is worker, fetching job count');
       fetchJobCount();
       fetchWorkerFinancials();
+      fetchJobStats();
+      fetchCategoryStats();
     } else {
       console.log('User is not worker or no user:', user?.type);
     }
-  }, [user]);
+  }, [user, fetchJobCount, fetchWorkerFinancials, fetchJobStats, fetchCategoryStats, fetchLatestJobs]);
 
   const fetchShaktiScore = async (workerId) => {
     try {
@@ -341,14 +344,11 @@ function Homepage() {
                   <h3 className="text-xl font-bold text-gray-900">{user?.name}</h3>
                   <p className="text-sm text-gray-500 capitalize">{user?.type}</p>
                   
-                  {/* Worker Balance Display */}
                   {user?.type === 'worker' && (
                     <div className="mt-2 flex items-center space-x-4">
                       <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                        </svg>
-                        Balance: ₹{workerBalance.toLocaleString()}
+                        <Wallet className="w-4 h-4 mr-1" />
+                        {t('common.wallet')}: ₹{workerBalance.toLocaleString()}
                       </div>
                       
                       {jobCount > 0 && (
@@ -389,10 +389,9 @@ function Homepage() {
             </div>
           </div>
           
-          {/* Recent Earnings Section for Workers */}
           {user?.type === 'worker' && recentEarnings.length > 0 && (
             <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-blue-50 border-t">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">Recent Earnings</h4>
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">{t('home.recentEarnings')}</h4>
               <div className="space-y-1">
                 {recentEarnings.map((earning, index) => (
                   <div key={index} className="flex justify-between items-center text-xs">
@@ -417,8 +416,8 @@ function Homepage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
-      {/* Job Count Popup Notification */}
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
+      {/* Enhanced Job Count Popup with Indian Design */}
       <AnimatePresence>
         {showJobNotification && user?.type === 'worker' && jobCount > 0 && (
           <motion.div
@@ -427,56 +426,76 @@ function Homepage() {
             exit={{ opacity: 0, scale: 0.8, x: 100 }}
             className="fixed bottom-6 right-6 z-50 max-w-sm"
           >
-            <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-green-500 text-white p-6 rounded-xl shadow-2xl border border-white/20 backdrop-blur-sm">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse">
-                    <Briefcase className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-lg">New Jobs Available!</h4>
-                    <p className="text-sm text-white/90">
-                      🎯 {stats.totalJobs} job{stats.totalJobs !== 1 ? 's' : ''} 
-                      {user.location?.state ? ` available in ${user.location.state}` : ' waiting for you'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={handleCloseJobNotification}
-                  className="text-white/70 hover:text-white transition-colors p-1"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+            <div className="bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 text-white p-6 rounded-2xl shadow-2xl border-2 border-yellow-400 backdrop-blur-sm relative overflow-hidden">
+              {/* Traditional Border Pattern */}
+              <div className="absolute inset-0 border-4 border-yellow-300 rounded-2xl opacity-30"></div>
+              <div className="absolute -top-1 -left-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
+              <div className="absolute -bottom-1 -left-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
               
-              <div className="flex gap-3">
-                <button
-                  onClick={handleViewJobs}
-                  className="flex-1 bg-white text-blue-600 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-100 transition-colors shadow-md"
-                >
-                  View All Jobs
-                </button>
-                <button
-                  onClick={handleCloseJobNotification}
-                  className="px-4 py-2.5 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors backdrop-blur-sm"
-                >
-                  Later
-                </button>
+              <div className="relative">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse border-2 border-yellow-300">
+                      <Briefcase className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg flex items-center">
+                        🌟 New Jobs Available!
+                      </h4>
+                      <p className="text-sm text-white/90">
+                        🎯 {stats.totalJobs} job{stats.totalJobs !== 1 ? 's' : ''} 
+                        {user.location?.state ? ` available in ${user.location.state}` : ' waiting for you'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCloseJobNotification}
+                    className="text-white/70 hover:text-white transition-colors p-1 bg-black/20 rounded-full"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleViewJobs}
+                    className="flex-1 bg-white text-orange-600 px-4 py-2.5 rounded-lg font-bold hover:bg-yellow-50 transition-colors shadow-md border-2 border-yellow-300"
+                  >
+                    View All Jobs
+                  </button>
+                  <button
+                    onClick={handleCloseJobNotification}
+                    className="px-4 py-2.5 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors backdrop-blur-sm border border-yellow-300"
+                  >
+                    Later
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Interactive Hero Section */}
+      {/* Enhanced Hero Section with Indian Cultural Elements */}
       <div className="relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-green-600/10"></div>
+        {/* Traditional Pattern Background */}
+        <div className="absolute inset-0 bg-gradient-to-r from-orange-600/5 to-green-600/5"></div>
         <div className="absolute inset-0" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234F46E5' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FF6B35' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }}></div>
+
+        {/* Floating Elements */}
+        <div className="absolute top-20 left-10 w-16 h-16 opacity-10">
+          <div className="w-full h-full bg-gradient-to-br from-orange-400 to-red-500 rounded-full animate-pulse"></div>
+        </div>
+        
+        <div className="absolute bottom-20 right-10 w-20 h-20 opacity-10">
+          <div className="w-full h-full bg-gradient-to-br from-pink-400 to-red-500 transform rotate-45"></div>
+        </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="pt-10 pb-16 md:pt-16 md:pb-20 lg:pt-20 lg:pb-28">
@@ -486,15 +505,15 @@ function Homepage() {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="mb-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg"
+                    className="mb-8 inline-flex items-center px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full shadow-2xl border-2 border-yellow-300"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                      <span className="font-semibold">
-                        {t('home.welcomeBack')}, {user.name || user.company?.name}!
+                      <div className="w-4 h-4 bg-yellow-300 rounded-full animate-pulse"></div>
+                      <span className="font-bold text-lg">
+                        🙏 Welcome back, {user.name || user.company?.name}!
                       </span>
                       {user?.type === 'worker' && stats.totalJobs > 0 && (
-                        <div className="ml-3 px-3 py-1 bg-white/20 rounded-full text-sm">
+                        <div className="ml-3 px-4 py-2 bg-white/20 rounded-full text-sm border border-yellow-300">
                           🎯 {stats.totalJobs} job{stats.totalJobs !== 1 ? 's' : ''} 
                           {user.location?.state && ` in ${user.location.state}`}
                         </div>
@@ -521,93 +540,117 @@ function Homepage() {
                 )}
               </AnimatePresence>
 
-              {/* Main Title with Animation */}
+              {/* Enhanced Main Title */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="mb-8"
+                className="mb-8 relative"
               >
+                {/* Decorative Elements */}
+                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-8 h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
+                    <div className="w-4 h-4 bg-yellow-400 transform rotate-45"></div>
+                    <div className="w-8 h-1 bg-gradient-to-r from-red-500 to-orange-400"></div>
+                  </div>
+                </div>
+
                 <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-4">
                   <span className="bg-gradient-to-r from-orange-600 to-orange-600 bg-clip-text text-transparent">
-                    
                     I N D U S
                   </span>
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
                 </h1>
                 <h2 className="text-2xl md:text-3xl font-semibold text-gray-700 mb-6">
-                  {t('home.tagline')}
+                  🌾 {t('home.tagline')} 🌾
                 </h2>
                 <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
                   {t('home.description')}
                 </p>
               </motion.div>
 
-              {/* Interactive Stats Cards - now with real job count */}
+              {/* Enhanced Stats Cards */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 max-w-4xl mx-auto"
+                className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 max-w-5xl mx-auto"
               >
                 <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                  whileHover={{ scale: 1.05, rotateY: 5 }}
+                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-orange-200 relative overflow-hidden"
                 >
-                  <div className="flex items-center justify-center mb-2">
-                    <Briefcase className="w-8 h-8 text-blue-600" />
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
+                  <div className="flex items-center justify-center mb-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-lg">
+                      <Briefcase className="w-6 h-6 text-white" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.totalJobs}</div>
-                  <div className="text-sm text-gray-600">{t('stats.activeJobs')}</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.totalJobs}</div>
+                  <div className="text-sm text-gray-700 font-medium">{t('stats.activeJobs')}</div>
                   {user?.type === 'worker' && stats.totalJobs > 0 && (
-                    <div className="mt-1 text-xs text-green-600 font-medium">
-                      {user.location?.state ? `Available in ${user.location.state}` : 'Available now!'}
+                    <div className="mt-2 text-xs text-green-700 font-bold bg-green-100 rounded-full px-3 py-1">
+                      🎯 {user.location?.state ? `Available in ${user.location.state}` : 'Available now!'}
                     </div>
                   )}
                 </motion.div>
 
                 <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                  whileHover={{ scale: 1.05, rotateY: 5 }}
+                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-green-200 relative overflow-hidden"
                 >
-                  <div className="flex items-center justify-center mb-2">
-                    <Users className="w-8 h-8 text-green-600" />
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                  <div className="flex items-center justify-center mb-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                      <Users className="w-6 h-6 text-white" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.activeWorkers.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">{t('stats.activeWorkers')}</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.activeWorkers.toLocaleString()}</div>
+                  <div className="text-sm text-gray-700 font-medium">{t('stats.activeWorkers')}</div>
                 </motion.div>
 
                 <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                  whileHover={{ scale: 1.05, rotateY: 5 }}
+                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-purple-200 relative overflow-hidden"
                 >
-                  <div className="flex items-center justify-center mb-2">
-                    <TrendingUp className="w-8 h-8 text-purple-600" />
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-400 to-pink-500"></div>
+                  <div className="flex items-center justify-center mb-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.successfulMatches.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600">{t('stats.successfulMatches')}</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.successfulMatches.toLocaleString()}</div>
+                  <div className="text-sm text-gray-700 font-medium">{t('stats.successfulMatches')}</div>
                 </motion.div>
 
                 <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/20"
+                  whileHover={{ scale: 1.05, rotateY: 5 }}
+                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-yellow-200 relative overflow-hidden"
                 >
-                  <div className="flex items-center justify-center mb-2">
-                    <Star className="w-8 h-8 text-yellow-500" />
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-orange-500"></div>
+                  <div className="flex items-center justify-center mb-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                      <Star className="w-6 h-6 text-white" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.averageRating}</div>
-                  <div className="text-sm text-gray-600">{t('stats.averageRating')}</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.averageRating}</div>
+                  <div className="text-sm text-gray-700 font-medium">{t('stats.averageRating')}</div>
                 </motion.div>
               </motion.div>
 
-              {/* Large Interactive Action Buttons - enhanced for workers */}
+              {/* Enhanced Action Buttons */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
-                className="flex flex-col sm:flex-row gap-6 justify-center items-center max-w-2xl mx-auto"
+                className="flex flex-col sm:flex-row gap-8 justify-center items-center max-w-3xl mx-auto"
               >
                 <motion.button
-                  whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
+                  whileHover={{ 
+                    scale: 1.05, 
+                    boxShadow: "0 25px 50px rgba(59, 130, 246, 0.4)"
+                  }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleFindWork}
                   className="group relative w-full sm:w-auto px-12 py-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl shadow-xl font-bold text-lg transition-all duration-300 overflow-hidden"
@@ -625,7 +668,10 @@ function Homepage() {
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(34, 197, 94, 0.3)" }}
+                  whileHover={{ 
+                    scale: 1.05, 
+                    boxShadow: "0 25px 50px rgba(34, 197, 94, 0.4)"
+                  }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handlePostJob}
                   className="group relative w-full sm:w-auto px-12 py-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-xl font-bold text-lg transition-all duration-300 overflow-hidden"
@@ -644,7 +690,7 @@ function Homepage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.8 }}
-                  className="mt-12 p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/30 max-w-md mx-auto"
+                  className="mt-12 p-6 bg-white/80 backdrop-blur-sm rounded-2xl border border-white/30 max-w-md mx-auto shadow-lg"
                 >
                   <div className="text-center">
                     <Phone className="w-8 h-8 text-green-600 mx-auto mb-3" />
@@ -665,10 +711,10 @@ function Homepage() {
         </div>
       </div>
 
-      {/* GrameenLink Profile - now shows job count */}
+      {/* GrameenLink Profile */}
       {renderGrameenLinkProfile()}
 
-      {/* Shakti Score Section (for workers) */}
+      {/* Shakti Score Section */}
       {user?.type === 'worker' && shaktiScore !== null && (
         <div className="py-12 bg-gradient-to-r from-purple-500 to-indigo-600">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -841,13 +887,13 @@ function Homepage() {
                 >
                   <div className="px-4 py-5 sm:p-6">
                     <h3 className="text-lg font-medium text-gray-900">{job.title}</h3>
-                    <p className="mt-1 text-sm text-gray-500">{job.company}</p>
+                    <p className="mt-1 text-sm text-gray-500">{job.companyName || job.company}</p>
                     <div className="mt-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {job.location}
+                        {job.location?.city ? `${job.location.city}, ${job.location.state}` : 'Location not specified'}
                       </span>
                       <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        ₹{job.salary}
+                        ₹{job.salary?.toLocaleString() || 'Salary not specified'}
                       </span>
                     </div>
                     <div className="mt-4">

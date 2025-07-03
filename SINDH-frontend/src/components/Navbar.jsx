@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, DollarSign } from 'lucide-react';
+import { Menu, X, DollarSign, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import LogoutButton from './LogoutButton';
-import { getCurrentUser, getUserType, isLoggedIn } from '../utils/authUtils';
 import LanguageSwitcher from './LanguageSwitcher';
 import { getApiUrl } from '../utils/apiUtils';
 
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user: contextUser, logoutUser, isLoadingUser, loginUser } = useUser();
+  const { user, logoutUser, isLoadingUser } = useUser(); // Use 'user' directly from context
   const { t } = useTranslation();
   
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
@@ -21,19 +20,17 @@ const Navbar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [workerBalance, setWorkerBalance] = useState(0);
   
-  // Simplified authentication checks using utility functions
-  const hasUser = isLoggedIn();
-  const user = getCurrentUser();
-  const userType = getUserType();
+  // Use user from context for all checks
+  const isAuthenticated = !!user && !isLoadingUser;
+  const userType = user?.type;
 
   useEffect(() => {
-    // Set active section based on current path
     const path = location.pathname;
     if (path === '/') setActiveSection('home');
     else if (path === '/about') setActiveSection('about');
     else if (path === '/news') setActiveSection('news');
     else if (path.includes('/profile')) setActiveSection('profile');
-    else if (path.includes('/jobs/available') || path.includes('/worker/register')) setActiveSection('find-work');
+    else if (path.includes('/jobs') || path.includes('/worker/register')) setActiveSection('find-work');
     else if (path.includes('/my-applications')) setActiveSection('applications');
   }, [location]);
 
@@ -52,19 +49,18 @@ const Navbar = () => {
       }
     };
 
-    fetchWorkerBalance();
-    
-    // Refresh balance every 30 seconds
-    const interval = setInterval(fetchWorkerBalance, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
-
-  const isAuthenticated = contextUser && hasUser;
+    // Fetch balance only if user is a worker and not loading
+    if (!isLoadingUser && user?.type === 'worker') {
+      fetchWorkerBalance();
+      const interval = setInterval(fetchWorkerBalance, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, isLoadingUser]); // Depend on user and isLoadingUser
 
   const handleNavigation = (section) => {
     setActiveSection(section);
-    setIsSideMenuOpen(false);   // Close mobile menu when navigating
-    setShowProfileMenu(false);  // Close profile dropdown when navigating
+    setIsSideMenuOpen(false);
+    setShowProfileMenu(false);
   };
 
   const handleLogoutComplete = () => {
@@ -74,8 +70,6 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
-    // This function is no longer needed since we're using the LogoutButton component
-    // but we'll keep it for any legacy code that might still reference it
     logoutUser();
     setShowProfileMenu(false);
     navigate('/');
@@ -91,8 +85,8 @@ const Navbar = () => {
     } else {
       navigate('/login');
     }
-    setShowProfileMenu(false); // Close profile dropdown
-    setIsSideMenuOpen(false);  // Close side menu if open
+    setShowProfileMenu(false);
+    setIsSideMenuOpen(false);
   };
 
   const handleFindWork = () => {
@@ -144,17 +138,25 @@ const Navbar = () => {
     <div className="hidden md:flex items-center space-x-4">
       <Link to="/" className="nav-link" onClick={() => handleNavigation('home')}>{t('nav.home')}</Link>
       
-      {/* Show job-specific links based on user type */}
       {isAuthenticated && (
         <>
           {userType === 'worker' && (
-            <Link
-              to="/my-applications"
-              className="nav-link"
-              onClick={() => handleNavigation('applications')}
-            >
-              {t('nav.myJobs')}
-            </Link>
+            <>
+              <Link
+                to="/my-applications"
+                className="nav-link"
+                onClick={() => handleNavigation('applications')}
+              >
+                {t('nav.myJobs')}
+              </Link>
+              <Link
+                to="/worker/wallet"
+                className="nav-link flex items-center"
+                onClick={() => handleNavigation('wallet')}
+              >
+                <Wallet className="w-4 h-4 mr-1" /> {t('common.wallet')}: ₹{workerBalance.toLocaleString()}
+              </Link>
+            </>
           )}
           {userType === 'employer' && (
             <Link
@@ -168,10 +170,8 @@ const Navbar = () => {
         </>
       )}
       
-      {/* Language Switcher */}
       <LanguageSwitcher className="ml-2" />
 
-      {/* User Profile Menu */}
       {isAuthenticated ? (
         <div className="relative">
           <button
@@ -247,16 +247,28 @@ const Navbar = () => {
           </div>
 
           {userType === 'worker' && (
-            <Link
-              to="/my-applications"
-              className="mobile-nav-link"
-              onClick={() => {
-                handleNavigation('applications');
-                setIsSideMenuOpen(false);
-              }}
-            >
-              {t('nav.myJobs')}
-            </Link>
+            <>
+              <Link
+                to="/my-applications"
+                className="mobile-nav-link"
+                onClick={() => {
+                  handleNavigation('applications');
+                  setIsSideMenuOpen(false);
+                }}
+              >
+                {t('nav.myJobs')}
+              </Link>
+              <Link
+                to="/worker/wallet"
+                className="mobile-nav-link flex items-center"
+                onClick={() => {
+                  handleNavigation('wallet');
+                  setIsSideMenuOpen(false);
+                }}
+              >
+                <Wallet className="w-5 h-5 mr-2" /> {t('common.wallet')}: ₹{workerBalance.toLocaleString()}
+              </Link>
+            </>
           )}
           
           {userType === 'employer' && (
@@ -310,7 +322,6 @@ const Navbar = () => {
         </div>
       )}
       
-      {/* Language Switcher in Mobile Menu */}
       <div className="pt-4 border-t border-gray-200 mt-4">
         <p className="text-sm text-gray-500 mb-2">{t('nav.selectLanguage')}</p>
         <LanguageSwitcher />
@@ -331,10 +342,8 @@ const Navbar = () => {
             </Link>
           </div>
           
-          {/* Desktop Navigation */}
           {renderDesktopNav()}
 
-          {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setIsSideMenuOpen(true)}
@@ -346,7 +355,6 @@ const Navbar = () => {
         </div>
       </div>
       
-      {/* Mobile menu */}
       {isSideMenuOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50">
           <div className="absolute inset-y-0 right-0 w-64 bg-white">

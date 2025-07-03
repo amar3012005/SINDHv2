@@ -1,0 +1,352 @@
+db.jobs.insertMany([
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b5d"
+    },
+    "title": "Farm Field Worker - Crop Harvesting",
+    "description": "Looking for experienced workers to help with seasonal crop harvesting. Work involves cutting, collecting, and loading crops. Physical fitness required. Meals and water provided during work hours.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Agriculture",
+    "location": {
+      "type": "onsite",
+      "street": "Village Road",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509001"
+    },
+    "employmentType": "part-time",
+    "salary": 450,
+    "duration": "5",
+    "requirements": "Physical fitness, experience in farming, ability to work in outdoor conditions, teamwork skills",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["farming", "physical_labor", "outdoor_work"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:25:10.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:25:10.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b5e"
+    },
+    "title": "Construction Helper - Building Foundation",
+    "description": "Need reliable workers for foundation construction work. Tasks include digging, cement mixing, brick laying assistance, and site cleaning. Safety equipment provided. Experience preferred but training available.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Construction",
+    "location": {
+      "type": "onsite",
+      "street": "New Colony",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509002"
+    },
+    "employmentType": "full-time",
+    "salary": 650,
+    "duration": "12",
+    "requirements": "Physical strength, willingness to learn, punctuality, basic construction knowledge helpful",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["construction", "manual_labor", "teamwork"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:26:15.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:26:15.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b5f"
+    },
+    "title": "Dairy Farm Assistant",
+    "description": "Looking for dedicated workers to assist in daily dairy operations. Responsibilities include cow milking, feeding animals, cleaning barn areas, and basic animal care. Early morning shifts required.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Agriculture",
+    "location": {
+      "type": "onsite",
+      "street": "Dairy Farm Road",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509003"
+    },
+    "employmentType": "full-time",
+    "salary": 550,
+    "duration": "10",
+    "requirements": "Animal handling experience, early morning availability, hygiene awareness, reliability",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["animal_care", "dairy_farming", "hygiene_maintenance"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:27:20.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:27:20.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b60"
+    },
+    "title": "Warehouse Loading Helper",
+    "description": "Seeking strong workers for loading and unloading goods at warehouse facility. Work involves moving boxes, organizing inventory, and maintaining warehouse cleanliness. Regular work available.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Local Trade",
+    "location": {
+      "type": "onsite",
+      "street": "Industrial Area",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509004"
+    },
+    "employmentType": "part-time",
+    "salary": 400,
+    "duration": "6",
+    "requirements": "Physical strength, ability to lift heavy items, organizational skills, punctuality",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["warehouse_work", "inventory_management", "physical_labor"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:28:25.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:28:25.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b61"
+    },
+    "title": "Kitchen Helper - Food Preparation",
+    "description": "Need assistant for local food processing unit. Tasks include vegetable cutting, cleaning utensils, packaging assistance, and maintaining kitchen hygiene. Food handling certificate preferred.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Food Processing",
+    "location": {
+      "type": "onsite",
+      "street": "Market Street",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509001"
+    },
+    "employmentType": "part-time",
+    "salary": 350,
+    "duration": "4",
+    "requirements": "Food hygiene awareness, knife handling skills, cleanliness standards, willingness to follow instructions",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["food_handling", "kitchen_work", "hygiene_maintenance"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:29:30.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:29:30.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b62"
+    },
+    "title": "Garden Maintenance Worker",
+    "description": "Seeking skilled workers for maintaining large garden area. Work includes planting, watering, pruning, grass cutting, and general landscaping. Knowledge of plants and gardening tools required.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Agriculture",
+    "location": {
+      "type": "onsite",
+      "street": "Garden Colony",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509005"
+    },
+    "employmentType": "part-time",
+    "salary": 375,
+    "duration": "6",
+    "requirements": "Gardening knowledge, tool handling experience, plant identification skills, outdoor work ability",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["gardening", "landscaping", "plant_care", "tool_handling"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:30:35.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:30:35.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b63"
+    },
+    "title": "Handicraft Production Assistant",
+    "description": "Looking for skilled workers to assist in traditional handicraft production. Work involves cutting materials, basic assembly, quality checking, and packaging. Training provided for traditional techniques.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Handicrafts",
+    "location": {
+      "type": "onsite",
+      "street": "Artisan Quarter",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509006"
+    },
+    "employmentType": "full-time",
+    "salary": 425,
+    "duration": "8",
+    "requirements": "Hand-eye coordination, attention to detail, patience, willingness to learn traditional crafts",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["handicrafts", "manual_dexterity", "quality_control", "traditional_arts"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:31:40.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:31:40.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b64"
+    },
+    "title": "Poultry Farm Worker",
+    "description": "Need dedicated workers for poultry farm operations. Responsibilities include feeding birds, cleaning coops, egg collection, and basic bird health monitoring. Experience with poultry preferred.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Agriculture",
+    "location": {
+      "type": "onsite",
+      "street": "Farm Road",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509007"
+    },
+    "employmentType": "full-time",
+    "salary": 500,
+    "duration": "9",
+    "requirements": "Poultry handling experience, early morning availability, animal care knowledge, hygiene awareness",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["poultry_farming", "animal_care", "egg_collection", "farm_maintenance"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:32:45.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:32:45.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b65"
+    },
+    "title": "Road Construction Helper",
+    "description": "Seeking workers for local road construction project. Work includes material preparation, equipment assistance, site cleaning, and general construction support. Safety training provided.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Construction",
+    "location": {
+      "type": "onsite",
+      "street": "Highway Junction",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509008"
+    },
+    "employmentType": "full-time",
+    "salary": 700,
+    "duration": "10",
+    "requirements": "Physical fitness, safety awareness, teamwork skills, equipment handling ability",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["road_construction", "equipment_handling", "safety_protocols", "teamwork"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:33:50.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:33:50.042Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "68664c2afe8edb65839a0b66"
+    },
+    "title": "Local Shop Assistant",
+    "description": "Looking for reliable assistant for busy local shop. Duties include customer service, inventory management, billing assistance, and shop maintenance. Basic math skills required.",
+    "employer": {
+      "$oid": "6863ddf27f2a4e4d388ec011"
+    },
+    "category": "Local Trade",
+    "location": {
+      "type": "onsite",
+      "street": "Main Bazaar",
+      "city": "MAHABUBNAGAR",
+      "state": "Telangana",
+      "pincode": "509001"
+    },
+    "employmentType": "full-time",
+    "salary": 450,
+    "duration": "8",
+    "requirements": "Customer service skills, basic math, local language fluency, trustworthiness, retail experience helpful",
+    "status": "active",
+    "employerName": "AMAR SAI - Employer",
+    "companyName": "HAWK",
+    "workerDetails": {
+      "skills": ["customer_service", "retail", "inventory_management", "billing"]
+    },
+    "createdAt": {
+      "$date": "2025-07-03T09:34:55.042Z"
+    },
+    "updatedAt": {
+      "$date": "2025-07-03T09:34:55.042Z"
+    },
+    "__v": 0
+  }
+])

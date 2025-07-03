@@ -240,218 +240,173 @@ const MyApplications = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Applications</h1>
-          
-          <div className="flex items-center space-x-2">
-            {lastUpdated && (
-              <span className="text-sm text-gray-500">
-                Last updated: {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
-            <button 
-              onClick={handleRetry}
-              disabled={loading || isRetrying}
-              className="flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300 transition"
-            >
-              {(loading || isRetrying) ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Refreshing...
-                </>
-              ) : (
-                <>
-                  <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{error}</span>
-            </div>
-            <button
-              onClick={handleRetry}
-              className="mt-2 px-3 py-1 bg-red-100 text-red-800 rounded-md hover:bg-red-200"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Current Applications Section */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Applications</h2>
-          {applications.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-lg shadow-md p-6 text-center"
-            >
-              <div className="flex flex-col items-center">
-                <div className="rounded-full bg-blue-100 p-3">
-                  <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                  </svg>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+          My Applications
+        </h1>
+        
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {/* Current Applications Section */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Applications</h2>
+            {applications.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-lg shadow-md p-6 text-center"
+              >
+                <div className="flex flex-col items-center">
+                  <div className="rounded-full bg-blue-100 p-3">
+                    <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                  </div>
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">No Current Applications</h3>
+                  <p className="mt-1 text-gray-500">Start by applying to available jobs</p>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate('/jobs')}
+                    className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Browse Available Jobs
+                  </motion.button>
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">No Current Applications</h3>
-                <p className="mt-1 text-gray-500">Start by applying to available jobs</p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => navigate('/jobs')}
-                  className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Browse Available Jobs
-                </motion.button>
+              </motion.div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {applications.map((application) => (
+                  <motion.div
+                    key={application._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-lg shadow-md overflow-hidden"
+                  >
+                    <div className="p-6">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-900">{application.job.title}</h3>
+                          <p className="text-sm text-gray-500">{application.job.companyName}</p>
+                        </div>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(application.status)}`}>
+                          {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
+                        </span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-sm text-gray-500">Location</p>
+                          <p className="text-sm font-medium">{application.job.location?.city}, {application.job.location?.state}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Salary</p>
+                          <p className="text-sm font-medium">₹{application.job.salary}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-500">Applied on</p>
+                        <p className="text-sm font-medium">
+                          {new Date(application.appliedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      
+                      {/* Add status message for pending applications */}
+                      {application.status === 'pending' && (
+                        <div className="mt-2">
+                          <p className="text-sm text-yellow-600 italic">
+                            Waiting for employer response
+                          </p>
+                        </div>
+                      )}
+                      
+                      {application.status === 'accepted' && (
+                        <div className="mt-2">
+                          <p className="text-sm text-green-600 italic">
+                            Application accepted! Ready to start work.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Conditional buttons based on status */}
+                    <div className="px-6 pb-6 space-y-2">
+                      <button
+                        onClick={() => handleViewJobDetails(application.job._id)}
+                        className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                      >
+                        View Job Details
+                      </button>
+                      
+                      {application.status === 'accepted' && (
+                        <button
+                          onClick={() => handleStatusUpdate(application._id, 'completed')}
+                          className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                        >
+                          Mark as Completed
+                        </button>
+                      )}
+                      
+                      {application.status === 'pending' && (
+                        <button
+                          onClick={() => handleCancelApplication(application)}
+                          disabled={cancellingJobIds.has(application.job._id)}
+                          className={`w-full px-4 py-2 rounded-md text-white transition-colors ${
+                            cancellingJobIds.has(application.job._id) 
+                              ? 'bg-gray-400 cursor-wait' 
+                              : 'bg-red-500 hover:bg-red-600'
+                          }`}
+                        >
+                          {cancellingJobIds.has(application.job._id) ? 'Cancelling...' : 'Cancel Application'}
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            </motion.div>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {applications.map((application) => (
-                <motion.div
-                  key={application._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-lg shadow-md overflow-hidden"
-                >
-                  <div className="p-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900">{application.job.title}</h3>
-                        <p className="text-sm text-gray-500">{application.job.companyName}</p>
+            )}
+          </div>
+
+          {/* Past Jobs Section */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Past Jobs</h2>
+            {pastJobs.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-md p-6 text-center">
+                <p className="text-gray-500">No past jobs to show</p>
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {pastJobs.map((job) => (
+                  <motion.div
+                    key={job.job._id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-lg shadow-md overflow-hidden"
+                  >
+                    <div className="p-6">
+                      <h3 className="text-xl font-semibold text-gray-900">{job.job.title}</h3>
+                      <p className="text-sm text-gray-500">{job.job.company}</p>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-sm text-gray-500">Location</p>
+                          <p className="text-sm font-medium">{job.job.location?.city}, {job.job.location?.state}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Salary</p>
+                          <p className="text-sm font-medium">₹{job.job.salary}</p>
+                        </div>
                       </div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(application.status)}`}>
-                        {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
-                      </span>
-                    </div>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-sm text-gray-500">Location</p>
-                        <p className="text-sm font-medium">{application.job.location?.city}, {application.job.location?.state}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Salary</p>
-                        <p className="text-sm font-medium">₹{application.job.salary}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-500">Applied on</p>
-                      <p className="text-sm font-medium">
-                        {new Date(application.appliedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    
-                    {/* Add status message for pending applications */}
-                    {application.status === 'pending' && (
-                      <div className="mt-2">
-                        <p className="text-sm text-yellow-600 italic">
-                          Waiting for employer response
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-500">Completed on</p>
+                        <p className="text-sm font-medium">
+                          {new Date(job.completedAt || job.updatedAt).toLocaleDateString()}
                         </p>
                       </div>
-                    )}
-                    
-                    {application.status === 'accepted' && (
-                      <div className="mt-2">
-                        <p className="text-sm text-green-600 italic">
-                          Application accepted! Ready to start work.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Conditional buttons based on status */}
-                  <div className="px-6 pb-6 space-y-2">
-                    <button
-                      onClick={() => handleViewJobDetails(application.job._id)}
-                      className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-                    >
-                      View Job Details
-                    </button>
-                    
-                    {application.status === 'accepted' && (
-                      <button
-                        onClick={() => handleStatusUpdate(application._id, 'completed')}
-                        className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                      >
-                        Mark as Completed
-                      </button>
-                    )}
-                    
-                    {application.status === 'pending' && (
-                      <button
-                        onClick={() => handleCancelApplication(application)}
-                        disabled={cancellingJobIds.has(application.job._id)}
-                        className={`w-full px-4 py-2 rounded-md text-white transition-colors ${
-                          cancellingJobIds.has(application.job._id) 
-                            ? 'bg-gray-400 cursor-wait' 
-                            : 'bg-red-500 hover:bg-red-600'
-                        }`}
-                      >
-                        {cancellingJobIds.has(application.job._id) ? 'Cancelling...' : 'Cancel Application'}
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Past Jobs Section */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Past Jobs</h2>
-          {pastJobs.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <p className="text-gray-500">No past jobs to show</p>
-            </div>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {pastJobs.map((job) => (
-                <motion.div
-                  key={job.job._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-lg shadow-md overflow-hidden"
-                >
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">{job.job.title}</h3>
-                    <p className="text-sm text-gray-500">{job.job.company}</p>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <div>
-                        <p className="text-sm text-gray-500">Location</p>
-                        <p className="text-sm font-medium">{job.job.location?.city}, {job.job.location?.state}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Salary</p>
-                        <p className="text-sm font-medium">₹{job.job.salary}</p>
-                      </div>
                     </div>
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-500">Completed on</p>
-                      <p className="text-sm font-medium">
-                        {new Date(job.completedAt || job.updatedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

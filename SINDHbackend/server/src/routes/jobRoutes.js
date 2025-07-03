@@ -117,7 +117,7 @@ router.get('/', async (req, res) => {
       .populate({
         path: 'employer',
         model: 'Employer',
-        select: 'name company companyName rating contact'
+        select: 'name company companyName rating contact _id' // Make sure _id is included
       })
       .sort({ createdAt: -1 })
       .lean();
@@ -163,7 +163,7 @@ router.get('/', async (req, res) => {
         urgency: job.urgency || 'Normal',
         createdAt: job.createdAt || new Date().toISOString(),
         updatedAt: job.updatedAt || new Date().toISOString(),
-        employer: job.employer || null,
+        employer: job.employer || null, // Include full employer object with _id
         hasApplied: !!workerApplication,
         application: workerApplication || null,
         applicationStatus: workerApplication?.status || null
@@ -328,11 +328,29 @@ router.get('/count', async (req, res) => {
   }
 });
 
+// Get recent jobs
+router.get('/recent', async (req, res) => {
+  try {
+    const jobs = await Job.find({ status: { $in: ['active', 'in-progress'] } })
+      .sort({ createdAt: -1 })
+      .limit(10) // You can adjust the limit as needed
+      .populate('employer', 'name company');
+    res.json(jobs);
+  } catch (error) {
+    logger.error('Error fetching recent jobs', { error: error.message, stack: error.stack });
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Get job by ID
 router.get('/:id', async (req, res) => {
   try {
     const job = await Job.findById(req.params.id)
-      .populate('employer')
+      .populate({
+        path: 'employer',
+        model: 'Employer',
+        select: 'name company companyName rating contact _id' // Make sure _id is included
+      })
       .populate('applications.worker');
     if (!job) {
       return res.status(404).json({ message: 'Job not found' });
