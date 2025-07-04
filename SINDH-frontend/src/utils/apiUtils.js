@@ -11,13 +11,26 @@ export const getApiBaseUrl = () => {
 
 // Helper function to build full API URLs
 export const getApiUrl = (endpoint) => {
-  // Use environment variable for API base URL, fallback to production URL
-  const baseUrl = process.env.REACT_APP_API_URL || 'https://sindh-backend.onrender.com';
+  // Determine the base URL based on environment
+  let baseUrl;
+  
+  if (process.env.NODE_ENV === 'production') {
+    baseUrl = process.env.REACT_APP_API_URL || 'https://sindh-backend.onrender.com';
+  } else {
+    baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:10000';
+  }
   
   // Remove leading slash from endpoint if present to avoid double slashes
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   
-  return `${baseUrl}${cleanEndpoint}`;
+  const fullUrl = `${baseUrl}${cleanEndpoint}`;
+  
+  // Log API calls in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('API Call:', fullUrl);
+  }
+  
+  return fullUrl;
 };
 
 // Alternative: Use environment variable (recommended)

@@ -22,21 +22,61 @@ mongoose.connect(process.env.MONGODB_URL, {
 .then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// CORS configuration for production
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'https://splendid-travesseiro-45ebea.netlify.app',
-    'https://sindh-frontend.netlify.app' // Add this if you change the domain
-  ],
+// Enhanced CORS configuration for production
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://splendid-travesseiro-45ebea.netlify.app',
+      'https://sindh-frontend.netlify.app'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'User-Type', 'User-ID']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'User-Type', 'User-ID'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
+
+// Add a health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Add a root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'SINDH Backend API',
+    version: '1.0.0',
+    status: 'Running',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      docs: '/api-docs'
+    }
+  });
+});
 
 // Routes
 app.use('/api/workers', workerRoutes);

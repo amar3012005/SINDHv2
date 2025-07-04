@@ -10,7 +10,9 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+
+// Use Render's dynamic port or fallback to 10000 for local development
+const PORT = process.env.PORT || 10000;
 
 // Initialize server with database connection
 const initializeServer = async () => {
@@ -54,10 +56,18 @@ const initializeServer = async () => {
       res.status(500).json({ message: 'Something went wrong!' });
     });
 
-    // Start server only after successful DB connection
-    app.listen(PORT, () => {
+    // Bind to 0.0.0.0 to accept connections from any IP (required for Render)
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Server running on port ${PORT}`);
-      console.log(`📡 API available at http://localhost:${PORT}/api`);
+      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+      
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`📡 API available at https://sindh-backend.onrender.com/api`);
+      } else {
+        console.log(`📡 API available at http://localhost:${PORT}/api`);
+      }
+      
+      console.log('🎉 Your service is live!');
     });
   } catch (error) {
     console.error('❌ Server initialization failed:', error.message);
