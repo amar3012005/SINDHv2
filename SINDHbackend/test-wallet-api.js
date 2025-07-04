@@ -18,7 +18,7 @@ async function testWalletAPI() {
     const fetch = require('node-fetch');
     
     try {
-      const response = await fetch('http://localhost:5000/api/workers/6863bfe35bc522d4b1a999bc/wallet');
+      const response = await fetch('https://sindh-backend.onrender.comapi/workers/6863bfe35bc522d4b1a999bc/wallet');
       if (response.ok) {
         const walletData = await response.json();
         console.log('\nWallet API Response:', {

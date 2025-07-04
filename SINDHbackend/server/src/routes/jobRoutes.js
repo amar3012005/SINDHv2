@@ -117,7 +117,7 @@ router.get('/', async (req, res) => {
       .populate({
         path: 'employer',
         model: 'Employer',
-        select: 'name company companyName rating contact _id' // Make sure _id is included
+        select: 'name company companyName rating contact'
       })
       .sort({ createdAt: -1 })
       .lean();
@@ -163,7 +163,7 @@ router.get('/', async (req, res) => {
         urgency: job.urgency || 'Normal',
         createdAt: job.createdAt || new Date().toISOString(),
         updatedAt: job.updatedAt || new Date().toISOString(),
-        employer: job.employer || null, // Include full employer object with _id
+        employer: job.employer || null,
         hasApplied: !!workerApplication,
         application: workerApplication || null,
         applicationStatus: workerApplication?.status || null
@@ -180,78 +180,6 @@ router.get('/', async (req, res) => {
       success: false,
       message: 'Failed to fetch jobs',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
-      data: []
-    });
-  }
-});
-
-// Get completed jobs for a worker (Past Jobs) - FIXED
-router.get('/worker/:workerId/completed', async (req, res) => {
-  try {
-    const { workerId } = req.params;
-    
-    let completedApplications = await JobApplication.find({
-      worker: workerId,
-      status: 'completed'
-    })
-    .populate('job')
-    .populate('employer', 'name company companyName')
-    .sort({ updatedAt: -1 });
-    
-    if (completedApplications.length === 0) {
-      const worker = await Worker.findById(workerId);
-      if (worker && worker.phone) {
-        completedApplications = await JobApplication.find({
-          'workerDetails.phone': worker.phone,
-          status: 'completed'
-        })
-        .populate('job')
-        .populate('employer', 'name company companyName')
-        .sort({ updatedAt: -1 });
-        
-        for (const app of completedApplications) {
-          if (app.worker.toString() !== workerId) {
-            app.worker = workerId;
-            app.workerDetails.name = worker.name;
-            await app.save();
-          }
-        }
-      }
-    }
-    
-    const completedJobs = completedApplications.map(app => ({
-      _id: app._id,
-      job: {
-        _id: app.job._id,
-        title: app.job.title,
-        companyName: app.job.companyName,
-        location: app.job.location,
-        salary: app.job.salary,
-        category: app.job.category,
-        description: app.job.description
-      },
-      application: {
-        status: app.status,
-        appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
-        completedAt: app.jobCompletedDate || app.updatedAt,
-        paymentStatus: app.paymentStatus || 'pending',
-        paymentAmount: app.paymentAmount || app.job.salary,
-        paymentDate: app.paymentDate
-      },
-      employer: app.employer
-    }));
-    
-    res.json({
-      success: true,
-      count: completedJobs.length,
-      data: completedJobs
-    });
-    
-  } catch (error) {
-    logger.error('Error fetching completed jobs', { error: error.message, stack: error.stack });
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch completed jobs',
       data: []
     });
   }
@@ -328,34 +256,235 @@ router.get('/count', async (req, res) => {
   }
 });
 
-// Get recent jobs
+// Get completed jobs for a worker (Past Jobs) - MUST be before /:id route
+router.get('/worker/:workerId/completed', async (req, res) => {
+  try {
+    const { workerId } = req.params;
+    
+    let completedApplications = await JobApplication.find({
+      worker: workerId,
+      status: 'completed'
+    })
+    .populate('job')
+    .populate('employer', 'name company companyName')
+    .sort({ updatedAt: -1 });
+    
+    if (completedApplications.length === 0) {
+      const worker = await Worker.findById(workerId);
+      if (worker && worker.phone) {
+        completedApplications = await JobApplication.find({
+          'workerDetails.phone': worker.phone,
+          status: 'completed'
+        })
+        .populate('job')
+        .populate('employer', 'name company companyName')
+        .sort({ updatedAt: -1 });
+        
+        for (const app of completedApplications) {
+          if (app.worker.toString() !== workerId) {
+            app.worker = workerId;
+            app.workerDetails.name = worker.name;
+            await app.save();
+          }
+        }
+      }
+    }
+    
+    const completedJobs = completedApplications.map(app => ({
+      _id: app._id,
+      job: {
+        _id: app.job._id,
+        title: app.job.title,
+        companyName: app.job.companyName,
+        location: app.job.location,
+        salary: app.job.salary,
+        category: app.job.category,
+        description: app.job.description
+      },
+      application: {
+        status: app.status,
+        appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
+        completedAt: app.jobCompletedDate || app.updatedAt,
+        paymentStatus: app.paymentStatus || 'pending',
+        paymentAmount: app.paymentAmount || app.job.salary,
+        paymentDate: app.paymentDate
+      },
+      employer: app.employer
+    }));
+    
+    res.json({
+      success: true,
+      count: completedJobs.length,
+      data: completedJobs
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching completed jobs', { error: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch completed jobs',
+      data: []
+    });
+  }
+});
+
+// Get recent jobs - MUST be before /:id route
 router.get('/recent', async (req, res) => {
   try {
-    const jobs = await Job.find({ status: { $in: ['active', 'in-progress'] } })
+    const { limit = 10, workerId } = req.query;
+    
+    logger.info(`Fetching recent jobs, limit: ${limit}, workerId: ${workerId}`);
+    
+    const query = {
+      status: { $in: ['active', 'in-progress'] }
+    };
+
+    // If workerId provided, exclude completed jobs for that worker
+    let excludeJobIds = [];
+    if (workerId) {
+      try {
+        const completedApplications = await JobApplication.find({
+          worker: workerId,
+          status: 'completed'
+        }).select('job');
+        
+        excludeJobIds = completedApplications.map(app => app.job);
+        
+        if (excludeJobIds.length > 0) {
+          query._id = { $nin: excludeJobIds };
+        }
+      } catch (appError) {
+        logger.error('Error fetching worker completed jobs for recent filter', { error: appError.message });
+      }
+    }
+
+    const recentJobs = await Job.find(query)
+      .populate({
+        path: 'employer',
+        model: 'Employer',
+        select: 'name company companyName rating contact'
+      })
       .sort({ createdAt: -1 })
-      .limit(10) // You can adjust the limit as needed
-      .populate('employer', 'name company');
-    res.json(jobs);
+      .limit(parseInt(limit))
+      .lean();
+
+    logger.info(`Found ${recentJobs.length} recent jobs`);
+
+    res.json({
+      success: true,
+      count: recentJobs.length,
+      data: recentJobs
+    });
+    
   } catch (error) {
     logger.error('Error fetching recent jobs', { error: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch recent jobs',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// Get jobs posted by an employer - MUST be before /:id route
+router.get('/employer/:employerId', async (req, res) => {
+  try {
+    const { employerId } = req.params;
+    
+    if (!employerId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid employer ID format',
+        data: []
+      });
+    }
+
+    const jobs = await Job.find({ 
+      employer: employerId 
+    })
+    .populate('employer', 'name company')
+    .sort({ createdAt: -1 });
+    
+    res.json(jobs || []);
+    
+  } catch (error) {
+    logger.error('Error fetching employer jobs', { error: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch jobs',
+      data: [],
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Get accepted jobs for a worker - MUST be before /:id route
+router.get('/worker/:workerId/accepted-jobs', async (req, res) => {
+  try {
+    const { workerId } = req.params;
+    
+    const applications = await JobApplication.find({ workerId })
+      .populate('jobId')
+      .populate('employerId', 'company.name')
+      .sort({ appliedAt: -1 });
+
+    res.json(applications);
+  } catch (error) {
+    logger.error('Error fetching accepted jobs', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
   }
 });
 
-// Get job by ID
+// Get job applications for an employer - MUST be before /:id route
+router.get('/employer/:employerId/applications', async (req, res) => {
+  try {
+    const { employerId } = req.params;
+    
+    const applications = await JobApplication.find({ employerId })
+      .populate('jobId')
+      .populate('workerId', 'name skills experience_years')
+      .sort({ appliedAt: -1 });
+
+    res.json(applications);
+  } catch (error) {
+    logger.error('Error fetching job applications', { error: error.message, stack: error.stack });
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get job by ID - MUST be after all specific routes
 router.get('/:id', async (req, res) => {
   try {
-    const job = await Job.findById(req.params.id)
-      .populate({
-        path: 'employer',
-        model: 'Employer',
-        select: 'name company companyName rating contact _id' // Make sure _id is included
-      })
-      .populate('applications.worker');
+    const { id } = req.params;
+    
+    // Validate ObjectId format
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid job ID format'
+      });
+    }
+    
+    const job = await Job.findById(id)
+      .populate('employer');
+    
     if (!job) {
       return res.status(404).json({ message: 'Job not found' });
     }
-    res.json(job);
+
+    // Fetch applications separately from JobApplication collection
+    const applications = await JobApplication.find({ job: id })
+      .populate('worker', 'name phone email skills experience')
+      .populate('employer', 'name companyName')
+      .sort({ createdAt: -1 });
+
+    // Add applications to the job object
+    const jobWithApplications = {
+      ...job.toObject(),
+      applications: applications
+    };
+
+    res.json(jobWithApplications);
   } catch (error) {
     logger.error(`Error fetching job by ID: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
@@ -393,27 +522,43 @@ router.post('/:id/apply', async (req, res) => {
       return res.status(404).json({ message: 'Worker not found' });
     }
 
-    const existingApplication = job.applications.find(
-      app => app.worker.toString() === worker._id.toString()
-    );
+    // Check if application already exists in JobApplication collection
+    const existingApplication = await JobApplication.findOne({
+      job: req.params.id,
+      worker: req.body.workerId
+    });
 
     if (existingApplication) {
       return res.status(400).json({ message: 'Already applied for this job' });
     }
 
-    job.applications.push({
-      worker: worker._id,
-      status: 'pending'
+    // Create new application in JobApplication collection
+    const newApplication = new JobApplication({
+      job: req.params.id,
+      worker: req.body.workerId,
+      employer: job.employer,
+      status: 'pending',
+      workerDetails: {
+        name: worker.name,
+        phone: worker.phone,
+        email: worker.email,
+        skills: worker.skills || [],
+        experience: worker.experience || ''
+      }
     });
 
-    await job.save();
+    await newApplication.save();
     
-    const updatedJob = await Job.findById(job._id)
-      .populate('employer')
-      .populate('applications.worker');
+    // Return the job with updated applications
+    const updatedJob = await Job.findById(job._id).populate('employer');
+    const applications = await JobApplication.find({ job: job._id })
+      .populate('worker', 'name phone email skills experience');
     
     logger.info(`Worker ${worker.name} applied for job: ${job.title}`);
-    res.status(201).json(updatedJob);
+    res.status(201).json({
+      ...updatedJob.toObject(),
+      applications: applications
+    });
   } catch (error) {
     logger.error('Error applying for job', { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
@@ -428,15 +573,27 @@ router.patch('/:id/applications/:applicationId', async (req, res) => {
       return res.status(404).json({ message: 'Job not found' });
     }
 
-    const application = job.applications.id(req.params.applicationId);
+    // Update application in JobApplication collection
+    const application = await JobApplication.findByIdAndUpdate(
+      req.params.applicationId,
+      { status: req.body.status },
+      { new: true }
+    ).populate('worker', 'name phone email skills experience');
+
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
     }
 
-    application.status = req.body.status;
-    await job.save();
     logger.info(`Application status updated for job: ${job.title}`);
-    res.json(job);
+    
+    // Return updated job with applications
+    const applications = await JobApplication.find({ job: req.params.id })
+      .populate('worker', 'name phone email skills experience');
+    
+    res.json({
+      ...job.toObject(),
+      applications: applications
+    });
   } catch (error) {
     logger.error('Error updating application status', { error: error.message, stack: error.stack });
     res.status(400).json({ message: error.message });
@@ -510,67 +667,6 @@ router.post('/accept', async (req, res) => {
   }
 });
 
-// Get accepted jobs for a worker
-router.get('/worker/:workerId/accepted-jobs', async (req, res) => {
-  try {
-    const { workerId } = req.params;
-    
-    const applications = await JobApplication.find({ workerId })
-      .populate('jobId')
-      .populate('employerId', 'company.name')
-      .sort({ appliedAt: -1 });
-
-    res.json(applications);
-  } catch (error) {
-    logger.error('Error fetching accepted jobs', { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get job applications for an employer
-router.get('/employer/:employerId/applications', async (req, res) => {
-  try {
-    const { employerId } = req.params;
-    
-    const applications = await JobApplication.find({ employerId })
-      .populate('jobId')
-      .populate('workerId', 'name skills experience_years')
-      .sort({ appliedAt: -1 });
-
-    res.json(applications);
-  } catch (error) {
-    logger.error('Error fetching job applications', { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Update application status (employer accepts/rejects application)
-router.patch('/applications/:applicationId', async (req, res) => {
-  try {
-    const { applicationId } = req.params;
-    const { status, notes } = req.body;
-
-    if (!['accepted', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: 'Invalid status' });
-    }
-
-    const application = await JobApplication.findById(applicationId);
-    if (!application) {
-      return res.status(404).json({ message: 'Application not found' });
-    }
-
-    application.status = status;
-    if (notes) application.notes = notes;
-    await application.save();
-
-    logger.info(`Application status updated: ${applicationId}`);
-    res.json({ message: 'Application status updated successfully' });
-  } catch (error) {
-    logger.error('Error updating application status', { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
 // Update job status
 router.patch('/:jobId/update-status', async (req, res) => {
   try {
@@ -606,38 +702,6 @@ router.patch('/:jobId/update-status', async (req, res) => {
   } catch (error) {
     logger.error('Error updating job status', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
-  }
-});
-
-// Get jobs posted by an employer
-router.get('/employer/:employerId', async (req, res) => {
-  try {
-    const { employerId } = req.params;
-    
-    if (!employerId.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid employer ID format',
-        data: []
-      });
-    }
-
-    const jobs = await Job.find({ 
-      employer: employerId 
-    })
-    .populate('employer', 'name company')
-    .sort({ createdAt: -1 });
-    
-    res.json(jobs || []);
-    
-  } catch (error) {
-    logger.error('Error fetching employer jobs', { error: error.message, stack: error.stack });
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch jobs',
-      data: [],
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
   }
 });
 

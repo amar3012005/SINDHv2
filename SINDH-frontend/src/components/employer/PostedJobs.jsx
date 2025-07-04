@@ -46,7 +46,7 @@ const PostedJobs = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/employer/${user.id}`);
+      const response = await fetch(`https://sindh-backend.onrender.comapi/jobs/employer/${user.id}`);
       
       if (response.ok) {
         const jobsData = await response.json();
@@ -72,7 +72,7 @@ const PostedJobs = () => {
     
     for (const job of jobs) {
       try {
-        const response = await fetch(`http://localhost:5000/api/job-applications/job/${job._id}`);
+        const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/job/${job._id}`);
         if (response.ok) {
           const data = await response.json();
           applicationsMap[job._id] = data.data || [];
@@ -97,7 +97,7 @@ const PostedJobs = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}`, {
+      const response = await fetch(`https://sindh-backend.onrender.comapi/jobs/${jobId}`, {
         method: 'DELETE',
       });
 
@@ -136,7 +136,7 @@ const PostedJobs = () => {
     try {
       console.log('Updating application status:', applicationId, 'to:', newStatus);
       
-      const response = await fetch(`http://localhost:5000/api/job-applications/${applicationId}/status`, {
+      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -968,7 +968,7 @@ const PostedJobs = () => {
                     try {
                       console.log('Processing payment for application:', selectedJobForPayment.application._id);
                       
-                      const response = await fetch(`http://localhost:5000/api/job-applications/${selectedJobForPayment.application._id}/process-payment`, {
+                      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${selectedJobForPayment.application._id}/process-payment`, {
                         method: 'PATCH',
                         headers: {
                           'Content-Type': 'application/json'

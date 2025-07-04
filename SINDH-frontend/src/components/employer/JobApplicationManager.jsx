@@ -24,7 +24,7 @@ const JobApplicationManager = ({ jobId }) => {
 
   const fetchApplications = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/job-applications/job/${jobId}`);
+      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/job/${jobId}`);
       if (response.ok) {
         const data = await response.json();
         setApplications(data.data || []);
@@ -38,7 +38,7 @@ const JobApplicationManager = ({ jobId }) => {
 
   const updateApplicationStatus = async (applicationId, status) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/job-applications/${applicationId}/status`, {
+      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

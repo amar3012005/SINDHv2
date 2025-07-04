@@ -11,10 +11,13 @@ export const getApiBaseUrl = () => {
 
 // Helper function to build full API URLs
 export const getApiUrl = (endpoint) => {
-  const baseUrl = getApiBaseUrl();
-  // Remove leading slash if present to avoid double slashes
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-  return `${baseUrl}/${cleanEndpoint}`;
+  // Use environment variable for API base URL, fallback to production URL
+  const baseUrl = process.env.REACT_APP_API_URL || 'https://sindh-backend.onrender.com';
+  
+  // Remove leading slash from endpoint if present to avoid double slashes
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  return `${baseUrl}${cleanEndpoint}`;
 };
 
 // Alternative: Use environment variable (recommended)

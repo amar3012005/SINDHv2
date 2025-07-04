@@ -257,11 +257,6 @@ router.post('/jobs', auth, async (req, res) => {
     const newJob = new Job(jobData);
     await newJob.save();
     
-    await Employer.findByIdAndUpdate(
-      employerId,
-      { $push: { postedJobs: newJob._id } }
-    );
-    
     logger.info(`Job saved successfully: ${newJob._id}`);
     res.status(201).json({ 
       message: 'Job posted successfully', 
@@ -274,37 +269,6 @@ router.post('/jobs', auth, async (req, res) => {
       return res.status(400).json({ message: messages.join(', ') });
     }
     res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Update employer's job status
-router.patch('/:employerId/update-job', async (req, res) => {
-  try {
-    const { employerId } = req.params;
-    const { jobId, status, applicantId, applicationId } = req.body;
-
-    const employer = await Employer.findById(employerId);
-    if (!employer) {
-      return res.status(404).json({ message: 'Employer not found' });
-    }
-
-    if (!employer.postedJobs) {
-      employer.postedJobs = [];
-    }
-
-    const jobIndex = employer.postedJobs.findIndex(job => job.jobId.toString() === jobId);
-    if (jobIndex > -1) {
-      employer.postedJobs[jobIndex].status = status;
-      employer.postedJobs[jobIndex].applicantId = applicantId;
-      employer.postedJobs[jobIndex].applicationId = applicationId;
-    }
-
-    await employer.save();
-    logger.info(`Employer job status updated for employer: ${employerId}`);
-    res.json(employer);
-  } catch (error) {
-    logger.error(`Error updating employer job: ${employerId}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
   }
 });
 
@@ -324,59 +288,6 @@ router.post('/:id/logout', async (req, res) => {
   } catch (error) {
     logger.error(`Logout error for employer: ${req.params.id}`, { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
-  }
-});
-
-// Add job to employer's postedJobs array - separate endpoint for better error handling
-router.post('/:employerId/addJob/:jobId', async (req, res) => {
-  try {
-    const { employerId, jobId } = req.params;
-    
-    if (!mongoose.Types.ObjectId.isValid(employerId) || !mongoose.Types.ObjectId.isValid(jobId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid employer or job ID format'
-      });
-    }
-    
-    const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Job not found'
-      });
-    }
-    
-    const employer = await Employer.findById(employerId);
-    if (!employer) {
-      return res.status(404).json({
-        success: false,
-        message: 'Employer not found'
-      });
-    }
-    
-    if (employer.postedJobs.includes(jobId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Job already linked to this employer'
-      });
-    }
-    
-    employer.postedJobs.push(jobId);
-    await employer.save();
-    
-    logger.info(`Successfully added job ${jobId} to employer ${employerId}`);
-    return res.status(200).json({
-      success: true,
-      message: 'Job added to employer successfully'
-    });
-  } catch (error) {
-    logger.error(`Error adding job to employer: ${employerId}`, { error: error.message, stack: error.stack });
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to add job to employer',
-      error: error.message
-    });
   }
 });
 
