@@ -129,6 +129,29 @@ jobApplicationSchema.pre('save', function(next) {
 // Create compound index to prevent duplicate applications
 jobApplicationSchema.index({ job: 1, worker: 1 }, { unique: true });
 
+// Add a pre-find middleware to automatically populate and filter out null jobs
+jobApplicationSchema.pre(/^find/, function(next) {
+  this.populate({
+    path: 'job',
+    select: 'title companyName location salary category description status'
+  });
+  next();
+});
+
+// Add a method to clean up orphaned applications
+jobApplicationSchema.statics.cleanupOrphanedApplications = async function() {
+  try {
+    const orphanedApps = await this.find({ job: null });
+    if (orphanedApps.length > 0) {
+      console.log(`Found ${orphanedApps.length} orphaned applications, cleaning up...`);
+      await this.deleteMany({ job: null });
+      console.log('Orphaned applications cleaned up successfully');
+    }
+  } catch (error) {
+    console.error('Error cleaning up orphaned applications:', error);
+  }
+};
+
 const JobApplication = mongoose.model('JobApplication', jobApplicationSchema);
 
 module.exports = JobApplication;

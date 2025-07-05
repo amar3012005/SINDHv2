@@ -290,27 +290,42 @@ router.get('/worker/:workerId/completed', async (req, res) => {
       }
     }
     
-    const completedJobs = completedApplications.map(app => ({
-      _id: app._id,
-      job: {
-        _id: app.job._id,
-        title: app.job.title,
-        companyName: app.job.companyName,
-        location: app.job.location,
-        salary: app.job.salary,
-        category: app.job.category,
-        description: app.job.description
-      },
-      application: {
-        status: app.status,
-        appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
-        completedAt: app.jobCompletedDate || app.updatedAt,
-        paymentStatus: app.paymentStatus || 'pending',
-        paymentAmount: app.paymentAmount || app.job.salary,
-        paymentDate: app.paymentDate
-      },
-      employer: app.employer
-    }));
+    // Filter out applications with null jobs and safely map the data
+    const validApplications = completedApplications.filter(app => app.job && app.job._id);
+    
+    const completedJobs = validApplications.map(app => {
+      try {
+        return {
+          _id: app._id,
+          job: {
+            _id: app.job._id,
+            title: app.job.title || 'Job Title Not Available',
+            companyName: app.job.companyName || 'Company Not Available',
+            location: app.job.location || { city: 'Not specified', state: 'Not specified' },
+            salary: app.job.salary || 0,
+            category: app.job.category || 'General',
+            description: app.job.description || 'No description available'
+          },
+          application: {
+            status: app.status,
+            appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
+            completedAt: app.jobCompletedDate || app.updatedAt,
+            paymentStatus: app.paymentStatus || 'pending',
+            paymentAmount: app.paymentAmount || app.job.salary || 0,
+            paymentDate: app.paymentDate
+          },
+          employer: app.employer || { name: 'Unknown Employer' }
+        };
+      } catch (mapError) {
+        logger.error('Error mapping completed job:', { 
+          error: mapError.message, 
+          applicationId: app._id 
+        });
+        return null;
+      }
+    }).filter(Boolean); // Remove any null entries
+    
+    logger.info(`Successfully processed ${completedJobs.length} completed jobs for worker ${workerId}`);
     
     res.json({
       success: true,

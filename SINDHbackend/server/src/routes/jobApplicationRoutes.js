@@ -287,28 +287,48 @@ router.get('/worker/:workerId/completed', async (req, res) => {
 
     logger.info(`Found ${completedApplications.length} completed applications for worker ${workerId}`);
 
-    // Transform the data to match the expected format
-    const transformedData = completedApplications.map(app => ({
-      _id: app._id,
-      job: {
-        _id: app.job._id,
-        title: app.job.title,
-        companyName: app.job.companyName,
-        location: app.job.location,
-        salary: app.job.salary,
-        category: app.job.category,
-        description: app.job.description
-      },
-      application: {
-        status: app.status,
-        appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
-        completedAt: app.jobCompletedDate || app.updatedAt,
-        paymentStatus: app.paymentStatus || 'pending',
-        paymentAmount: app.paymentAmount || app.job.salary,
-        paymentDate: app.paymentDate
-      },
-      employer: app.employer
-    }));
+    // Filter out applications with null jobs and safely transform the data
+    const validApplications = completedApplications.filter(app => {
+      if (!app.job || !app.job._id) {
+        logger.warn(`Application ${app._id} has null job reference, skipping`);
+        return false;
+      }
+      return true;
+    });
+
+    const transformedData = validApplications.map(app => {
+      try {
+        return {
+          _id: app._id,
+          job: {
+            _id: app.job._id,
+            title: app.job.title || 'Job Title Not Available',
+            companyName: app.job.companyName || 'Company Not Available',
+            location: app.job.location || { city: 'Not specified', state: 'Not specified' },
+            salary: app.job.salary || 0,
+            category: app.job.category || 'General',
+            description: app.job.description || 'No description available'
+          },
+          application: {
+            status: app.status,
+            appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
+            completedAt: app.jobCompletedDate || app.updatedAt,
+            paymentStatus: app.paymentStatus || 'pending',
+            paymentAmount: app.paymentAmount || app.job.salary || 0,
+            paymentDate: app.paymentDate
+          },
+          employer: app.employer || { name: 'Unknown Employer' }
+        };
+      } catch (transformError) {
+        logger.error('Error transforming application data:', { 
+          error: transformError.message, 
+          applicationId: app._id 
+        });
+        return null;
+      }
+    }).filter(Boolean); // Remove any null entries
+
+    logger.info(`Successfully processed ${transformedData.length} valid completed applications`);
 
     res.json({
       success: true,
@@ -317,7 +337,10 @@ router.get('/worker/:workerId/completed', async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Error fetching completed applications for worker:', { message: error.message, stack: error.stack });
+    logger.error('Error fetching completed applications for worker:', { 
+      message: error.message, 
+      stack: error.stack 
+    });
     res.status(500).json({
       success: false,
       message: 'Failed to fetch completed applications',
