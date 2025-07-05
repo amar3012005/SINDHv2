@@ -287,13 +287,26 @@ router.get('/worker/:workerId/completed', async (req, res) => {
 
     logger.info(`Found ${completedApplications.length} completed applications for worker ${workerId}`);
 
-    // Filter out applications with null jobs and safely transform the data
+    // Filter out applications with null/invalid jobs and safely transform the data
     const validApplications = completedApplications.filter(app => {
-      if (!app.job || !app.job._id) {
+      if (!app.job) {
         logger.warn(`Application ${app._id} has null job reference, skipping`);
         return false;
       }
-      return true;
+      
+      // Check if job is a valid populated object
+      if (typeof app.job === 'object' && app.job._id) {
+        return true;
+      }
+      
+      // Check if job is a valid ObjectId string
+      if (typeof app.job === 'string' && app.job.match(/^[0-9a-fA-F]{24}$/)) {
+        logger.warn(`Application ${app._id} has unpopulated job reference: ${app.job}`);
+        return false; // Skip unpopulated references for now
+      }
+      
+      logger.warn(`Application ${app._id} has invalid job data type: ${typeof app.job}`);
+      return false;
     });
 
     const transformedData = validApplications.map(app => {

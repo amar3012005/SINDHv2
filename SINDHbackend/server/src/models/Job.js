@@ -3,101 +3,90 @@ const mongoose = require('mongoose');
 const jobSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true,
+    required: [true, 'Job title is required'],
     trim: true,
-    index: true
+    maxLength: [200, 'Job title cannot exceed 200 characters']
   },
   description: {
     type: String,
-    required: true
+    required: [true, 'Job description is required'],
+    trim: true,
+    maxLength: [2000, 'Job description cannot exceed 2000 characters']
+  },
+  category: {
+    type: String,
+    required: [true, 'Job category is required'],
+    enum: {
+      values: ['Agriculture', 'Construction', 'Domestic', 'Manufacturing', 'Transportation', 'Retail', 'Food Service', 'General'],
+      message: 'Please select a valid category'
+    }
+  },
+  salary: {
+    type: Number,
+    required: [true, 'Salary is required'],
+    min: [100, 'Salary must be at least ₹100'],
+    max: [100000, 'Salary cannot exceed ₹100,000']
   },
   employer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employer',
-    required: true,
-    index: true
+    required: [true, 'Employer is required']
   },
-  category: {
+  companyName: {
     type: String,
-    required: true,
-    enum: ['Construction', 'Agriculture', 'Household', 'Transportation', 'Manufacturing', 'Retail']
+    required: [true, 'Company name is required'],
+    trim: true
   },
   location: {
     type: {
       type: String,
-      enum: ['remote', 'hybrid', 'onsite'],
-      required: true
+      enum: ['onsite', 'remote', 'hybrid'],
+      default: 'onsite'
     },
-    street: {
-      type: String,
-      required: true
-    },
+    street: String,
     city: {
       type: String,
-      required: true
+      required: [true, 'City is required'],
+      trim: true
     },
     state: {
       type: String,
-      required: true
+      required: [true, 'State is required'],
+      trim: true
     },
     pincode: {
       type: String,
-      required: true
+      match: [/^\d{6}$/, 'Please provide a valid 6-digit pincode']
     }
   },
   employmentType: {
     type: String,
-    enum: ['full-time', 'part-time', 'contract', 'internship'],
-    required: true
+    enum: ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Daily wage'],
+    default: 'Full-time'
   },
-  salary: {
-    type: Number,
-    required: true
-  },
-  duration: {
+  skillsRequired: [{
     type: String,
-    required: true
-  },
+    trim: true
+  }],
   requirements: {
-    type: String
+    type: String,
+    default: 'Basic requirements apply'
   },
   status: {
     type: String,
-    enum: ['active', 'in-progress', 'completed', 'cancelled', 'draft'],
+    enum: ['active', 'in-progress', 'completed', 'cancelled'],
     default: 'active'
   },
-  employerName: {
+  urgency: {
     type: String,
-    required: true
+    enum: ['Low', 'Normal', 'High', 'Urgent'],
+    default: 'Normal'
   },
-  companyName: {
-    type: String,
-    required: true
-  },
-  assignedWorker: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Worker'
-  },
-  workerDetails: {
-    name: String,
-    phone: String,
-    skills: [String],
-    rating: Number,
-    location: {
-      state: String,
-      city: String
-    }
-  },
-  jobStartDate: Date,
-  jobEndDate: Date,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
+  startDate: Date,
+  endDate: Date,
+  completedAt: Date
+}, {
+  timestamps: true
 });
 
 // Text search index

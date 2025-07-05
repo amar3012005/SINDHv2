@@ -10,8 +10,29 @@ const logger = require('../config/logger');
 
 // Create a new job
 router.post('/', async (req, res) => {
-  logger.info('New job posting');
+  logger.info('New job posting attempt', { 
+    employer: req.body.employer, 
+    title: req.body.title,
+    body: req.body 
+  });
+  
   try {
+    // Validate required fields
+    if (!req.body.title) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Job title is required' 
+      });
+    }
+    
+    if (!req.body.employer) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Employer ID is required' 
+      });
+    }
+
+    // Check for duplicate job posting (relaxed timing)
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const existingJob = await Job.findOne({
       title: req.body.title,
@@ -21,37 +42,103 @@ router.post('/', async (req, res) => {
     });
     
     if (existingJob) {
-      logger.warn('Duplicate job submission detected');
+      logger.warn('Duplicate job submission detected', { 
+        existingJobId: existingJob._id,
+        newJobTitle: req.body.title 
+      });
       return res.status(400).json({ 
         success: false, 
         message: 'A similar job was already posted in the last 5 minutes'
       });
     }
     
-    const job = new Job(req.body);
-    await job.save();
-    
-    if (req.body.employer) {
-      try {
-        await Employer.findByIdAndUpdate(
-          req.body.employer,
-          { $push: { postedJobs: job._id } },
-          { new: true }
-        );
-      } catch (employerError) {
-        logger.error('Error updating employer after job creation', { error: employerError.message, stack: employerError.stack });
-      }
+    // Verify employer exists
+    const employer = await Employer.findById(req.body.employer);
+    if (!employer) {
+      logger.error('Employer not found', { employerId: req.body.employer });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Employer not found' 
+      });
     }
     
-    logger.info(`Job posted successfully: ${job.title}`);
+    // Create the job with proper defaults
+    const jobData = {
+      title: req.body.title,
+      description: req.body.description || 'Job description to be provided',
+      category: req.body.category || 'General',
+      salary: req.body.salary || 15000,
+      employer: req.body.employer,
+      companyName: req.body.companyName || employer.companyName || employer.name,
+      location: {
+        type: req.body.location?.type || 'onsite',
+        street: req.body.location?.street || '',
+        city: req.body.location?.city || '',
+        state: req.body.location?.state || '',
+        pincode: req.body.location?.pincode || ''
+      },
+      employmentType: req.body.employmentType || 'Full-time',
+      skillsRequired: req.body.skillsRequired || [],
+      requirements: req.body.requirements || 'Basic requirements apply',
+      status: req.body.status || 'active',
+      urgency: req.body.urgency || 'Normal',
+      startDate: req.body.startDate,
+      endDate: req.body.endDate
+    };
+    
+    logger.info('Creating job with data:', jobData);
+    
+    const job = new Job(jobData);
+    await job.save();
+    
+    // Update employer's posted jobs list
+    try {
+      await Employer.findByIdAndUpdate(
+        req.body.employer,
+        { $push: { postedJobs: job._id } },
+        { new: true }
+      );
+      logger.info('Updated employer posted jobs list');
+    } catch (employerError) {
+      logger.error('Error updating employer after job creation', { 
+        error: employerError.message, 
+        stack: employerError.stack,
+        employerId: req.body.employer,
+        jobId: job._id
+      });
+      // Don't fail the whole request if employer update fails
+    }
+    
+    logger.info(`Job posted successfully: ${job.title}`, { jobId: job._id });
+    
     res.status(201).json({ 
       success: true, 
       message: 'Job posted successfully',
       job: job 
     });
+    
   } catch (error) {
-    logger.error('Error posting job', { error: error.message, stack: error.stack });
-    res.status(400).json({ message: error.message });
+    logger.error('Error posting job', { 
+      error: error.message, 
+      stack: error.stack,
+      requestBody: req.body
+    });
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        success: false,
+        message: 'Validation failed',
+        errors: validationErrors
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to create job',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
   }
 });
 
@@ -225,17 +312,34 @@ router.get('/count', async (req, res) => {
           status: 'completed'
         }).select('job');
         
-        const completedJobIds = completedApplications.map(app => app.job.toString());
+        // Filter and validate job IDs
+        const validJobIds = completedApplications
+          .map(app => {
+            try {
+              // Handle corrupted data where job might be a string or object
+              if (app.job && typeof app.job === 'object' && app.job._id) {
+                return app.job._id.toString();
+              } else if (app.job && typeof app.job === 'string' && app.job.match(/^[0-9a-fA-F]{24}$/)) {
+                return app.job;
+              }
+              return null;
+            } catch (e) {
+              logger.warn(`Invalid job ID in application ${app._id}: ${e.message}`);
+              return null;
+            }
+          })
+          .filter(Boolean); // Remove null values
         
-        if (completedJobIds.length > 0) {
+        if (validJobIds.length > 0) {
           const excludeCompletedQuery = {
             ...query,
-            _id: { $nin: completedJobIds }
+            _id: { $nin: validJobIds }
           };
           count = await Job.countDocuments(excludeCompletedQuery);
         }
       } catch (error) {
         logger.error('Error filtering completed jobs from count', { error: error.message, stack: error.stack });
+        // Return original count if filtering fails
       }
     }
     
@@ -355,7 +459,6 @@ router.get('/recent', async (req, res) => {
     };
 
     // If workerId provided, exclude completed jobs for that worker
-    let excludeJobIds = [];
     if (workerId) {
       try {
         const completedApplications = await JobApplication.find({
@@ -363,10 +466,26 @@ router.get('/recent', async (req, res) => {
           status: 'completed'
         }).select('job');
         
-        excludeJobIds = completedApplications.map(app => app.job);
+        // Filter and validate job IDs
+        const validJobIds = completedApplications
+          .map(app => {
+            try {
+              // Handle corrupted data where job might be a string or object
+              if (app.job && typeof app.job === 'object' && app.job._id) {
+                return app.job._id;
+              } else if (app.job && typeof app.job === 'string' && app.job.match(/^[0-9a-fA-F]{24}$/)) {
+                return app.job;
+              }
+              return null;
+            } catch (e) {
+              logger.warn(`Invalid job ID in application ${app._id}: ${e.message}`);
+              return null;
+            }
+          })
+          .filter(Boolean); // Remove null values
         
-        if (excludeJobIds.length > 0) {
-          query._id = { $nin: excludeJobIds };
+        if (validJobIds.length > 0) {
+          query._id = { $nin: validJobIds };
         }
       } catch (appError) {
         logger.error('Error fetching worker completed jobs for recent filter', { error: appError.message });
