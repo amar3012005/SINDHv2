@@ -28,6 +28,10 @@ body {
   position: relative;
   z-index: 0;
   height: 100%; /* Ensure body takes full height */
+
+  /* Mobile optimizations */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 
@@ -167,4 +171,32 @@ code {
 
 .audio-assistance:hover {
   background-color: #5ca508;
+}
+
+/* Mobile-first responsive design */
+* {
+  box-sizing: border-box;
+}
+
+/* Touch-friendly buttons */
+button, .btn {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+/* Improve form inputs on mobile */
+input, select, textarea {
+  font-size: 16px; /* Prevents zoom on iOS */
+}
+
+/* Mobile scrolling improvements */
+.scroll-smooth {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Responsive images */
+img {
+  max-width: 100%;
+  height: auto;
 }

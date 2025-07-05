@@ -66,7 +66,7 @@ const PaymentModal = ({
   };
 
   const processPayment = async (method) => {
-    const response = await fetch(`http://localhost:5000/api/job-applications/${application._id}/process-payment`, {
+    const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${application._id}/process-payment`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json'

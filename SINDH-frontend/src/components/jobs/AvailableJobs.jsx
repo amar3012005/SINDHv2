@@ -73,21 +73,27 @@ const AvailableJobs = () => {
       const jobsData = await response.json();
       const jobsArray = Array.isArray(jobsData) ? jobsData : [];
       
-      setJobs(jobsArray);
-      setFilteredJobs(jobsArray);
+      // Deduplicate jobs by ID
+      const uniqueJobs = deduplicateJobs(jobsArray);
+      
+      setJobs(uniqueJobs);
+      setFilteredJobs(uniqueJobs);
       
       // Group jobs by location if user has location preference
       if (user?.location?.state) {
         const userState = user.location.state.toLowerCase();
-        const locationBased = jobsArray.filter(job => 
+        const locationBased = uniqueJobs.filter(job => 
           job.location?.state?.toLowerCase() === userState
         );
-        const otherLocation = jobsArray.filter(job => 
+        const otherLocation = uniqueJobs.filter(job => 
           job.location?.state?.toLowerCase() !== userState
         );
         
         setLocationBasedJobs(locationBased);
         setOtherLocationJobs(otherLocation);
+      } else {
+        setLocationBasedJobs([]);
+        setOtherLocationJobs(uniqueJobs);
       }
       
     } catch (error) {
@@ -95,10 +101,29 @@ const AvailableJobs = () => {
       setError(error.message);
       setJobs([]);
       setFilteredJobs([]);
+      setLocationBasedJobs([]);
+      setOtherLocationJobs([]);
     } finally {
       setLoading(false);
     }
   }, [user, filters]);
+
+  // Enhanced deduplication function
+  const deduplicateJobs = (jobs) => {
+    const uniqueJobsMap = new Map();
+    
+    jobs.forEach(job => {
+      const jobId = job._id || job.id;
+      if (jobId && !uniqueJobsMap.has(jobId)) {
+        uniqueJobsMap.set(jobId, job);
+      }
+    });
+    
+    const uniqueJobs = Array.from(uniqueJobsMap.values());
+    console.log(`Deduplicated ${jobs.length} jobs to ${uniqueJobs.length} unique jobs`);
+    
+    return uniqueJobs;
+  };
 
   // Apply search and filters
   useEffect(() => {
@@ -113,7 +138,9 @@ const AvailableJobs = () => {
       );
     }
 
-    setFilteredJobs(filtered);
+    // Deduplicate filtered results as well
+    const uniqueFiltered = deduplicateJobs(filtered);
+    setFilteredJobs(uniqueFiltered);
   }, [searchTerm, jobs]);
 
   // Job application handler
@@ -387,7 +414,7 @@ const AvailableJobs = () => {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Location-based job sections */}
+        {/* Only render location-based sections if we have location preference and jobs */}
         {user?.location?.state && locationBasedJobs.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -399,7 +426,8 @@ const AvailableJobs = () => {
           </div>
         )}
 
-        {otherLocationJobs.length > 0 && (
+        {/* Other locations section - only if we have location preference */}
+        {user?.location?.state && otherLocationJobs.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
               Other Locations
@@ -410,79 +438,81 @@ const AvailableJobs = () => {
           </div>
         )}
 
-        {/* Jobs Grid */}
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex justify-center py-12"
-            >
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </motion.div>
-          ) : error ? (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="text-center py-12"
-            >
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading jobs</h3>
-              <p className="text-gray-500 mb-6">{error}</p>
-              <button
-                onClick={fetchJobs}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        {/* Main Jobs Grid - only show if no location preference or as fallback */}
+        {(!user?.location?.state || (locationBasedJobs.length === 0 && otherLocationJobs.length === 0)) && (
+          <AnimatePresence mode="wait">
+            {loading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex justify-center py-12"
               >
-                Try Again
-              </button>
-            </motion.div>
-          ) : filteredJobs.length === 0 ? (
-            <motion.div
-              key="no-jobs"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="text-center py-12"
-            >
-              <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs available</h3>
-              <p className="text-gray-500 mb-6">
-                {searchTerm || filters.category || filters.location || filters.employmentType
-                  ? "Try adjusting your filters to see more results."
-                  : "Check back later for new opportunities."}
-              </p>
-              {(searchTerm || filters.category || filters.location || filters.employmentType) && (
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </motion.div>
+            ) : error ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="text-center py-12"
+              >
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading jobs</h3>
+                <p className="text-gray-500 mb-6">{error}</p>
                 <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setFilters({
-                      location: '',
-                      category: '',
-                      minSalary: '',
-                      employmentType: ''
-                    });
-                  }}
+                  onClick={fetchJobs}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Clear Filters
+                  Try Again
                 </button>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="jobs-grid"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-            >
-              {filteredJobs.map(renderJobCard)}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            ) : filteredJobs.length === 0 ? (
+              <motion.div
+                key="no-jobs"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="text-center py-12"
+              >
+                <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs available</h3>
+                <p className="text-gray-500 mb-6">
+                  {searchTerm || filters.category || filters.location || filters.employmentType
+                    ? "Try adjusting your filters to see more results."
+                    : "Check back later for new opportunities."}
+                </p>
+                {(searchTerm || filters.category || filters.location || filters.employmentType) && (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilters({
+                        location: '',
+                        category: '',
+                        minSalary: '',
+                        employmentType: ''
+                      });
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="jobs-grid"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+              >
+                {filteredJobs.map(renderJobCard)}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Success Animation */}
         <AnimatePresence>

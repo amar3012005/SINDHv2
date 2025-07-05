@@ -22,7 +22,7 @@ mongoose.connect(process.env.MONGODB_URL, {
 .then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// CORS configuration for production
+// Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -31,34 +31,21 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
-      'https://splendid-travesseiro-45ebea.netlify.app', // Your actual Netlify URL
-      'https://sindh-backend.onrender.com', // Your backend URL
-      /\.netlify\.app$/, // Allow all Netlify subdomains
-      /\.vercel\.app$/, // In case you use Vercel
-      /\.onrender\.com$/, // Allow Render subdomains
+      'https://splendid-travesseiro-45ebea.netlify.app',
+      'https://sindh-frontend.netlify.app'
     ];
     
-    // Check if origin is allowed
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (typeof allowed === 'string') {
-        return origin === allowed;
-      }
-      if (allowed instanceof RegExp) {
-        return allowed.test(origin);
-      }
-      return false;
-    });
-    
-    if (isAllowed) {
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
+      console.log('Blocked by CORS:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'User-Type', 'User-ID'],
+  preflightContinue: false,
   optionsSuccessStatus: 200
 };
 
@@ -66,6 +53,30 @@ app.use(cors(corsOptions));
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
+
+// Add a health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Add a root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'SINDH Backend API',
+    version: '1.0.0',
+    status: 'Running',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      docs: '/api-docs'
+    }
+  });
+});
 
 // Routes
 app.use('/api/workers', workerRoutes);

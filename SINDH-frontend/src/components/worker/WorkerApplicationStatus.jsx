@@ -20,7 +20,7 @@ const WorkerApplicationStatus = ({ applicationId }) => {
 
   const fetchApplicationStatus = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/job-applications/${applicationId}`);
+      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}`);
       if (response.ok) {
         const data = await response.json();
         setApplication(data);

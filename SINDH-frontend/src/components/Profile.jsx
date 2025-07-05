@@ -47,7 +47,7 @@ const Profile = () => {
       }
 
       const { id } = JSON.parse(userData);
-      const response = await fetch(`http://localhost:5000/api/users/${id}`);
+      const response = await fetch(`https://sindh-backend.onrender.comapi/users/${id}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch user details');
@@ -112,7 +112,7 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${user._id}`, {
+      const response = await fetch(`https://sindh-backend.onrender.comapi/users/${user._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

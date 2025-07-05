@@ -143,7 +143,7 @@ const Navbar = () => {
           {userType === 'worker' && (
             <>
               <Link
-                to="/my-applications"
+                to="/worker/applications"
                 className="nav-link"
                 onClick={() => handleNavigation('applications')}
               >
@@ -249,7 +249,7 @@ const Navbar = () => {
           {userType === 'worker' && (
             <>
               <Link
-                to="/my-applications"
+                to="/worker/applications"
                 className="mobile-nav-link"
                 onClick={() => {
                   handleNavigation('applications');

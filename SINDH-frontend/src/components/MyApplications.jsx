@@ -20,7 +20,7 @@ const MyApplications = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:5000/api/jobs/worker/${user.id}/accepted-jobs`);
+      const response = await fetch(`https://sindh-backend.onrender.comapi/jobs/worker/${user.id}/accepted-jobs`);
 
       if (!response.ok) {
         if (response.status === 404) {

@@ -150,4 +150,104 @@ router.post('/employers/login', async (req, res) => {
   }
 });
 
+// Check if user exists by phone number
+router.get('/check-user/:phone', async (req, res) => {
+  try {
+    const { phone } = req.params;
+    
+    // Check in workers collection
+    const worker = await Worker.findOne({ phone });
+    if (worker) {
+      return res.json({
+        success: true,
+        exists: true,
+        userType: 'worker'
+      });
+    }
+    
+    // Check in employers collection
+    const employer = await Employer.findOne({ phone });
+    if (employer) {
+      return res.json({
+        success: true,
+        exists: true,
+        userType: 'employer'
+      });
+    }
+    
+    // User doesn't exist
+    res.json({
+      success: true,
+      exists: false
+    });
+    
+  } catch (error) {
+    logger.error('Error checking user existence:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check user'
+    });
+  }
+});
+
+// Verify OTP and login
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    
+    // Simple OTP validation (always 0000)
+    if (otp !== '0000') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP'
+      });
+    }
+    
+    // Find user by phone
+    let user = await Worker.findOne({ phone });
+    let userType = 'worker';
+    
+    if (!user) {
+      user = await Employer.findOne({ phone });
+      userType = 'employer';
+    }
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Return user data
+    const userData = {
+      id: user._id,
+      name: user.name,
+      phone: user.phone,
+      email: user.email,
+      type: userType
+    };
+    
+    if (userType === 'employer') {
+      userData.companyName = user.companyName || user.company?.name;
+    } else {
+      userData.skills = user.skills;
+      userData.location = user.location;
+    }
+    
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user: userData
+    });
+    
+  } catch (error) {
+    logger.error('Error verifying OTP:', error);
+    res.status(500).json({
+      success: false,
+      message: 'OTP verification failed'
+    });
+  }
+});
+
 module.exports = router;

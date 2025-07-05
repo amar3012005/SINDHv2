@@ -9,7 +9,7 @@ import { UserProvider } from './context/UserContext';
 // Components
 import Navbar from './components/Navbar';
 import Homepage from './components/Homepage';
-import Login from './components/auth/Login';
+import Login from './components/Login'; // Use the OTP-based login
 import Registration from './components/auth/Registration';
 import AvailableJobs from './components/jobs/AvailableJobs';
 import JobDetails from './components/jobs/JobDetails';

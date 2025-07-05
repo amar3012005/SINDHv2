@@ -93,14 +93,7 @@ const employerSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  postedJobs: [{
-    type: String,
-    ref: 'Job',
-    set: function(v) {
-      // Ensure we're always storing strings
-      return v.toString();
-    }
-  }],
+  
   verificationStatus: {
     type: String,
     enum: ['pending', 'verified', 'rejected'],

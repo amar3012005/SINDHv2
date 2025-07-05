@@ -17,7 +17,7 @@ const JobActionButtons = ({ job = {}, onStatusChange }) => {
       if (!user?.id) return;
       
       try {
-        const response = await fetch(`http://localhost:5000/api/job-applications/worker/${user.id}/current`);
+        const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/worker/${user.id}/current`);
         const data = await response.json();
         setAcceptedJobs(data.filter(app => app.status === 'accepted'));
       } catch (error) {
@@ -50,7 +50,7 @@ const JobActionButtons = ({ job = {}, onStatusChange }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/job-applications/apply', {
+      const response = await fetch('https://sindh-backend.onrender.comapi/job-applications/apply', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

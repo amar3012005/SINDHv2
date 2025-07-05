@@ -1,0 +1,17 @@
+[build]
+  publish = "build"
+  command = "npm run build"
+
+[build.environment]
+  REACT_APP_API_URL = "https://sindh-backend.onrender.com"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[context.deploy-preview.environment]
+  REACT_APP_API_URL = "https://sindh-backend.onrender.com"
+
+[context.branch-deploy.environment]
+  REACT_APP_API_URL = "https://sindh-backend.onrender.com"
