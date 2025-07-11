@@ -28,8 +28,8 @@ const MyApplications = () => {
 
       console.log(`Fetching applications for worker ID: ${workerId}`);
       
-      // Fetch current applications from the correct backend endpoint
-      const currentResponse = await fetch(getApiUrl(`/api/job-applications/worker/${workerId}/current`), {
+      // Fetch current applications from the correct backend endpoint for new database structure
+      const currentResponse = await fetch(getApiUrl(`/api/jobapplications/worker/${workerId}`), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ const MyApplications = () => {
     try {
       console.log('Updating application status:', { applicationId, newStatus });
       
-      const response = await fetch(getApiUrl(`/api/job-applications/${applicationId}/status`), {
+      const response = await fetch(getApiUrl(`/api/jobapplications/${applicationId}/status`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -179,7 +179,7 @@ const MyApplications = () => {
       
       console.log('Cancelling application:', applicationId);
       
-      const response = await fetch(getApiUrl(`/api/job-applications/${applicationId}`), {
+      const response = await fetch(getApiUrl(`/api/jobapplications/${applicationId}`), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

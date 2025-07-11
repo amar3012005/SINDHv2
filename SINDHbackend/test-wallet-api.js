@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 const Worker = require('./server/src/models/Worker');
 
+// API URL configuration
+const getApiUrl = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://sindh-backend.onrender.com/api';
+  }
+  return 'http://localhost:10000/api';
+};
+
 async function testWalletAPI() {
   try {
     await mongoose.connect('mongodb://localhost:27017/sindh');
@@ -18,7 +26,7 @@ async function testWalletAPI() {
     const fetch = require('node-fetch');
     
     try {
-      const response = await fetch('https://sindh-backend.onrender.comapi/workers/6863bfe35bc522d4b1a999bc/wallet');
+      const response = await fetch(`${getApiUrl()}/workers/6863bfe35bc522d4b1a999bc/wallet`);
       if (response.ok) {
         const walletData = await response.json();
         console.log('\nWallet API Response:', {

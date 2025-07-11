@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from '../config';
 
 const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -71,7 +72,7 @@ const Login = () => {
 
       // Make API call to verify OTP and login
       const endpoint = userType === 'worker' ? '/workers/login' : '/employers/login';
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://sindh-backend.onrender.com'}/api/auth${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber, otp }),
@@ -92,10 +93,20 @@ const Login = () => {
         // Clear any existing data
         localStorage.removeItem('user');
         localStorage.removeItem('userType');
+        localStorage.removeItem('token');
+        localStorage.removeItem('authToken');
 
-        // Set new user data
+        // Set new user data and token
         localStorage.setItem('userType', userType);
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('authToken', data.token);
+
+        // Store employer profile separately if employer
+        if (userType === 'employer') {
+          localStorage.setItem('employerProfile', JSON.stringify(userData));
+          localStorage.setItem('employerId', userData.id);
+        }
 
         // Update context
         loginUser(userData);

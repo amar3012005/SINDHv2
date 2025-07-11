@@ -4,6 +4,16 @@ const Worker = require('../models/Worker');
 const Employer = require('../models/Employer');
 const JobApplication = require('../models/JobApplication');
 const logger = require('../config/logger');
+const jwt = require('jsonwebtoken');
+
+// Generate JWT token
+const generateToken = (userId, role) => {
+  return jwt.sign(
+    { userId, role },
+    process.env.JWT_SECRET || 'fallback-secret-key',
+    { expiresIn: '7d' }
+  );
+};
 
 // Worker login
 router.post('/workers/login', async (req, res) => {
@@ -52,7 +62,10 @@ router.post('/workers/login', async (req, res) => {
       app.status === 'completed' || app.status === 'rejected'
     );
 
-    // Return worker data with job history
+    // Generate JWT token
+    const token = generateToken(worker._id, 'worker');
+
+    // Return worker data with job history and token
     const workerData = {
       id: worker._id,
       name: worker.name,
@@ -73,6 +86,7 @@ router.post('/workers/login', async (req, res) => {
     res.json({
       success: true,
       message: 'Login successful',
+      token,
       data: workerData
     });
   } catch (error) {
@@ -116,6 +130,9 @@ router.post('/employers/login', async (req, res) => {
     employer.lastLogin = new Date();
     await employer.save();
 
+    // Generate JWT token
+    const token = generateToken(employer._id, 'employer');
+
     // Format the employer data correctly
     const employerData = {
       id: employer._id.toString(),
@@ -139,6 +156,7 @@ router.post('/employers/login', async (req, res) => {
     res.json({
       success: true,
       message: 'Login successful',
+      token,
       data: employerData
     });
   } catch (error) {
@@ -150,102 +168,30 @@ router.post('/employers/login', async (req, res) => {
   }
 });
 
-// Check if user exists by phone number
-router.get('/check-user/:phone', async (req, res) => {
+// Generate token endpoint for newly registered employers
+router.post('/generate-token', async (req, res) => {
   try {
-    const { phone } = req.params;
+    const { userId, role } = req.body;
     
-    // Check in workers collection
-    const worker = await Worker.findOne({ phone });
-    if (worker) {
-      return res.json({
-        success: true,
-        exists: true,
-        userType: 'worker'
-      });
-    }
-    
-    // Check in employers collection
-    const employer = await Employer.findOne({ phone });
-    if (employer) {
-      return res.json({
-        success: true,
-        exists: true,
-        userType: 'employer'
-      });
-    }
-    
-    // User doesn't exist
-    res.json({
-      success: true,
-      exists: false
-    });
-    
-  } catch (error) {
-    logger.error('Error checking user existence:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to check user'
-    });
-  }
-});
-
-// Verify OTP and login
-router.post('/verify-otp', async (req, res) => {
-  try {
-    const { phone, otp } = req.body;
-    
-    // Simple OTP validation (always 0000)
-    if (otp !== '0000') {
+    if (!userId || !role) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid OTP'
+        message: 'User ID and role are required'
       });
     }
-    
-    // Find user by phone
-    let user = await Worker.findOne({ phone });
-    let userType = 'worker';
-    
-    if (!user) {
-      user = await Employer.findOne({ phone });
-      userType = 'employer';
-    }
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-    
-    // Return user data
-    const userData = {
-      id: user._id,
-      name: user.name,
-      phone: user.phone,
-      email: user.email,
-      type: userType
-    };
-    
-    if (userType === 'employer') {
-      userData.companyName = user.companyName || user.company?.name;
-    } else {
-      userData.skills = user.skills;
-      userData.location = user.location;
-    }
+
+    // Generate JWT token
+    const token = generateToken(userId, role);
     
     res.json({
       success: true,
-      message: 'Login successful',
-      user: userData
+      token
     });
-    
   } catch (error) {
-    logger.error('Error verifying OTP:', error);
+    logger.error('Error generating token', { error: error.message });
     res.status(500).json({
       success: false,
-      message: 'OTP verification failed'
+      message: 'Internal server error'
     });
   }
 });

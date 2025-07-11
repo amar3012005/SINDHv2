@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import { getSessionToken } from '@shopify/app-bridge-utils';
 import ShopifyAuth from '../components/ShopifyAuth';
+import { getApiUrl } from '../utils/apiUtils.js';
 
 function DropshippingDashboard() {
   const app = useAppBridge();
@@ -16,7 +17,7 @@ function DropshippingDashboard() {
         const token = await getSessionToken(app);
         
         // Replace with your actual backend endpoint
-        const response = await fetch('https://sindh-backend.onrender.comapi/products', {
+        const response = await fetch(`${getApiUrl()}/products`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

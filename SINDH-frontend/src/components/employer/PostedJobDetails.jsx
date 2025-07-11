@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { getApiUrl } from '../../utils/apiUtils.js';
 
 const PostedJobDetails = () => {
   const { jobId } = useParams();
@@ -18,7 +19,7 @@ const PostedJobDetails = () => {
         setLoading(true);
         
         // Fetch job details
-        const jobResponse = await fetch(`https://sindh-backend.onrender.comapi/jobs/${jobId}`);
+        const jobResponse = await fetch(`${getApiUrl()}/jobs/${jobId}`);
         
         if (!jobResponse.ok) {
           throw new Error('Failed to fetch job details');
@@ -28,7 +29,7 @@ const PostedJobDetails = () => {
         setJob(jobData);
         
         // Fetch applications for this job
-        const applicationsResponse = await fetch(`https://sindh-backend.onrender.comapi/jobs/${jobId}/applications`);
+        const applicationsResponse = await fetch(`${getApiUrl()}/jobs/${jobId}/applications`);
         
         if (!applicationsResponse.ok) {
           throw new Error('Failed to fetch applications');
@@ -51,7 +52,7 @@ const PostedJobDetails = () => {
     try {
       setProcessingAction(applicationId);
       
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/final-selection`, {
+      const response = await fetch(`${getApiUrl()}/job-applications/${applicationId}/final-selection`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

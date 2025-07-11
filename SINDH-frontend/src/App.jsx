@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
 import { UserProvider } from './context/UserContext';
 import { TranslationProvider } from './context/TranslationContext';
@@ -24,6 +24,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 // Worker Components
 import WorkerRegistration from './components/worker/WorkerRegistration';
+import ChatRegistration from './components/worker/ChatRegistration';
+import RegistrationChoice from './components/worker/RegistrationChoice';
 import WorkerProfile from './components/worker/WorkerProfile';
 import WorkerProfileSimple from './components/worker/WorkerProfileSimple';
 import FindWork from './components/worker/FindWork';
@@ -31,10 +33,13 @@ import WorkerSearch from './components/worker/WorkerSearch';
 
 // Employer Components
 import EmployerRegistration from './components/employer/EmployerRegistration';
+import EmployerChatRegistration from './components/employer/EmployerChatRegistration';
+import EmployerRegistrationChoice from './components/employer/EmployerRegistrationChoice';
 import EmployerProfile from './components/employer/EmployerProfile';
 import EmployerProfilePage from './components/employer/EmployerProfilePage';
 import PostJob from './components/employer/PostJob';
 import EmployerPostJob from './components/EmployerPostJob';
+import JobChatPosting from './components/employer/JobChatPosting';
 import PostedJobs from './components/employer/PostedJobs';
 import PostedJobDetails from './components/employer/PostedJobDetails';
 
@@ -46,6 +51,7 @@ import AvailableJobs from './components/jobs/AvailableJobs';
 import MyApplications from './components/jobs/MyApplications';
 import Login from './components/Login';
 import TranslationDemo from './components/TranslationDemo';
+import ChatMode from './components/ChatMode';
 
 // Import our custom ErrorBoundary component
 import ErrorBoundary from './components/ErrorBoundary';
@@ -83,6 +89,65 @@ const ErrorFallback = ({ error, resetErrorBoundary }) => {
   );
 };
 
+// Component to conditionally render navbar
+const AppContent = () => {
+  const location = useLocation();
+  const isChatModePage = location.pathname === '/chat-mode';
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {!isChatModePage && <Navbar />}
+      <main className={isChatModePage ? "" : "pt-16"}>
+        <AnimatePresence mode="wait">
+          <ErrorBoundary fallback={ErrorFallback}>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Layout><Homepage /></Layout>} />
+              <Route path="/register" element={<Layout><UnifiedRegistration /></Layout>} />
+              
+              {/* Worker Routes */}
+              <Route path="/worker/register" element={<Layout><RegistrationChoice /></Layout>} />
+              <Route path="/worker/form-register" element={<Layout><WorkerRegistration /></Layout>} />
+              <Route path="/worker/chat-register" element={<Layout><ChatRegistration /></Layout>} />
+              <Route path="/worker/profile" element={<Layout><WorkerProfile /></Layout>} />
+              <Route path="/worker/profile-simple" element={<Layout><WorkerProfileSimple /></Layout>} />
+              <Route path="/worker/find-work" element={<Layout><FindWork /></Layout>} />
+              <Route path="/worker/search" element={<Layout><WorkerSearch /></Layout>} />
+              
+              {/* Employer Routes */}
+              <Route path="/employer/register" element={<Layout><EmployerRegistrationChoice /></Layout>} />
+              <Route path="/employer/form-register" element={<Layout><EmployerRegistration /></Layout>} />
+              <Route path="/employer/chat-register" element={<Layout><EmployerChatRegistration /></Layout>} />
+              <Route path="/employer/profile" element={<Layout><EmployerProfilePage /></Layout>} />
+              <Route path="/employer/post-job" element={<PostJob />} />
+              <Route path="/employer/post-job/chat" element={<JobChatPosting />} />
+              <Route path="/employer/posted-jobs" element={<PostedJobs />} />
+              <Route path="/employer/job/:jobId" element={<PostedJobDetails />} />
+              
+              {/* Job Routes */}
+              <Route path="/jobs" element={<Layout><AvailableJobs /></Layout>} />
+              <Route path="/jobs/:jobId" element={<Layout><AvailableJobs /></Layout>} />
+              <Route path="/job-categories" element={<Layout><JobCategories /></Layout>} />
+
+              {/* New route for MyApplications */}
+              <Route path="/my-applications" element={<Layout><MyApplications /></Layout>} />
+
+              {/* Login route */}
+              <Route path="/login" element={<Layout><Login /></Layout>} />
+
+              {/* Translation Demo route */}
+              <Route path="/translation-demo" element={<Layout><TranslationDemo /></Layout>} />
+
+              {/* Chat Mode route - No Layout wrapper */}
+              <Route path="/chat-mode" element={<ChatMode />} />
+            </Routes>
+          </ErrorBoundary>
+        </AnimatePresence>
+      </main>
+    </div>
+  );
+};
+
 // Update your routes with the ErrorBoundary
 function App() {
   // Initialize user state on app load
@@ -98,48 +163,7 @@ function App() {
             <Router>
               <Toaster position="top-center" />
               <ToastContainer position="top-right" autoClose={3000} />
-              <div className="min-h-screen bg-gray-50">
-                <Navbar />
-                <main className="pt-16">
-                  <AnimatePresence mode="wait">
-                    <ErrorBoundary fallback={ErrorFallback}>
-                      <Routes>
-                        {/* Public Routes */}
-          <Route path="/" element={<Layout><Homepage /></Layout>} />
-                    <Route path="/register" element={<Layout><UnifiedRegistration /></Layout>} />
-                    
-                    {/* Worker Routes */}
-                    <Route path="/worker/register" element={<Layout><WorkerRegistration /></Layout>} />
-                    <Route path="/worker/profile" element={<Layout><WorkerProfile /></Layout>} />
-                    <Route path="/worker/profile-simple" element={<Layout><WorkerProfileSimple /></Layout>} />
-                    <Route path="/worker/find-work" element={<Layout><FindWork /></Layout>} />
-                    <Route path="/worker/search" element={<Layout><WorkerSearch /></Layout>} />
-                    
-                    {/* Employer Routes */}
-                    <Route path="/employer/register" element={<Layout><EmployerRegistration /></Layout>} />
-                    <Route path="/employer/profile" element={<Layout><EmployerProfilePage /></Layout>} />
-                    <Route path="/employer/post-job" element={<PostJob />} />
-                    <Route path="/employer/posted-jobs" element={<PostedJobs />} />
-                    <Route path="/employer/job/:jobId" element={<PostedJobDetails />} />
-                    
-                    {/* Job Routes */}
-                    <Route path="/jobs" element={<Layout><AvailableJobs /></Layout>} />
-                    <Route path="/jobs/:jobId" element={<Layout><AvailableJobs /></Layout>} />
-                    <Route path="/job-categories" element={<Layout><JobCategories /></Layout>} />
-
-                    {/* New route for MyApplications */}
-                    <Route path="/my-applications" element={<Layout><MyApplications /></Layout>} />
-
-                    {/* Login route */}
-                    <Route path="/login" element={<Layout><Login /></Layout>} />
-
-                    {/* Translation Demo route */}
-                    <Route path="/translation-demo" element={<Layout><TranslationDemo /></Layout>} />
-                      </Routes>
-                    </ErrorBoundary>
-                  </AnimatePresence>
-                </main>
-              </div>
+              <AppContent />
             </Router>
           </UserProvider>
         </LanguageProvider>

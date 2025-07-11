@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { getApiUrl } from '../utils/apiUtils.js';
 
 const EmployerPostJob = () => {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ const EmployerPostJob = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('https://sindh-backend.onrender.comapi/jobs', {
+      const response = await fetch(`${getApiUrl()}/jobs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -46,11 +47,104 @@ const EmployerPostJob = () => {
     }
   };
 
+  const handleChatMode = () => {
+    navigate('/employer/post-job/chat');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <h2 className="text-3xl font-bold text-center mb-8">Post a New Job</h2>
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow">
+        
+        {/* Job Posting Dashboard */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-2xl">💬</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Chat Mode Job Posting</h3>
+                <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mt-1">
+                  New Feature
+                </span>
+              </div>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Post your job through an interactive chat interface. Just answer simple questions and we'll create your job posting automatically!
+            </p>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center text-sm text-gray-600">
+                <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Quick and easy
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Guided process
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                No missed fields
+              </div>
+            </div>
+            <button
+              onClick={handleChatMode}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105"
+            >
+              Start Chat Mode Posting →
+            </button>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
+                <span className="text-2xl">📝</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Traditional Form</h3>
+                <span className="text-sm text-gray-500">Classic job posting</span>
+              </div>
+            </div>
+            <p className="text-gray-600 mb-4">
+              Use the traditional form-based approach to post your job. Fill out all fields manually with complete control over the process.
+            </p>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center text-sm text-gray-600">
+                <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Full control
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Familiar interface
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Direct editing
+              </div>
+            </div>
+            <button
+              onClick={() => document.getElementById('job-form').scrollIntoView({ behavior: 'smooth' })}
+              className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-gray-700 transition-colors"
+            >
+              Use Traditional Form ↓
+            </button>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto">
+          <form id="job-form" onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow">
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-700">Job Title</label>
             <input
@@ -144,6 +238,7 @@ const EmployerPostJob = () => {
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

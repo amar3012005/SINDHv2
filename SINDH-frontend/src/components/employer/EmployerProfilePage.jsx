@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Building, MapPin, FileText, Phone, Mail, Award, Calendar, 
@@ -7,9 +7,15 @@ import {
   Loader, RefreshCw, ArrowLeft
 } from 'lucide-react';
 import { employerService } from '../../services/employerService';
+import { getApiUrl } from '../../utils/apiUtils';
+import { useUser } from '../../context/UserContext';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const EmployerProfilePage = () => {
+  const { user, isLoadingUser } = useUser();
+  const navigate = useNavigate();
+  
   const [employerData, setEmployerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,58 +29,34 @@ const EmployerProfilePage = () => {
     totalApplications: 0
   });
 
-  // Get employer ID from various sources
-  const getEmployerId = () => {
-    // Try to get from localStorage
-    const storedUser = localStorage.getItem('user');
-    const storedEmployer = localStorage.getItem('employer');
-    const storedEmployerId = localStorage.getItem('employerId');
-    
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        if (user.type === 'employer' && (user.id || user._id)) {
-          return user.id || user._id;
-        }
-      } catch (e) {
-        console.error('Error parsing stored user:', e);
-      }
-    }
-    
-    if (storedEmployer) {
-      try {
-        const employer = JSON.parse(storedEmployer);
-        if (employer._id || employer.id) {
-          return employer._id || employer.id;
-        }
-      } catch (e) {
-        console.error('Error parsing stored employer:', e);
-      }
-    }
-    
-    if (storedEmployerId) {
-      return storedEmployerId;
-    }
-    
-    return null;
-  };
-
   // Fetch employer profile data
-  const fetchEmployerProfile = async (employerId) => {
+  const fetchEmployerProfile = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('Fetching employer profile for ID:', employerId);
+      // Check if user and user.id exist
+      if (!user || !user.id) {
+        console.error('User or user.id is not available');
+        setError('No user logged in. Please log in again.');
+        setLoading(false);
+        return;
+      }
       
-      // Add user type headers for proper authentication
-      const response = await fetch(`https://sindh-backend.onrender.comapi/employers/${employerId}`, {
+      console.log('🔍 Fetching profile for employer ID:', user.id);
+      console.log('🌐 API URL:', getApiUrl(`/api/employers/${user.id}`));
+      
+      const response = await fetch(getApiUrl(`/api/employers/${user.id}`), {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'User-Type': 'employer',
-          'User-ID': employerId
+          'user-type': 'employer', // Important: Backend checks this header
+          'User-Type': 'employer'
         }
       });
+      
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -82,12 +64,14 @@ const EmployerProfilePage = () => {
         } else if (response.status === 403) {
           throw new Error('Access denied. Please log in as an employer.');
         } else {
-          throw new Error(`Failed to fetch profile: ${response.status} ${response.statusText}`);
+          const errorText = await response.text();
+          console.error('❌ API Error:', errorText);
+          throw new Error(`Failed to fetch profile: ${response.status} ${errorText}`);
         }
       }
       
       const data = await response.json();
-      console.log('Employer profile data:', data);
+      console.log('✅ Profile data received:', data);
       
       setEmployerData(data);
       
@@ -95,89 +79,133 @@ const EmployerProfilePage = () => {
       localStorage.setItem('employer', JSON.stringify(data));
       localStorage.setItem('employerId', data._id || data.id);
       
-      // Fetch additional data
+      // Fetch additional data only if user.id is available
+      if (user?.id) {
       await Promise.all([
-        fetchPostedJobs(employerId),
-        fetchEmployerStats(employerId)
+          fetchPostedJobs(user.id),
+          fetchEmployerStats(user.id)
       ]);
+      }
       
     } catch (error) {
-      console.error('Error fetching employer profile:', error);
+      console.error('❌ Error fetching employer profile:', error);
       setError(error.message);
       toast.error(error.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   // Fetch posted jobs
   const fetchPostedJobs = async (employerId) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/jobs/employer/${employerId}`, {
+      console.log('🔍 Fetching posted jobs for employer:', employerId);
+      const response = await fetch(getApiUrl(`/api/employers/${employerId}/jobs`), {
         headers: {
           'Content-Type': 'application/json',
-          'User-Type': 'employer',
-          'User-ID': employerId
+          'user-type': 'employer',
+          'User-Type': 'employer'
         }
       });
       
       if (response.ok) {
         const jobs = await response.json();
         setPostedJobs(jobs);
-        console.log('Posted jobs:', jobs);
+        console.log('✅ Posted jobs fetched:', jobs);
+        
+        // Calculate stats from jobs
+        const totalJobs = jobs.length;
+        const activeJobs = jobs.filter(job => job.status === 'active' || job.status === 'open').length;
+        const completedJobs = jobs.filter(job => job.status === 'completed').length;
+        const totalApplications = jobs.reduce((sum, job) => sum + (job.applications?.length || 0), 0);
+        
+        setStats({
+          totalJobs,
+          activeJobs,
+          completedJobs,
+          totalApplications
+        });
+      } else {
+        console.error('❌ Failed to fetch posted jobs:', response.status);
       }
     } catch (error) {
-      console.error('Error fetching posted jobs:', error);
+      console.error('❌ Error fetching posted jobs:', error);
     }
   };
 
-  // Fetch employer statistics
+  // Fetch employer statistics (if available)
   const fetchEmployerStats = async (employerId) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/employers/${employerId}/stats`, {
+      console.log('🔍 Fetching employer stats for:', employerId);
+      // Note: This endpoint might not exist in backend, so we handle it gracefully
+      const response = await fetch(getApiUrl(`/api/employers/${employerId}/stats`), {
         headers: {
           'Content-Type': 'application/json',
-          'User-Type': 'employer',
-          'User-ID': employerId
+          'user-type': 'employer',
+          'User-Type': 'employer'
         }
       });
       
       if (response.ok) {
         const statsData = await response.json();
-        setStats(statsData);
-        console.log('Employer stats:', statsData);
+        setStats(prevStats => ({ ...prevStats, ...statsData }));
+        console.log('✅ Employer stats fetched:', statsData);
+      } else {
+        console.log('ℹ️ Stats endpoint not available, using calculated stats from jobs');
       }
     } catch (error) {
-      console.error('Error fetching employer stats:', error);
+      console.log('ℹ️ Stats endpoint not available, using calculated stats from jobs');
+      // This is not critical, so we don't show error to user
     }
   };
 
   // Handle manual refresh
   const handleRefresh = async () => {
-    const employerId = getEmployerId();
-    if (!employerId) {
-      setError('No employer ID found. Please log in again.');
+    if (!user || !user.id) {
+      setError('No user logged in. Please log in again.');
+      navigate('/login');
       return;
     }
     
     setRefreshing(true);
-    await fetchEmployerProfile(employerId);
+    await fetchEmployerProfile();
     setRefreshing(false);
     toast.success('Profile refreshed!');
   };
 
   // Initialize component
   useEffect(() => {
-    const employerId = getEmployerId();
+    console.log('🔍 EmployerProfilePage useEffect triggered');
+    console.log('🔍 isLoadingUser:', isLoadingUser);
+    console.log('🔍 user:', user);
+    console.log('🔍 localStorage user:', localStorage.getItem('user'));
+    console.log('🔍 localStorage employer:', localStorage.getItem('employer'));
+    console.log('🔍 localStorage employerId:', localStorage.getItem('employerId'));
     
-    if (!employerId) {
-      setError('No employer ID found. Please log in again.');
-      setLoading(false);
+    // If user is not loaded yet, wait
+    if (isLoadingUser) {
+      console.log('⏳ User is still loading, waiting...');
       return;
     }
     
-    fetchEmployerProfile(employerId);
-  }, []);
+    // If user is null or not an employer, redirect to login
+    if (!user || user.type !== 'employer') {
+      console.log('❌ User is null or not employer, redirecting to login');
+      console.log('❌ User data:', user);
+      navigate('/login');
+      return;
+    }
+    
+    // If user exists but doesn't have an id, redirect to login
+    if (!user.id) {
+      console.error('❌ User exists but has no id:', user);
+      navigate('/login');
+      return;
+    }
+    
+    console.log('✅ User validated, fetching employer profile for:', user);
+    fetchEmployerProfile();
+  }, [user, isLoadingUser, navigate, fetchEmployerProfile]);
 
   // Helper functions
   const getInitials = (name) => {
@@ -213,7 +241,28 @@ const EmployerProfilePage = () => {
     return parts.length > 0 ? parts.join(', ') : 'Location not specified';
   };
 
-  // Loading state
+  // User loading state (while UserContext loads user data)
+  if (isLoadingUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading User</h3>
+          <p className="text-gray-600">Checking your authentication...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Profile loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">

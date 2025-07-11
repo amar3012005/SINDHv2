@@ -1,11 +1,11 @@
 // Configuration for different environments
 const config = {
   development: {
-    API_BASE_URL: "http://localhost:5000",
+    API_BASE_URL: "http://localhost:10000",
   },
   production: {
-    // Your actual backend URL
-    API_BASE_URL: "http://localhost:5000", // For now, still using localhost - you'll need to deploy the backend
+    // Your Render backend URL - replace with your actual Render URL
+    API_BASE_URL: "https://sindh-backend.onrender.com", // Updated to use Render deployment
   }
 };
 

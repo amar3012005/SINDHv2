@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { getApiUrl } from '../utils/apiUtils.js';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ const Profile = () => {
       }
 
       const { id } = JSON.parse(userData);
-      const response = await fetch(`https://sindh-backend.onrender.comapi/users/${id}`);
+      const response = await fetch(`${getApiUrl()}/users/${id}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch user details');
@@ -112,7 +113,7 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/users/${user._id}`, {
+      const response = await fetch(`${getApiUrl()}/users/${user._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

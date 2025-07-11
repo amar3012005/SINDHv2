@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import { getSessionToken } from '@shopify/app-bridge-utils';
+import { getApiUrl } from '../utils/apiUtils.js';
 
 /**
  * Example component that fetches data from your backend using Shopify authentication
@@ -22,7 +23,7 @@ function ShopifyAuth() {
       const token = await getSessionToken(app);
       
       // Use token for authentication in API request
-      const response = await fetch('https://sindh-backend.onrender.comapi/products', {
+      const response = await fetch(`${getApiUrl()}/products`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

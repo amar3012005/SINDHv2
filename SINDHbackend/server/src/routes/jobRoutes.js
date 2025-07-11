@@ -8,6 +8,17 @@ const Employer = require('../models/Employer');
 const JobApplication = require('../models/JobApplication');
 const logger = require('../config/logger');
 
+// Test endpoint to confirm backend connectivity for job creation
+router.post('/initiate-creation', async (req, res) => {
+  console.log('🎉 Job creation initiated!');
+  logger.info('🎉 Job creation initiated!');
+  
+  res.json({ 
+    success: true, 
+    message: 'Job creation initiated successfully!' 
+  });
+});
+
 // Create a new job
 router.post('/', async (req, res) => {
   logger.info('New job posting attempt', { 

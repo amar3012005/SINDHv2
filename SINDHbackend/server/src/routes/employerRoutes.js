@@ -6,17 +6,33 @@ const auth = require('../middleware/auth');
 const mongoose = require('mongoose');
 const logger = require('../config/logger');
 
+// Test endpoint to confirm backend connectivity for employers
+router.post('/initiate-registration', async (req, res) => {
+  console.log('🎉 Employer registration initiated!');
+  logger.info('🎉 Employer registration initiated!');
+  
+  res.json({ 
+    success: true, 
+    message: 'Employer registration initiated successfully!' 
+  });
+});
+
 // Register a new employer
 router.post('/register', async (req, res) => {
+  console.log('🎯 /register endpoint hit');
   logger.info('Employer registration request');
   try {
+    console.log('📝 Request body received:', JSON.stringify(req.body, null, 2));
     const { name, phone, email, company, location, businessDescription, verificationDocuments } = req.body;
 
+    console.log('🔍 Checking for existing employer with phone:', phone);
     let employer = await Employer.findOne({ phone });
     if (employer) {
+      console.log('❌ Employer already exists with phone:', phone);
       logger.warn(`Employer already exists with phone: ${phone}`);
       return res.status(400).json({ message: 'Employer already exists with this phone number' });
     }
+    console.log('✅ No existing employer found, proceeding with registration');
 
     const formattedLocationAddress = 
       `${location.village}, ${location.district}, ${location.state} - ${location.pincode}`;
@@ -51,9 +67,13 @@ router.post('/register', async (req, res) => {
       verificationStatus: req.body.verificationStatus || 'pending'
     });
 
+    console.log('🔧 Creating employer object with data:', JSON.stringify(employer, null, 2));
     await employer.validate();
+    console.log('✅ Validation passed');
     await employer.save();
+    console.log('💾 Employer saved to database');
     logger.info(`Employer registered successfully: ${employer.name}`);
+    console.log('🎉 Employer created:', employer);
 
     const responseData = {
       success: true,
@@ -69,11 +89,15 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json(responseData);
   } catch (error) {
+    console.log('❌ Registration error:', error.message);
+    console.log('❌ Error stack:', error.stack);
     logger.error('Employer registration error', { error: error.message, stack: error.stack });
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
+      console.log('❌ Validation errors:', messages);
       return res.status(400).json({ message: messages.join(', ') });
     }
+    console.log('❌ Server error, returning 500');
     res.status(500).json({ message: 'Server error' });
   }
 });

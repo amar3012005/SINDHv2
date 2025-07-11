@@ -22,18 +22,41 @@ mongoose.connect(process.env.MONGODB_URL, {
 .then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error:', err));
 
+// Dynamic CORS configuration based on environment
+const getCorsOrigins = () => {
+  const origins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:8080', // For Capacitor development
+    'capacitor://localhost', // For Capacitor iOS
+    'ionic://localhost' // For Capacitor Android
+  ];
+  
+  // Add production origins
+  if (process.env.NODE_ENV === 'production') {
+    origins.push(
+      'https://splendid-travesseiro-45ebea.netlify.app',
+      'https://sindh-frontend.netlify.app',
+      'https://sindh-app.netlify.app'
+    );
+  }
+  
+  // Add custom origins from environment variables
+  if (process.env.ALLOWED_ORIGINS) {
+    origins.push(...process.env.ALLOWED_ORIGINS.split(','));
+  }
+  
+  return origins;
+};
+
 // Enhanced CORS configuration for production
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://splendid-travesseiro-45ebea.netlify.app',
-      'https://sindh-frontend.netlify.app'
-    ];
+    const allowedOrigins = getCorsOrigins();
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -60,7 +83,8 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    corsOrigins: getCorsOrigins()
   });
 });
 
@@ -74,7 +98,8 @@ app.get('/', (req, res) => {
       health: '/health',
       api: '/api',
       docs: '/api-docs'
-    }
+    },
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
@@ -94,4 +119,6 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Allowed CORS origins:`, getCorsOrigins());
 });

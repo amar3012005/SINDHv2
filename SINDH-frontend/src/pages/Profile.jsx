@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { getApiUrl } from '../utils/apiUtils.js';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const Profile = () => {
         workerId = JSON.parse(workerData).id;
       }
 
-      const response = await fetch(`https://sindh-backend.onrender.comapi/workers/${workerId}`);
+      const response = await fetch(`${getApiUrl()}/workers/${workerId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch worker details');
@@ -111,7 +112,7 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/workers/${worker._id}`, {
+      const response = await fetch(`${getApiUrl()}/workers/${worker._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

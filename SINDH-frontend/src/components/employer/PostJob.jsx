@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MapPin, 
   Briefcase, 
   DollarSign, 
   Users, 
-  FileText, 
   CheckCircle,
-  AlertCircle,
-  Clock,
-  Building
+  AlertCircle
 } from 'lucide-react';
+import { useSpring, animated as a } from '@react-spring/web';
+import { getApiUrl } from '../../utils/apiUtils.js';
+
+// Note: Removed unused components to fix ESLint warnings
 
 const PostJob = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -20,6 +21,7 @@ const PostJob = () => {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [notification, setNotification] = useState({ message: '', type: '', visible: false });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(true);
 
   // Notification system to replace react-toastify
   const showNotification = (message, type = 'info') => {
@@ -34,46 +36,96 @@ const PostJob = () => {
     // Using window.location for navigation since react-router-dom is not available
     if (path === '/employer/posted-jobs') {
       window.location.href = '/employer/posted-jobs';
+    } else if (path === '/employer/post-job/chat') {
+      window.location.href = '/employer/post-job/chat';
     } else {
       window.location.href = path;
     }
   };
+
+  const handleChatMode = async () => {
+    try {
+      // Log job creation initiation for chat mode
+      console.log('🎉 Chat Mode Job Posting initiated!');
+      
+      // Call backend to log the initiation
+      await fetch(`${getApiUrl()}/jobs/initiate-creation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mode: 'chat',
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        })
+      });
+      
+      showNotification('Chat mode initiated! Redirecting...', 'success');
+      
+      // Navigate to chat mode
+      navigateToPage('/employer/post-job/chat');
+    } catch (error) {
+      console.error('Error initiating chat mode:', error);
+      showNotification('Could not initiate chat mode. Please try again.', 'error');
+    }
+  };
+
+  const handleTraditionalForm = async () => {
+    try {
+      // Log job creation initiation for traditional form
+      console.log('🎉 Traditional Form Job Posting initiated!');
+      
+      // Call backend to log the initiation
+      await fetch(`${getApiUrl()}/jobs/initiate-creation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mode: 'traditional',
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        })
+      });
+      
+      showNotification('Traditional form mode initiated!', 'success');
+      
+      // Show the traditional form
+      setShowDashboard(false);
+    } catch (error) {
+      console.error('Error initiating traditional form:', error);
+      showNotification('Could not initiate traditional form. Please try again.', 'error');
+    }
+  };
+
   const [formData, setFormData] = useState({
     // Basic Job Information
     title: '',
     category: '',
-    employmentType: 'full-time', // Changed to match backend enum
+    employmentType: 'full-time',
     description: '',
     requirements: '',
     
+    // Company Information
+    companyName: '',
+    
     // Compensation
     salary: '',
-    duration: '' , // Added required duration field
     
     // Location (matching backend schema)
     location: {
-      type: 'onsite', // Added required location type
-      street: '', // Added required street field
+      type: 'onsite',
+      street: '',
       city: '',
       state: '',
       pincode: ''
     },
     
     // Job Details
-    workingHours: '',
     startDate: '',
     endDate: '',
-    urgency: 'normal',
-    workersNeeded: 1,
-    
-    // Contact & Additional Info
-    contactPerson: '',
-    contactPhone: '',
-    additionalInstructions: '',
-    
-    // Metadata
-    status: 'active',
-    visibility: 'public'
+    urgency: 'normal'
   });
 
   // Form validation errors
@@ -96,13 +148,10 @@ const PostJob = () => {
           // Pre-fill form with employer data
           setFormData(prev => ({
             ...prev,
-            contactPerson: profile.name || '',
-            contactPhone: profile.phone || '',
+            companyName: profile.companyName || profile.name || '',
             location: {
               ...prev.location,
-              village: profile.location?.village || '',
               city: profile.location?.city || '',
-              district: profile.location?.district || '',
               state: profile.location?.state || '',
               pincode: profile.location?.pincode || ''
             }
@@ -114,8 +163,7 @@ const PostJob = () => {
             setEmployerProfile(user);
             setFormData(prev => ({
               ...prev,
-              contactPerson: user.name || '',
-              contactPhone: user.phone || ''
+              companyName: user.name || ''
             }));
           }
         }
@@ -124,7 +172,7 @@ const PostJob = () => {
         const user = JSON.parse(localUser || '{}');
         if (user.id && user.type === 'employer') {
           try {
-            const response = await fetch(`https://sindh-backend.onrender.comapi/employers/${user.id}`);
+            const response = await fetch(`${getApiUrl()}/employers/${user.id}`);
             if (response.ok) {
               const profile = await response.json();
               setEmployerProfile(profile);
@@ -133,13 +181,10 @@ const PostJob = () => {
               // Update form data with fresh profile
               setFormData(prev => ({
                 ...prev,
-                contactPerson: profile.name || prev.contactPerson,
-                contactPhone: profile.phone || prev.contactPhone,
+                companyName: profile.companyName || profile.name || prev.companyName,
                 location: {
                   ...prev.location,
-                  village: profile.location?.village || prev.location.village,
                   city: profile.location?.city || prev.location.city,
-                  district: profile.location?.district || prev.location.district,
                   state: profile.location?.state || prev.location.state,
                   pincode: profile.location?.pincode || prev.location.pincode
                 }
@@ -161,7 +206,7 @@ const PostJob = () => {
   }, []);
 
   // Form steps configuration
-  const steps = [
+  const steps = useMemo(() => [
     {
       title: 'Job Information',
       icon: Briefcase,
@@ -169,48 +214,47 @@ const PostJob = () => {
       fields: ['title', 'category', 'employmentType', 'description']
     },
     {
-      title: 'Requirements & Compensation',
+      title: 'Company & Requirements',
       icon: DollarSign,
-      description: 'Skills needed and payment details',
-      fields: ['requirements', 'salary', 'duration', 'workingHours']
+      description: 'Company details and skills needed',
+      fields: ['companyName', 'requirements', 'salary']
     },
     {
       title: 'Location & Schedule',
       icon: MapPin,
       description: 'Where and when the work will happen',
-      fields: ['location.type', 'location.street', 'location.city', 'location.state', 'location.pincode', 'startDate', 'workersNeeded']
+      fields: ['location.type', 'location.street', 'location.city', 'location.state', 'location.pincode', 'startDate']
     },
     {
-      title: 'Contact & Final Details',
+      title: 'Final Details',
       icon: Users,
-      description: 'How workers can reach you',
-      fields: ['contactPerson', 'contactPhone', 'urgency', 'additionalInstructions']
+      description: 'Job urgency and completion',
+      fields: ['urgency']
     }
-  ];
+  ], []);
 
-  // Job categories with icons
+  // Job categories with icons (matching backend enum)
   const jobCategories = [
-    { value: 'Construction', label: 'Construction', icon: '🏗️' },
     { value: 'Agriculture', label: 'Agriculture', icon: '🌾' },
-    { value: 'Household', label: 'Household', icon: '🏠' },
-    { value: 'Transportation', label: 'Transportation', icon: '🚚' },
+    { value: 'Construction', label: 'Construction', icon: '🏗️' },
+    { value: 'Domestic', label: 'Domestic', icon: '🏠' },
     { value: 'Manufacturing', label: 'Manufacturing', icon: '🏭' },
+    { value: 'Transportation', label: 'Transportation', icon: '🚚' },
     { value: 'Retail', label: 'Retail', icon: '🛍️' },
     { value: 'Food Service', label: 'Food Service', icon: '🍽️' },
-    { value: 'Cleaning', label: 'Cleaning', icon: '🧹' },
-    { value: 'Security', label: 'Security', icon: '🛡️' },
-    { value: 'Other', label: 'Other', icon: '⚡' }
+    { value: 'General', label: 'General', icon: '⚡' }
   ];
 
-  // Employment types (matching backend schema)
+  // Employment types (matching backend enum)
   const employmentTypes = [
     { value: 'full-time', label: 'Full Time' },
     { value: 'part-time', label: 'Part Time' },
     { value: 'contract', label: 'Contract' },
-    { value: 'internship', label: 'Internship' }
+    { value: 'temporary', label: 'Temporary' },
+    { value: 'daily-wage', label: 'Daily Wage' }
   ];
 
-  // Urgency levels
+  // Urgency levels (matching backend enum)
   const urgencyLevels = [
     { value: 'low', label: 'Low - Can wait a few days', color: 'green' },
     { value: 'normal', label: 'Normal - Within 2-3 days', color: 'blue' },
@@ -275,13 +319,15 @@ const PostJob = () => {
         isValid = false;
       }
 
-      if (field === 'contactPhone' && value && !/^[+]?[\d\s-()]{10,15}$/.test(value)) {
-        newErrors[field] = 'Please enter a valid phone number';
+      // Validate city field specifically
+      if (field === 'location.city' && (!value || value.trim() === '')) {
+        newErrors[field] = 'City is required';
         isValid = false;
       }
 
-      if (field === 'workersNeeded' && value && (isNaN(value) || Number(value) < 1)) {
-        newErrors[field] = 'Number of workers must be at least 1';
+      // Validate state field specifically
+      if (field === 'location.state' && (!value || value.trim() === '')) {
+        newErrors[field] = 'State is required';
         isValid = false;
       }
     });
@@ -306,59 +352,137 @@ const PostJob = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    console.log('🚀 Job posting process initiated!');
+    console.log('📋 Current form data:', formData);
+    console.log('🔍 Validating current step...');
+    
     if (!validateStep(currentStep)) {
+      console.log('❌ Validation failed for step', currentStep);
       return;
     }
 
+    console.log('✅ Validation passed for step', currentStep);
     setIsSubmitting(true);
 
     try {
       // Get employer ID and profile
+      console.log('🔐 Checking user authentication...');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const employerProfile = JSON.parse(localStorage.getItem('employerProfile') || '{}');
       
+      console.log('👤 User data:', { id: user.id, type: user.type, name: user.name });
+      console.log('🏢 Employer profile:', { 
+        name: employerProfile.name, 
+        companyName: employerProfile.companyName,
+        fullProfile: employerProfile 
+      });
+      
       if (!user.id || user.type !== 'employer') {
+        console.error('❌ Authentication failed: User is not an employer');
         throw new Error('You must be logged in as an employer to post jobs');
       }
+      
+      console.log('✅ Authentication successful: User is an employer');
 
-      // Prepare job data for API (matching backend schema)
+      // Map employment type to backend format
+      const mapEmploymentType = (type) => {
+        const mapping = {
+          'full-time': 'Full-time',
+          'part-time': 'Part-time',
+          'contract': 'Contract',
+          'temporary': 'Temporary',
+          'daily-wage': 'Daily wage'
+        };
+        return mapping[type] || 'Full-time';
+      };
+
+      // Map urgency to backend format
+      const mapUrgency = (urgency) => {
+        const mapping = {
+          'low': 'Low',
+          'normal': 'Normal',
+          'high': 'High',
+          'urgent': 'Urgent'
+        };
+        return mapping[urgency] || 'Normal';
+      };
+
+      // Validate required location fields before submission
+      if (!formData.location.city || formData.location.city.trim() === '') {
+        throw new Error('City is required. Please fill in the city field.');
+      }
+      
+      if (!formData.location.state || formData.location.state.trim() === '') {
+        throw new Error('State is required. Please fill in the state field.');
+      }
+
+      // Get consistent company name
+      const getCompanyName = () => {
+        // Priority order: formData.companyName > employerProfile.companyName > employerProfile.name > user.name > fallback
+        const companyName = formData.companyName || employerProfile.companyName || employerProfile.name || user.name;
+        
+        if (!companyName || companyName.trim() === '') {
+          return 'Not Specified';
+        }
+        
+        return companyName.trim();
+      };
+
+      // Prepare job data for API (matching backend schema exactly)
       const jobData = {
         title: formData.title,
         description: formData.description,
         requirements: formData.requirements,
         salary: Number(formData.salary),
-        duration: formData.duration,
+        category: formData.category,
+        employmentType: mapEmploymentType(formData.employmentType),
         location: {
           type: formData.location.type,
           street: formData.location.street,
-          city: formData.location.city,
-          state: formData.location.state,
+          city: formData.location.city.trim(),
+          state: formData.location.state.trim(),
           pincode: formData.location.pincode
         },
-        category: formData.category,
-        employmentType: formData.employmentType,
-        workingHours: formData.workingHours,
+        urgency: mapUrgency(formData.urgency),
         startDate: formData.startDate,
         endDate: formData.endDate || null,
-        workersNeeded: Number(formData.workersNeeded),
-        urgency: formData.urgency,
-        contactPerson: formData.contactPerson,
-        contactPhone: formData.contactPhone,
-        additionalInstructions: formData.additionalInstructions || '',
-        employer: user.id, // Backend expects 'employer' field with ObjectId
-        
-        // Add required fields based on backend schema
-        employerName: employerProfile.name || formData.contactPerson || user.name || 'Unknown Employer',
-        companyName: employerProfile.company?.name || employerProfile.companyName || 'Not Specified',
-        
-        status: 'active',
-        visibility: 'public'
+        employer: user.id,
+        companyName: getCompanyName(),
+        skillsRequired: [], // Backend expects this array
+        status: 'active' // Backend expects this field
       };
 
-      console.log('Submitting job data:', jobData);
+      // Log the company name determination process
+      console.log('🏢 Company name determination:', {
+        formCompanyName: formData.companyName,
+        employerProfileCompanyName: employerProfile.companyName,
+        employerProfileName: employerProfile.name,
+        userName: user.name,
+        finalCompanyName: getCompanyName()
+      });
+
+      console.log('📝 Step 1: Preparing job data in correct schema format...');
+      console.log('📋 Job data structure:', {
+        title: jobData.title,
+        description: jobData.description,
+        category: jobData.category,
+        salary: jobData.salary,
+        employmentType: jobData.employmentType,
+        location: jobData.location,
+        urgency: jobData.urgency,
+        employer: jobData.employer,
+        companyName: jobData.companyName,
+        skillsRequired: jobData.skillsRequired,
+        status: jobData.status
+      });
+
+      console.log('📝 Step 2: Submitting job data to backend API...');
+      console.log('🌐 API Endpoint: http://localhost:10000/api/jobs');
+      console.log('📤 Request Method: POST');
+      console.log('📦 Request Body:', JSON.stringify(jobData, null, 2));
 
       // Submit to backend
-      const response = await fetch('https://sindh-backend.onrender.comapi/jobs', {
+              const response = await fetch(`${getApiUrl()}/jobs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -366,15 +490,31 @@ const PostJob = () => {
         body: JSON.stringify(jobData)
       });
 
+      console.log('📝 Step 3: Backend response received...');
+      console.log('📊 Response status:', response.status);
+      console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Backend error response:', errorData);
         throw new Error(errorData.message || `Server error: ${response.status}`);
       }
 
       const savedJob = await response.json();
-      console.log('Job saved successfully:', savedJob);
+      console.log('✅ Job saved successfully!');
+      console.log('📋 Saved job details:', {
+        id: savedJob._id || savedJob.id,
+        title: savedJob.title,
+        category: savedJob.category,
+        salary: savedJob.salary,
+        employer: savedJob.employer,
+        status: savedJob.status,
+        createdAt: savedJob.createdAt
+      });
+      console.log('🎉 Complete job object:', savedJob);
 
       // Update local storage and employer profile
+      console.log('📝 Step 4: Updating local storage with new job...');
       try {
         const currentProfile = JSON.parse(localStorage.getItem('employerProfile') || '{}');
         const updatedProfile = {
@@ -382,11 +522,16 @@ const PostJob = () => {
           postedJobs: [...(currentProfile.postedJobs || []), savedJob._id || savedJob.id]
         };
         localStorage.setItem('employerProfile', JSON.stringify(updatedProfile));
+        console.log('✅ Local storage updated successfully');
+        console.log('📋 Updated profile posted jobs:', updatedProfile.postedJobs);
       } catch (storageError) {
-        console.warn('Could not update local profile:', storageError);
+        console.warn('⚠️ Could not update local profile:', storageError);
       }
 
       // Show success message
+      console.log('📝 Step 5: Job posting process completed successfully!');
+      console.log('🎯 Redirecting to posted jobs page in 3 seconds...');
+      
       showNotification('Job posted successfully!', 'success');
       
       // Mark completion
@@ -395,13 +540,20 @@ const PostJob = () => {
       
       // Redirect after a short delay
       setTimeout(() => {
+        console.log('🔄 Redirecting to: /employer/posted-jobs');
         navigateToPage('/employer/posted-jobs');
       }, 3000);
 
     } catch (error) {
-      console.error('Error posting job:', error);
+      console.error('❌ Error posting job:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       showNotification(error.message || 'Failed to post job. Please try again.', 'error');
     } finally {
+      console.log('🏁 Job posting process finished (success or error)');
       setIsSubmitting(false);
     }
   };
@@ -416,11 +568,11 @@ const PostJob = () => {
       return formData[fieldName] || '';
     };
 
-    const baseClasses = `w-full px-4 py-3 border-2 rounded-xl transition-all duration-200 ${
+    const baseClasses = `w-full px-3 py-2.5 border border-gray-300 rounded-xl transition-all duration-200 shadow-sm text-sm ${
       errors[field] 
         ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
-        : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500'
-    }`;
+        : 'border-gray-200 focus:border-[#ff6b35] focus:ring-[#ff6b35]'
+    } focus:outline-none focus:ring-1 focus:ring-opacity-20 bg-white`;
 
     switch (field) {
       case 'title':
@@ -484,6 +636,18 @@ const PostJob = () => {
           />
         );
 
+      case 'companyName':
+        return (
+          <input
+            type="text"
+            name={field}
+            value={getFieldValue(field)}
+            onChange={handleInputChange}
+            placeholder="Enter your company name (optional - will use profile if left empty)"
+            className={baseClasses}
+          />
+        );
+
       case 'requirements':
         return (
           <textarea
@@ -500,7 +664,7 @@ const PostJob = () => {
       case 'salary':
         return (
           <div className="flex">
-            <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-xl">
+            <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-2xl">
               ₹
             </span>
             <input
@@ -509,41 +673,14 @@ const PostJob = () => {
               value={getFieldValue(field)}
               onChange={handleInputChange}
               placeholder="Enter amount"
-              className={`${baseClasses} rounded-l-none`}
+              className={`${baseClasses} rounded-l-none rounded-r-2xl`}
               min="1"
               required
             />
           </div>
         );
 
-      case 'salaryType':
-        return (
-          <select
-            name={field}
-            value={getFieldValue(field)}
-            onChange={handleInputChange}
-            className={baseClasses}
-          >
-            <option value="daily">Per Day</option>
-            <option value="weekly">Per Week</option>
-            <option value="monthly">Per Month</option>
-            <option value="hourly">Per Hour</option>
-            <option value="project">Per Project</option>
-          </select>
-        );
 
-      case 'workingHours':
-        return (
-          <input
-            type="text"
-            name={field}
-            value={getFieldValue(field)}
-            onChange={handleInputChange}
-            placeholder="e.g., 8 AM - 6 PM, 8 hours/day, Flexible"
-            className={baseClasses}
-            required
-          />
-        );
 
       case 'startDate':
         return (
@@ -570,33 +707,20 @@ const PostJob = () => {
           />
         );
 
-      case 'workersNeeded':
-        return (
-          <input
-            type="number"
-            name={field}
-            value={getFieldValue(field)}
-            onChange={handleInputChange}
-            placeholder="Number of workers needed"
-            className={baseClasses}
-            min="1"
-            max="50"
-            required
-          />
-        );
+
 
       case 'urgency':
         return (
           <div className="space-y-2">
             {urgencyLevels.map(level => (
-              <label key={level.value} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+              <label key={level.value} className="flex items-center space-x-3 p-3 border rounded-2xl hover:bg-gray-50 cursor-pointer transition-all duration-200 shadow-sm">
                 <input
                   type="radio"
                   name={field}
                   value={level.value}
                   checked={getFieldValue(field) === level.value}
                   onChange={handleInputChange}
-                  className="text-blue-600"
+                  className="text-[#ff6b35]"
                 />
                 <div className="flex items-center space-x-2">
                   <div className={`w-3 h-3 rounded-full bg-${level.color}-500`}></div>
@@ -607,30 +731,7 @@ const PostJob = () => {
           </div>
         );
 
-      case 'additionalInstructions':
-        return (
-          <textarea
-            name={field}
-            value={getFieldValue(field)}
-            onChange={handleInputChange}
-            placeholder="Any additional instructions for workers (optional)"
-            className={`${baseClasses} min-h-[80px] resize-vertical`}
-            rows="3"
-          />
-        );
 
-      case 'duration':
-        return (
-          <input
-            type="text"
-            name={field}
-            value={getFieldValue(field)}
-            onChange={handleInputChange}
-            placeholder="e.g., 1 week, 2 months, 6 months, Permanent"
-            className={baseClasses}
-            required
-          />
-        );
 
       case 'location.type':
         return (
@@ -663,15 +764,27 @@ const PostJob = () => {
 
       default:
         // Handle location fields and other inputs
+        const getPlaceholder = (fieldName) => {
+          if (fieldName === 'location.city') return 'Enter city name (required)';
+          if (fieldName === 'location.state') return 'Enter state name (required)';
+          if (fieldName === 'location.street') return 'Enter street address';
+          if (fieldName === 'location.pincode') return 'Enter 6-digit PIN code';
+          return `Enter ${fieldName.split('.').pop()}`;
+        };
+
+        const isRequired = (fieldName) => {
+          return fieldName === 'location.city' || fieldName === 'location.state' || steps[stepIndex].fields.includes(fieldName);
+        };
+
         return (
           <input
             type="text"
             name={field}
             value={getFieldValue(field)}
             onChange={handleInputChange}
-            placeholder={`Enter ${field.split('.').pop()}`}
+            placeholder={getPlaceholder(field)}
             className={baseClasses}
-            required={steps[stepIndex].fields.includes(field)}
+            required={isRequired(field)}
           />
         );
     }
@@ -684,200 +797,195 @@ const PostJob = () => {
       'category': 'Job Category',
       'employmentType': 'Employment Type',
       'description': 'Job Description',
+      'companyName': 'Company Name',
       'requirements': 'Requirements & Skills',
       'salary': 'Salary Amount',
-      'salaryType': 'Payment Frequency',
-      'duration': 'Job Duration',
-      'workingHours': 'Working Hours',
       'startDate': 'Start Date',
       'endDate': 'End Date (Optional)',
-      'workersNeeded': 'Number of Workers Needed',
       'urgency': 'How urgent is this job?',
       'location.type': 'Work Location Type',
       'location.street': 'Street Address',
-      'location.village': 'Village/Town',
-      'location.city': 'City',
-      'location.district': 'District',
-      'location.state': 'State',
-      'location.pincode': 'PIN Code',
-      'contactPerson': 'Contact Person',
-      'contactPhone': 'Contact Phone',
-      'additionalInstructions': 'Additional Instructions'
+      'location.city': 'City *',
+      'location.state': 'State *',
+      'location.pincode': 'PIN Code'
     };
     return labels[field] || field;
   };
 
   if (loadingProfile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#f5f6fa] flex items-center justify-center" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your profile...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#ff6b35] mx-auto mb-4"></div>
+          <p className="text-[#666]">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show dashboard first
+  if (showDashboard) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f5f6fa] px-4 pt-8" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+        <div className="w-full max-w-sm mx-auto flex flex-col justify-center min-h-[calc(100vh-4rem)]">
+          {/* Progress Bar */}
+          <div className="w-full h-0.5 bg-[#e0e0e0] rounded-full overflow-hidden mb-6">
+            <motion.div
+              className="h-0.5 bg-[#222] rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: '100%' }}
+              transition={{ duration: 0.4 }}
+              aria-label="Progress"
+            />
+          </div>
+          
+          {/* Step Content */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -30 }}
+            transition={{ duration: 0.4, type: 'spring' }}
+            className="flex flex-col gap-8"
+          >
+            {/* Question/Prompt */}
+            <div className="text-center">
+              <h2 className="text-2xl md:text-3xl font-bold text-[#222] mb-2 leading-tight" style={{ letterSpacing: '-0.3px' }}>
+                Choose Your Method
+              </h2>
+              <p className="text-sm md:text-base text-[#222]/60 mt-1">Select how you'd like to post your job</p>
+            </div>
+            
+            {/* Options */}
+            <div className="flex flex-col gap-4">
+              <motion.button
+                onClick={handleChatMode}
+                className="w-full py-4 px-5 bg-[#222] text-white rounded-xl text-base font-medium flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 shadow-md hover:shadow-lg"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                aria-label="Chat Mode"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">💬</span>
+                  <span>Chat Mode</span>
+                </div>
+                <span className="text-sm opacity-80">→</span>
+              </motion.button>
+              
+              <motion.button
+                onClick={handleTraditionalForm}
+                className="w-full py-4 px-5 bg-[#ff6b35] text-white rounded-xl text-base font-medium flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 shadow-md hover:shadow-lg"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                aria-label="Traditional Form"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">📝</span>
+                  <span>Traditional Form</span>
+                </div>
+                <span className="text-sm opacity-80">→</span>
+              </motion.button>
+            </div>
+          </motion.div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
-      {/* Notification System */}
-      <AnimatePresence>
-        {notification.visible && (
-          <motion.div
-            initial={{ opacity: 0, y: -50, x: '-50%' }}
-            animate={{ opacity: 1, y: 0, x: '-50%' }}
-            exit={{ opacity: 0, y: -50, x: '-50%' }}
-            className={`fixed top-4 left-1/2 transform z-50 px-6 py-4 rounded-lg shadow-lg max-w-md ${
-              notification.type === 'success' ? 'bg-green-500 text-white' :
-              notification.type === 'error' ? 'bg-red-500 text-white' :
-              'bg-blue-500 text-white'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              {notification.type === 'success' && <CheckCircle className="w-5 h-5" />}
-              {notification.type === 'error' && <AlertCircle className="w-5 h-5" />}
-              {notification.type === 'info' && <Clock className="w-5 h-5" />}
-              <span>{notification.message}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f5f6fa] px-4 pt-6" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      {/* Step Indicator */}
+      <div className="w-full flex flex-col items-center justify-center pb-3">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-xl p-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="flex items-center justify-center gap-2"
         >
-          {/* Header */}
-          <div className="text-center mb-8">
-            <motion.h1
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
-            >
-              Post a New Job
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="mt-2 text-gray-600"
-            >
-              Step {currentStep} of {steps.length}
-            </motion.p>
+          <span className="text-xs font-medium text-[#ff6b35] tracking-wider">
+            STEP {currentStep} OF {steps.length}
+          </span>
+          <motion.div
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.5, 1, 0.5]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="w-1 h-1 bg-[#ff6b35] rounded-full"
+          />
+        </motion.div>
+      </div>
+      
+      <div className="w-full max-w-sm mx-auto flex flex-col justify-center min-h-[calc(100vh-6rem)]">
+        {/* Progress Bar */}
+        <div className="w-full h-0.5 bg-[#e0e0e0] rounded-full overflow-hidden mb-6">
+          <motion.div
+            className="h-0.5 bg-[#222] rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${(currentStep / steps.length) * 100}%` }}
+            transition={{ duration: 0.4 }}
+            aria-label="Progress"
+          />
+        </div>
+        
+        {/* Step Content */}
+        <motion.div
+          key={currentStep}
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -30 }}
+          transition={{ duration: 0.4, type: 'spring' }}
+          className="flex flex-col gap-6"
+        >
+          {/* Question/Prompt */}
+          <div className="text-center">
+            <h2 className="text-xl md:text-2xl font-bold text-[#222] mb-2 leading-tight" style={{ letterSpacing: '-0.3px' }}>
+              {steps[currentStep - 1].title}
+            </h2>
+            <p className="text-sm md:text-base text-[#222]/60 mt-1">{steps[currentStep - 1].description}</p>
+            {currentStep === 3 && (
+              <p className="text-xs text-[#ff6b35] mt-2">⚠️ City and State are required</p>
+            )}
           </div>
-
-          {/* Progress Bar */}
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              {steps.map((step, index) => {
-                const StepIcon = step.icon;
-                const isCompleted = completedSteps.has(index + 1);
-                const isCurrent = index + 1 === currentStep;
-                
-                return (
-                  <motion.div
-                    key={index}
-                    className="flex flex-col items-center"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-                        isCompleted
-                          ? 'bg-green-500 text-white shadow-lg'
-                          : isCurrent
-                          ? 'bg-blue-500 text-white shadow-lg ring-4 ring-blue-200'
-                          : 'bg-gray-200 text-gray-400'
-                      }`}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle className="w-6 h-6" />
-                      ) : (
-                        <StepIcon className="w-6 h-6" />
-                      )}
-                    </div>
-                    <span className={`mt-2 text-xs font-medium text-center max-w-20 ${
-                      isCurrent ? 'text-blue-600' : 'text-gray-500'
-                    }`}>
-                      {step.title}
-                    </span>
-                  </motion.div>
-                );
-              })}
-            </div>
-            <div className="flex justify-between">
-              {steps.map((_, index) => (
+          
+          {/* Form Fields */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <div className="space-y-4">
+              {steps[currentStep - 1].fields.map((field, index) => (
                 <motion.div
-                  key={index}
-                  className={`flex-1 h-2 mx-1 rounded-full transition-all duration-500 ${
-                    index + 1 <= currentStep ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-gray-200'
-                  }`}
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ delay: index * 0.1, duration: 0.5 }}
-                />
+                  key={field}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <label className="block text-xs font-medium text-[#222] mb-1.5">
+                    {getFieldLabel(field)}
+                    {(field === 'location.city' || field === 'location.state' || 
+                      (steps[currentStep - 1].fields.includes(field) && field !== 'endDate' && field !== 'additionalInstructions')) && (
+                      <span className="text-red-500 ml-1">*</span>
+                    )}
+                  </label>
+                  {renderField(field, currentStep - 1)}
+                  {errors[field] && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-1 text-xs text-red-600 flex items-center"
+                    >
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      {errors[field]}
+                    </motion.p>
+                  )}
+                </motion.div>
               ))}
             </div>
-          </div>
-
-          {/* Form Content */}
-          <form onSubmit={handleSubmit}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentStep}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-                    {steps[currentStep - 1].title}
-                  </h2>
-                  <p className="text-gray-600">
-                    {steps[currentStep - 1].description}
-                  </p>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  {steps[currentStep - 1].fields.map((field, index) => (
-                    <motion.div
-                      key={field}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className={field === 'description' || field === 'requirements' || field === 'urgency' || field === 'additionalInstructions' ? 'md:col-span-2' : ''}
-                    >
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {getFieldLabel(field)}
-                        {steps[currentStep - 1].fields.includes(field) && field !== 'endDate' && field !== 'additionalInstructions' && (
-                          <span className="text-red-500 ml-1">*</span>
-                        )}
-                      </label>
-                      {renderField(field, currentStep - 1)}
-                      {errors[field] && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="mt-1 text-sm text-red-600 flex items-center"
-                        >
-                          <AlertCircle className="w-4 h-4 mr-1" />
-                          {errors[field]}
-                        </motion.p>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-
+            
             {/* Navigation Buttons */}
             <motion.div
-              className="mt-8 flex justify-between"
+              className="flex justify-between mt-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
@@ -888,7 +996,7 @@ const PostJob = () => {
                   onClick={handleBack}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium"
+                  className="px-4 py-2.5 bg-[#222] text-white rounded-xl hover:bg-[#333] transition-all duration-200 font-medium shadow-sm text-sm"
                 >
                   Back
                 </motion.button>
@@ -900,7 +1008,7 @@ const PostJob = () => {
                   onClick={handleNext}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="ml-auto px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium shadow-lg"
+                  className="ml-auto px-4 py-2.5 bg-[#ff6b35] text-white rounded-xl hover:bg-[#e55a2b] transition-all duration-200 font-medium shadow-sm text-sm"
                 >
                   Next
                 </motion.button>
@@ -910,10 +1018,10 @@ const PostJob = () => {
                   disabled={isSubmitting}
                   whileHover={{ scale: isSubmitting ? 1 : 1.02 }}
                   whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
-                  className={`ml-auto px-6 py-3 rounded-xl font-medium transition-all duration-200 shadow-lg ${
+                  className={`ml-auto px-4 py-2.5 rounded-xl font-medium transition-all duration-200 shadow-sm text-sm ${
                     isSubmitting
                       ? 'bg-gray-400 cursor-not-allowed text-white'
-                      : 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800'
+                      : 'bg-[#ff6b35] text-white hover:bg-[#e55a2b]'
                   }`}
                 >
                   {isSubmitting ? (
@@ -923,11 +1031,11 @@ const PostJob = () => {
                       animate={{ opacity: 1 }}
                     >
                       <motion.div
-                        className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-3"
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       />
-                      Posting Job...
+                      <span className="text-xs">Posting...</span>
                     </motion.div>
                   ) : (
                     'Post Job'
@@ -936,124 +1044,69 @@ const PostJob = () => {
               )}
             </motion.div>
           </form>
-
-          {/* Success Animation */}
-          <AnimatePresence>
-            {showSuccessModal && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-              >
-                <motion.div
-                  initial={{ y: 50 }}
-                  animate={{ y: 0 }}
-                  className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center"
-                >
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                    className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4"
-                  >
-                    <CheckCircle className="w-8 h-8 text-white" />
-                  </motion.div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Job Posted Successfully!</h3>
-                  <p className="text-gray-600 mb-4">
-                    Your job has been published and workers can now apply.
-                  </p>
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={() => navigateToPage('/employer/jobs')}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      View Posted Jobs
-                    </button>
-                    <button
-                      onClick={() => window.location.reload()}
-                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                    >
-                      Post Another
-                    </button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Job Preview (Optional - can be shown in last step) */}
-          {currentStep === steps.length && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-8 p-6 bg-gray-50 rounded-xl"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <FileText className="w-5 h-5 mr-2" />
-                Job Preview
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="font-medium">Title:</span>
-                  <span>{formData.title || 'Not specified'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Category:</span>
-                  <span>{formData.category || 'Not specified'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Salary:</span>
-                  <span>₹{formData.salary} {formData.salaryType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Location:</span>
-                  <span>{formData.location.city}, {formData.location.state}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Workers Needed:</span>
-                  <span>{formData.workersNeeded}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Urgency:</span>
-                  <span className="capitalize">{formData.urgency}</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </motion.div>
-
-        {/* Help Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6 bg-blue-50 rounded-xl p-6"
-        >
-          <h3 className="text-lg font-semibold text-blue-900 mb-2 flex items-center">
-            <Building className="w-5 h-5 mr-2" />
-            Tips for Better Job Posts
-          </h3>
-          <ul className="text-sm text-blue-800 space-y-2">
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-              Be specific about the work required and skills needed
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-              Set fair wages based on local market rates
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-              Provide clear working hours and location details
-            </li>
-            <li className="flex items-start">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></span>
-              Include your contact information for worker inquiries
-            </li>
-          </ul>
         </motion.div>
       </div>
+
+      {/* Notification System */}
+      <AnimatePresence>
+        {notification.visible && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[#222] text-white px-4 py-2.5 rounded-2xl shadow-lg z-50 text-sm font-medium"
+            style={{ minWidth: 200, textAlign: 'center' }}
+          >
+            {notification.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Modal */}
+      <AnimatePresence>
+        {showSuccessModal && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ y: 50 }}
+              animate={{ y: 0 }}
+              className="bg-white rounded-3xl p-8 max-w-md mx-4 text-center shadow-xl"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="w-16 h-16 bg-[#ff6b35] rounded-full flex items-center justify-center mx-auto mb-4"
+              >
+                <CheckCircle className="w-8 h-8 text-white" />
+              </motion.div>
+              <h3 className="text-2xl font-bold text-[#222] mb-2">Job Posted Successfully!</h3>
+              <p className="text-[#666] mb-4">
+                Your job has been published and workers can now apply.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => navigateToPage('/employer/posted-jobs')}
+                  className="flex-1 px-4 py-2 bg-[#ff6b35] text-white rounded-2xl hover:bg-[#e55a2b] shadow-sm"
+                >
+                  View Posted Jobs
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="flex-1 px-4 py-2 bg-[#222] text-white rounded-2xl hover:bg-[#333] shadow-sm"
+                >
+                  Post Another
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

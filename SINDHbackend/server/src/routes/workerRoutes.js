@@ -5,6 +5,17 @@ const JobMatchingService = require('../services/JobMatchingService');
 const JobApplication = require('../models/JobApplication');
 const logger = require('../config/logger');
 
+// Test endpoint to confirm backend connectivity
+router.post('/initiate-registration', async (req, res) => {
+  console.log('🎉 Worker registration initiated!');
+  logger.info('🎉 Worker registration initiated!');
+  
+  res.json({ 
+    success: true, 
+    message: 'Worker registration initiated successfully!' 
+  });
+});
+
 // Register a new worker
 router.post('/register', async (req, res) => {
   logger.info('Worker registration request');
@@ -16,15 +27,12 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ 
       success: true,
       message: 'Worker registered successfully',
-      data: {
-        worker: {
-          id: worker._id,
-          name: worker.name,
-          phone: worker.phone,
-          rating: worker.rating,
-          shaktiScore: worker.shaktiScore,
-          profileCompletionPercentage: worker.profileCompletionPercentage
-        }
+      worker: {
+        ...worker.toObject(),
+        id: worker._id,
+        _id: worker._id,
+        type: 'worker',
+        isLoggedIn: 1
       }
     });
   } catch (error) {

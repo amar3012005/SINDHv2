@@ -435,3 +435,885 @@
 {"level":"info","message":"Found 0 recent jobs"}
 {"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
 {"level":"info","message":"Found 0 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 1234567892"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 6301805659"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 9161805656"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 6301805656"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 6301805656"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker login successful for Amar"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching current applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 current applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching current applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching completed applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 current applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 completed applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 valid completed applications"}
+{"level":"info","message":"Fetching completed applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 completed applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 valid completed applications"}
+{"level":"info","message":"Successfully processed 0 completed jobs for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 completed jobs for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching current applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 current applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching current applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching completed applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 current applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 completed applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 valid completed applications"}
+{"level":"info","message":"Fetching completed applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 completed applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 valid completed applications"}
+{"level":"info","message":"Successfully processed 0 completed jobs for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 completed jobs for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching current applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 current applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching completed applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 completed applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 valid completed applications"}
+{"level":"info","message":"Successfully processed 0 completed jobs for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching current applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 current applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching current applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 current applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching completed applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 completed applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 valid completed applications"}
+{"level":"info","message":"Fetching completed applications for worker: 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Found 0 completed applications for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 valid completed applications"}
+{"level":"info","message":"Successfully processed 0 completed jobs for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Successfully processed 0 completed jobs for worker 686aeaf364b3b9998c014724"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Creating new job application (simplified endpoint)"}
+{"level":"info","message":"Job application created successfully (simplified): 686b1598004319bd8806f7a6"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer login successful for Gadde Amar Sai"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 9701618269"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 0630180565"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 0630180565"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 0630180565"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 0630180565"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 0630180565"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 0630180656"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker login successful for Amar"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 9701618260"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 6301805656"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer login successful for Gadde Amar Sai"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 0630180565"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer login successful for Gadde Amar Sai"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 9701618260"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 1321321234"}
+{"level":"info","message":"Worker registration request"}
+{"error":"Worker validation failed: availability: Path `availability` is required., preferredWorkType: Path `preferredWorkType` is required., expectedSalary: Path `expectedSalary` is required., preferredCategory: Path `preferredCategory` is required., experience: Path `experience` is required., aadharNumber: Path `aadharNumber` is required., gender: Path `gender` is required., age: Path `age` is required., phone: 1321321234 is not a valid phone number!","level":"error","message":"Worker registration failed","stack":"ValidationError: Worker validation failed: availability: Path `availability` is required., preferredWorkType: Path `preferredWorkType` is required., expectedSalary: Path `expectedSalary` is required., preferredCategory: Path `preferredCategory` is required., experience: Path `experience` is required., aadharNumber: Path `aadharNumber` is required., gender: Path `gender` is required., age: Path `age` is required., phone: 1321321234 is not a valid phone number!\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Worker registration request"}
+{"error":"Worker validation failed: phone: 1321321234 is not a valid phone number!","level":"error","message":"Worker registration failed","stack":"ValidationError: Worker validation failed: phone: 1321321234 is not a valid phone number!\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Worker registration request"}
+{"error":"Worker validation failed: phone: 1321321234 is not a valid phone number!","level":"error","message":"Worker registration failed","stack":"ValidationError: Worker validation failed: phone: 1321321234 is not a valid phone number!\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Worker registration request"}
+{"error":"Worker validation failed: phone: 1321321234 is not a valid phone number!","level":"error","message":"Worker registration failed","stack":"ValidationError: Worker validation failed: phone: 1321321234 is not a valid phone number!\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer login successful for Gadde Amar Sai"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"body":{"category":"Construction","companyName":"H.A.W.K","description":"Job posting in progress via chat","duration":"To be specified","employer":"686aecae64b3b9998c014734","employerName":"Gadde Amar Sai","employmentType":"full-time","location":{"city":"City","pincode":"509337","state":"TELANGANA","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"draft","title":"Job in Progress"},"employer":"686aecae64b3b9998c014734","level":"info","message":"New job posting attempt","title":"Job in Progress"}
+{"category":"Construction","companyName":"H.A.W.K","description":"Job posting in progress via chat","employer":"686aecae64b3b9998c014734","employmentType":"full-time","level":"info","location":{"city":"City","pincode":"509337","state":"TELANGANA","street":"Location to be specified","type":"onsite"},"message":"Creating job with data:","requirements":"Requirements to be specified","salary":500,"skillsRequired":[],"status":"draft","title":"Job in Progress","urgency":"Normal"}
+{"error":"Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`., status: `draft` is not a valid enum value for path `status`.","level":"error","message":"Error posting job","requestBody":{"category":"Construction","companyName":"H.A.W.K","description":"Job posting in progress via chat","duration":"To be specified","employer":"686aecae64b3b9998c014734","employerName":"Gadde Amar Sai","employmentType":"full-time","location":{"city":"City","pincode":"509337","state":"TELANGANA","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"draft","title":"Job in Progress"},"stack":"ValidationError: Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`., status: `draft` is not a valid enum value for path `status`.\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 6301825656"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 6301805651"}
+{"level":"info","message":"🎉 Worker registration initiated!"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker login successful for Amar"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 1234267890"}
+{"level":"info","message":"🎉 Worker registration initiated!"}
+{"level":"info","message":"🎉 Worker registration initiated!"}
+{"level":"info","message":"Worker registration request"}
+{"error":"Worker validation failed: phone: 1234267890 is not a valid phone number!","level":"error","message":"Worker registration failed","stack":"ValidationError: Worker validation failed: phone: 1234267890 is not a valid phone number!\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Worker login attempt"}
+{"level":"info","message":"Worker not found with phone number: 6301877656"}
+{"level":"info","message":"🎉 Worker registration initiated!"}
+{"level":"info","message":"Worker registration request"}
+{"level":"info","message":"Worker registered successfully: sadf"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Creating new job application (simplified endpoint)"}
+{"level":"info","message":"Job application created successfully (simplified): 686b25d244c556ccb2f3311c"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 9999888812"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"level":"info","message":"Employer registered successfully: qwerty"}
+{"body":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"draft","title":"Job in Progress"},"employer":"686b271155bdc74578c266a4","level":"info","message":"New job posting attempt","title":"Job in Progress"}
+{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","employer":"686b271155bdc74578c266a4","employmentType":"full-time","level":"info","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"message":"Creating job with data:","requirements":"Requirements to be specified","salary":500,"skillsRequired":[],"status":"draft","title":"Job in Progress","urgency":"Normal"}
+{"error":"Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`., status: `draft` is not a valid enum value for path `status`.","level":"error","message":"Error posting job","requestBody":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"draft","title":"Job in Progress"},"stack":"ValidationError: Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`., status: `draft` is not a valid enum value for path `status`.\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 1 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"draft","title":"Job in Progress"},"employer":"686b271155bdc74578c266a4","level":"info","message":"New job posting attempt","title":"Job in Progress"}
+{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","employer":"686b271155bdc74578c266a4","employmentType":"full-time","level":"info","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"message":"Creating job with data:","requirements":"Requirements to be specified","salary":500,"skillsRequired":[],"status":"draft","title":"Job in Progress","urgency":"Normal"}
+{"error":"Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`., status: `draft` is not a valid enum value for path `status`.","level":"error","message":"Error posting job","requestBody":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"draft","title":"Job in Progress"},"stack":"ValidationError: Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`., status: `draft` is not a valid enum value for path `status`.\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"Full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"active","title":"Job in Progress"},"employer":"686b271155bdc74578c266a4","level":"info","message":"New job posting attempt","title":"Job in Progress"}
+{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","employer":"686b271155bdc74578c266a4","employmentType":"Full-time","level":"info","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"message":"Creating job with data:","requirements":"Requirements to be specified","salary":500,"skillsRequired":[],"status":"active","title":"Job in Progress","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"686b2a8bc3940960b1330476","level":"info","message":"Job posted successfully: Job in Progress"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"error":"Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`.","level":"error","message":"Error updating job: 686b2a8bc3940960b1330476","stack":"ValidationError: Job validation failed: employmentType: `full-time` is not a valid enum value for path `employmentType`.\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"error":"Job validation failed: startDate: Cast to date failed for value \"Immediately\" (type string) at path \"startDate\"","level":"error","message":"Error updating job: 686b2a8bc3940960b1330476","stack":"ValidationError: Job validation failed: startDate: Cast to date failed for value \"Immediately\" (type string) at path \"startDate\"\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at model.$set (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:1464:12)\n    at model.set [as startDate] (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\helpers\\document\\compile.js:205:19)\n    at Object.assign (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\jobRoutes.js:647:12\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Job updated successfully: Farm Worker for Wheat Harvesting"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 2 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 2 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 2 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 2 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 2 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"Full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"active","title":"Job in Progress"},"employer":"686b271155bdc74578c266a4","level":"info","message":"New job posting attempt","title":"Job in Progress"}
+{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","employer":"686b271155bdc74578c266a4","employmentType":"Full-time","level":"info","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"message":"Creating job with data:","requirements":"Requirements to be specified","salary":500,"skillsRequired":[],"status":"active","title":"Job in Progress","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"686b2c28673967345f75d1ae","level":"info","message":"Job posted successfully: Job in Progress"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"error":"Job validation failed: salary: Salary must be at least ₹100","level":"error","message":"Error updating job: 686b2c28673967345f75d1ae","stack":"ValidationError: Job validation failed: salary: Salary must be at least ₹100\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"error":"Job validation failed: employmentType: `contract` is not a valid enum value for path `employmentType`.","level":"error","message":"Error updating job: 686b2c28673967345f75d1ae","stack":"ValidationError: Job validation failed: employmentType: `contract` is not a valid enum value for path `employmentType`.\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"error":"Job validation failed: startDate: Cast to date failed for value \"Immediately\" (type string) at path \"startDate\"","level":"error","message":"Error updating job: 686b2c28673967345f75d1ae","stack":"ValidationError: Job validation failed: startDate: Cast to date failed for value \"Immediately\" (type string) at path \"startDate\"\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at model.$set (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:1464:12)\n    at model.set [as startDate] (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\helpers\\document\\compile.js:205:19)\n    at Object.assign (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\jobRoutes.js:647:12\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Job updated successfully: Yes, let's create a job!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 3 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 3 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 3 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"Full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"active","title":"Job in Progress"},"employer":"686b271155bdc74578c266a4","level":"info","message":"New job posting attempt","title":"Job in Progress"}
+{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","employer":"686b271155bdc74578c266a4","employmentType":"Full-time","level":"info","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"message":"Creating job with data:","requirements":"Requirements to be specified","salary":500,"skillsRequired":[],"status":"active","title":"Job in Progress","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"686babf6f81a0530ecfed949","level":"info","message":"Job posted successfully: Job in Progress"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 4 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 4 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 4 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 4 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","duration":"To be specified","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"Full-time","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"requirements":"Requirements to be specified","salary":500,"status":"active","title":"Job in Progress"},"employer":"686b271155bdc74578c266a4","level":"info","message":"New job posting attempt","title":"Job in Progress"}
+{"category":"Construction","companyName":"reri","description":"Job posting in progress via chat","employer":"686b271155bdc74578c266a4","employmentType":"Full-time","level":"info","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Location to be specified","type":"onsite"},"message":"Creating job with data:","requirements":"Requirements to be specified","salary":500,"skillsRequired":[],"status":"active","title":"Job in Progress","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"686bad25f81a0530ecfed96a","level":"info","message":"Job posted successfully: Job in Progress"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"error":"Job validation failed: category: Please select a valid category","level":"error","message":"Error updating job: 686bad25f81a0530ecfed96a","stack":"ValidationError: Job validation failed: category: Please select a valid category\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"error":"Job validation failed: employmentType: `contract` is not a valid enum value for path `employmentType`.","level":"error","message":"Error updating job: 686bad25f81a0530ecfed96a","stack":"ValidationError: Job validation failed: employmentType: `contract` is not a valid enum value for path `employmentType`.\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"error":"Job validation failed: startDate: Cast to date failed for value \"Immediately\" (type string) at path \"startDate\"","level":"error","message":"Error updating job: 686bad25f81a0530ecfed96a","stack":"ValidationError: Job validation failed: startDate: Cast to date failed for value \"Immediately\" (type string) at path \"startDate\"\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at model.$set (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:1464:12)\n    at model.set [as startDate] (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\helpers\\document\\compile.js:205:19)\n    at Object.assign (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\jobRoutes.js:647:12\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Job updated successfully: Kitchen Assistant"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 5 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 5 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 5 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Transportation","companyName":"reri","description":"Customer service and sales support","duration":"Ongoing/Permanent","employer":"686b271155bdc74578c266a4","employerName":"qwerty","employmentType":"Temporary","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Multiple locations in my area","type":"onsite"},"requirements":"Should understand local language","salary":800,"status":"active","title":"Shop Assistant"},"employer":"686b271155bdc74578c266a4","level":"info","message":"New job posting attempt","title":"Shop Assistant"}
+{"category":"Transportation","companyName":"reri","description":"Customer service and sales support","employer":"686b271155bdc74578c266a4","employmentType":"Temporary","level":"info","location":{"city":"City","pincode":"432434","state":"cwefqw","street":"Multiple locations in my area","type":"onsite"},"message":"Creating job with data:","requirements":"Should understand local language","salary":800,"skillsRequired":[],"status":"active","title":"Shop Assistant","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"686bb5ccb39d59c7615c3ec8","level":"info","message":"Job posted successfully: Shop Assistant"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 6301805644"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 6301805644"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 0630180565"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 0630180656"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 0630180565"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"error":"Employer validation failed: phone: Path `phone` is required.","level":"error","message":"Employer registration error","stack":"ValidationError: Employer validation failed: phone: Path `phone` is required.\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"level":"info","message":"Employer registration request"}
+{"level":"info","message":"Employer registered successfully: jkhb "}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"level":"info","message":"Employer registered successfully: yes"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 0630180565"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"level":"warn","message":"Employer already exists with phone: 9630180565"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 9789898987"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"level":"info","message":"Employer registered successfully: Amar"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"level":"info","message":"Employer registered successfully: qwerty"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer login successful for qwerty"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 6301845656"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"level":"info","message":"Employer registered successfully: Amar"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer not found with phone number: 6301825656"}
+{"level":"info","message":"🎉 Employer registration initiated!"}
+{"level":"info","message":"Employer registration request"}
+{"error":"E11000 duplicate key error collection: test.employers index: email_1 dup key: { email: \"amarsai2005@gmail.com\" }","level":"error","message":"Employer registration error","stack":"MongoServerError: E11000 duplicate key error collection: test.employers index: email_1 dup key: { email: \"amarsai2005@gmail.com\" }\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongodb\\lib\\operations\\insert.js:50:33\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongodb\\lib\\operations\\command.js:84:64\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Employer registration request"}
+{"level":"info","message":"Employer registered successfully: Gadde Amar Sai"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 6 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Agriculture","companyName":"QWERTY","description":"Physical farm work including planting and harvesting","duration":"1-2 weeks","employer":"6870acf10040bfc98d90b183","employerName":"Gadde Amar Sai","employmentType":"Full-time","location":{"city":"My District","pincode":"509001","state":"TELANGANA","street":"My Village","type":"onsite"},"requirements":"No experience needed - will train","salary":800,"status":"active","title":"Kitchen Assistant"},"employer":"6870acf10040bfc98d90b183","level":"info","message":"New job posting attempt","title":"Kitchen Assistant"}
+{"category":"Agriculture","companyName":"QWERTY","description":"Physical farm work including planting and harvesting","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","level":"info","location":{"city":"My District","pincode":"509001","state":"TELANGANA","street":"My Village","type":"onsite"},"message":"Creating job with data:","requirements":"No experience needed - will train","salary":800,"skillsRequired":[],"status":"active","title":"Kitchen Assistant","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"6870b0410040bfc98d90b1ab","level":"info","message":"Job posted successfully: Kitchen Assistant"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 7 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"},"employer":"6870acf10040bfc98d90b183","level":"info","message":"New job posting attempt","title":"hkgbiu"}
+{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"level":"info","location":{"city":"","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"message":"Creating job with data:","requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"}
+{"error":"Job validation failed: location.city: City is required","level":"error","message":"Error posting job","requestBody":{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"},"stack":"ValidationError: Job validation failed: location.city: City is required\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"body":{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"},"employer":"6870acf10040bfc98d90b183","level":"info","message":"New job posting attempt","title":"hkgbiu"}
+{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"level":"info","location":{"city":"","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"message":"Creating job with data:","requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"}
+{"error":"Job validation failed: location.city: City is required","level":"error","message":"Error posting job","requestBody":{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"},"stack":"ValidationError: Job validation failed: location.city: City is required\n    at Document.invalidate (C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3219:32)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\document.js:3012:17\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\node_modules\\mongoose\\lib\\schematype.js:1368:9\n    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)"}
+{"body":{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"},"employer":"6870acf10040bfc98d90b183","level":"info","message":"New job posting attempt","title":"hkgbiu"}
+{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"jh vbiu","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"level":"info","location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"message":"Creating job with data:","requirements":"mnnb ku","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"hkgbiu","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"6870ba5232196a528815404c","level":"info","message":"Job posted successfully: hkgbiu"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 8 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 8 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"kjkhg boi","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"kjhjgb i","salary":200,"skillsRequired":[],"startDate":"2025-07-20","status":"active","title":"jhg iu","urgency":"Normal"},"employer":"6870acf10040bfc98d90b183","level":"info","message":"New job posting attempt","title":"jhg iu"}
+{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"kjkhg boi","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"level":"info","location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"message":"Creating job with data:","requirements":"kjhjgb i","salary":200,"skillsRequired":[],"startDate":"2025-07-20","status":"active","title":"jhg iu","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"6870baac32196a5288154059","level":"info","message":"Job posted successfully: jhg iu"}
+{"level":"info","message":"Fetching applications for job: 6870baac32196a5288154059"}
+{"level":"info","message":"Found 0 applications for job 6870baac32196a5288154059"}
+{"level":"info","message":"Fetching applications for job: 6870ba5232196a528815404c"}
+{"level":"info","message":"Found 0 applications for job 6870ba5232196a528815404c"}
+{"level":"info","message":"Fetching applications for job: 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Found 0 applications for job 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Fetching applications for job: 6870baac32196a5288154059"}
+{"level":"info","message":"Found 0 applications for job 6870baac32196a5288154059"}
+{"level":"info","message":"Fetching applications for job: 6870ba5232196a528815404c"}
+{"level":"info","message":"Found 0 applications for job 6870ba5232196a528815404c"}
+{"level":"info","message":"Fetching applications for job: 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Found 0 applications for job 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Fetching applications for job: 6870baac32196a5288154059"}
+{"level":"info","message":"Found 0 applications for job 6870baac32196a5288154059"}
+{"level":"info","message":"Fetching applications for job: 6870ba5232196a528815404c"}
+{"level":"info","message":"Found 0 applications for job 6870ba5232196a528815404c"}
+{"level":"info","message":"Fetching applications for job: 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Found 0 applications for job 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Fetching applications for job: 6870baac32196a5288154059"}
+{"level":"info","message":"Found 0 applications for job 6870baac32196a5288154059"}
+{"level":"info","message":"Fetching applications for job: 6870ba5232196a528815404c"}
+{"level":"info","message":"Found 0 applications for job 6870ba5232196a528815404c"}
+{"level":"info","message":"Fetching applications for job: 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Found 0 applications for job 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Fetching applications for job: 6870baac32196a5288154059"}
+{"level":"info","message":"Found 0 applications for job 6870baac32196a5288154059"}
+{"level":"info","message":"Fetching applications for job: 6870ba5232196a528815404c"}
+{"level":"info","message":"Found 0 applications for job 6870ba5232196a528815404c"}
+{"level":"info","message":"Fetching applications for job: 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Found 0 applications for job 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Agriculture","companyName":"QWERTY","description":"oihp9","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"KLHNOI ","salary":500,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"joby","urgency":"Normal"},"employer":"6870acf10040bfc98d90b183","level":"info","message":"New job posting attempt","title":"joby"}
+{"category":"Agriculture","companyName":"QWERTY","description":"oihp9","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"level":"info","location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"message":"Creating job with data:","requirements":"KLHNOI ","salary":500,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"joby","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"6870bc8b32196a5288154081","level":"info","message":"Job posted successfully: joby"}
+{"level":"info","message":"Fetching applications for job: 6870bc8b32196a5288154081"}
+{"level":"info","message":"Found 0 applications for job 6870bc8b32196a5288154081"}
+{"level":"info","message":"Fetching applications for job: 6870bc8b32196a5288154081"}
+{"level":"info","message":"Fetching applications for job: 6870baac32196a5288154059"}
+{"level":"info","message":"Found 0 applications for job 6870bc8b32196a5288154081"}
+{"level":"info","message":"Found 0 applications for job 6870baac32196a5288154059"}
+{"level":"info","message":"Fetching applications for job: 6870baac32196a5288154059"}
+{"level":"info","message":"Fetching applications for job: 6870ba5232196a528815404c"}
+{"level":"info","message":"Found 0 applications for job 6870baac32196a5288154059"}
+{"level":"info","message":"Found 0 applications for job 6870ba5232196a528815404c"}
+{"level":"info","message":"Fetching applications for job: 6870ba5232196a528815404c"}
+{"level":"info","message":"Fetching applications for job: 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Found 0 applications for job 6870ba5232196a528815404c"}
+{"level":"info","message":"Found 0 applications for job 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Fetching applications for job: 6870b0410040bfc98d90b1ab"}
+{"level":"info","message":"Found 0 applications for job 6870b0410040bfc98d90b1ab"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"body":{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"dbhtwe","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"requirements":"sbhvhw","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"sdvfgs","urgency":"Normal"},"employer":"6870acf10040bfc98d90b183","level":"info","message":"New job posting attempt","title":"sdvfgs"}
+{"category":"Agriculture","companyName":"Gadde Amar Sai","description":"dbhtwe","employer":"6870acf10040bfc98d90b183","employmentType":"Full-time","endDate":null,"level":"info","location":{"city":"Mandi","pincode":"509001","state":"TELANGANA","street":"217/B18","type":"onsite"},"message":"Creating job with data:","requirements":"sbhvhw","salary":400,"skillsRequired":[],"startDate":"2025-07-30","status":"active","title":"sdvfgs","urgency":"Normal"}
+{"level":"info","message":"Updated employer posted jobs list"}
+{"jobId":"6870c034e372c4c5db4eea32","level":"info","message":"Job posted successfully: sdvfgs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Employer login attempt"}
+{"level":"info","message":"Employer login successful for Gadde Amar Sai"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"error":"Cannot read properties of undefined (reading 'length')","level":"error","message":"Error fetching employer stats: 6870acf10040bfc98d90b183","stack":"TypeError: Cannot read properties of undefined (reading 'length')\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:75\n    at Array.reduce (<anonymous>)\n    at C:\\Users\\AMAR\\SINDHv2\\SINDHbackend\\server\\src\\routes\\employerRoutes.js:249:31\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"🎉 Job creation initiated!"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}
+{"level":"info","message":"Fetching recent jobs, limit: 10, workerId: undefined"}
+{"level":"info","message":"Found 10 recent jobs"}

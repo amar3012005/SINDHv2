@@ -8,6 +8,7 @@ import {
   X,
   AlertCircle 
 } from 'lucide-react';
+import { getApiUrl } from '../../utils/apiUtils.js';
 
 const PaymentModal = ({ 
   isOpen, 
@@ -66,7 +67,7 @@ const PaymentModal = ({
   };
 
   const processPayment = async (method) => {
-    const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${application._id}/process-payment`, {
+    const response = await fetch(`${getApiUrl()}/job-applications/${application._id}/process-payment`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json'

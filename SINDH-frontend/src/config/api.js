@@ -1,17 +1,55 @@
+/**
+ * Centralized API Configuration for SINDH Platform
+ * 
+ * This file provides consistent API URL handling across the entire application.
+ * It automatically detects the environment and provides the appropriate backend URL.
+ * 
+ * Features:
+ * - Environment-aware URL selection (development vs production)
+ * - Mobile app support (Capacitor/Cordova detection)
+ * - Enhanced error handling and logging
+ * - Connection status monitoring
+ * - Request/response interceptors for debugging
+ * 
+ * Usage:
+ * import { getApiUrl } from '../utils/apiUtils.js';
+ * const response = await fetch(`${getApiUrl()}/endpoint`);
+ */
+
 import axios from 'axios';
 
-const API_URL = 'https://sindh-backend.onrender.com/api';
+// Enhanced API URL configuration
+const getApiUrl = () => {
+  // Check if we're in a mobile app environment (Capacitor)
+  const isMobileApp = window.Capacitor || window.cordova;
+  
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://sindh-backend.onrender.com/api';
+  }
+  
+  // For mobile app development, use the backend URL
+  if (isMobileApp) {
+    return 'https://sindh-backend.onrender.com/api';
+  }
+  
+  // For local development
+  return 'http://localhost:10000/api';
+};
+
+const API_URL = getApiUrl();
 
 console.log('🌐 API Configuration:', {
   environment: process.env.NODE_ENV,
   apiUrl: API_URL,
   mode: process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT',
-  host: window.location.host
+  host: window.location.host,
+  isMobileApp: !!(window.Capacitor || window.cordova),
+  userAgent: navigator.userAgent
 });
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 15000, // Increased timeout for mobile networks
   headers: {
     'Content-Type': 'application/json'
   }
@@ -24,14 +62,17 @@ const checkConnection = async () => {
     console.log('🟢 Backend connected successfully:', {
       url: API_URL,
       status: response.data.status,
-      services: response.data.services
+      services: response.data.services,
+      environment: response.data.environment
     });
     return true;
   } catch (error) {
     console.error('🔴 Backend connection failed:', {
       url: API_URL,
       error: error.message,
-      suggestion: 'Make sure backend server is running on http://localhost:5000'
+      suggestion: process.env.NODE_ENV === 'production' 
+        ? 'Check if backend is deployed on Render'
+        : 'Make sure backend server is running on http://localhost:10000'
     });
     return false;
   }
@@ -46,7 +87,8 @@ api.interceptors.request.use(request => {
     url: `${request.baseURL}${request.url}`,
     method: request.method?.toUpperCase(),
     environment: process.env.NODE_ENV,
-    origin: window.location.origin
+    origin: window.location.origin,
+    isMobileApp: !!(window.Capacitor || window.cordova)
   });
   return request;
 });
@@ -64,10 +106,13 @@ api.interceptors.response.use(
     console.error('API Error:', {
       url: error.config?.url,
       status: error.response?.status,
-      message: error.message
+      message: error.message,
+      isNetworkError: !error.response
     });
     return Promise.reject(error);
   }
 );
 
+// Export the axios instance as a named export and API_URL as default
+export { api };
 export default API_URL;

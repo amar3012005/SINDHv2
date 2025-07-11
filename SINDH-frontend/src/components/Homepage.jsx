@@ -5,8 +5,303 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { getCurrentUser } from '../utils/authUtils';
-import { Phone, Star, Users, Briefcase, TrendingUp, Wallet } from 'lucide-react';
+import { Phone, Star, Users, Briefcase, TrendingUp, Wallet, MessageCircle, ArrowRight, Calendar, MapPin } from 'lucide-react';
 import { getApiUrl } from '../utils/apiUtils';
+
+// Animated Pattern Components
+const FloatingGeometry = ({ delay = 0 }) => {
+  const shapes = ['square', 'circle', 'triangle'];
+  const shape = shapes[Math.floor(Math.random() * shapes.length)];
+  const size = Math.random() * 20 + 10;
+  const duration = Math.random() * 10 + 15;
+  
+  const initialX = Math.random() * window.innerWidth;
+  const initialY = Math.random() * window.innerHeight;
+  
+  return (
+    <motion.div
+      className="absolute pointer-events-none opacity-5"
+      style={{
+        width: size,
+        height: size,
+        left: initialX,
+        top: initialY,
+      }}
+      animate={{
+        x: [0, Math.random() * 200 - 100, Math.random() * 200 - 100, 0],
+        y: [0, Math.random() * 200 - 100, Math.random() * 200 - 100, 0],
+        rotate: [0, 180, 360],
+        scale: [1, 1.2, 0.8, 1]
+      }}
+      transition={{
+        duration: duration,
+        repeat: Infinity,
+        delay: delay,
+        ease: "linear"
+      }}
+    >
+      {shape === 'square' && <div className="w-full h-full bg-black" />}
+      {shape === 'circle' && <div className="w-full h-full bg-black rounded-full" />}
+      {shape === 'triangle' && (
+        <div 
+          className="w-0 h-0 border-l-[10px] border-r-[10px] border-b-[17px] border-l-transparent border-r-transparent border-b-black"
+          style={{ borderBottomWidth: size * 0.866 }}
+        />
+      )}
+    </motion.div>
+  );
+};
+
+const AnimatedGrid = ({ opacity = 0.05 }) => {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity }}>
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `
+            linear-gradient(90deg, black 1px, transparent 1px),
+            linear-gradient(black 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px'
+        }}
+        animate={{
+          x: [0, 50, 0],
+          y: [0, 50, 0]
+        }}
+        transition={{
+          duration: 20,
+          repeat: Infinity,
+          ease: "linear"
+        }}
+      />
+    </div>
+  );
+};
+
+const ParticleField = ({ count = 30 }) => {
+  const particles = Array.from({ length: count }, (_, i) => (
+    <motion.div
+      key={i}
+      className="absolute w-1 h-1 bg-black rounded-full opacity-20"
+      style={{
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+      }}
+      animate={{
+        y: [0, -20, 0],
+        opacity: [0.2, 0.5, 0.2],
+        scale: [1, 1.5, 1]
+      }}
+      transition={{
+        duration: Math.random() * 3 + 2,
+        repeat: Infinity,
+        delay: Math.random() * 2,
+        ease: "easeInOut"
+      }}
+    />
+  ));
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles}
+    </div>
+  );
+};
+
+const WavePattern = () => {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
+      <motion.svg
+        className="absolute w-full h-full"
+        viewBox="0 0 1000 1000"
+        preserveAspectRatio="none"
+        animate={{
+          rotate: [0, 360]
+        }}
+        transition={{
+          duration: 60,
+          repeat: Infinity,
+          ease: "linear"
+        }}
+      >
+        <defs>
+          <pattern id="wave" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+            <path d="M0,50 Q25,25 50,50 T100,50" stroke="black" strokeWidth="1" fill="none" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#wave)" />
+      </motion.svg>
+    </div>
+  );
+};
+
+const GeometricOverlay = () => {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Animated triangles */}
+      <motion.div
+        className="absolute top-10 right-10 w-16 h-16 opacity-10"
+        animate={{
+          rotate: [0, 360],
+          scale: [1, 1.2, 1]
+        }}
+        transition={{
+          duration: 8,
+          repeat: Infinity,
+          ease: "linear"
+        }}
+      >
+        <svg viewBox="0 0 100 100" className="w-full h-full">
+          <polygon points="50,10 90,80 10,80" fill="black" />
+        </svg>
+      </motion.div>
+
+      {/* Animated squares */}
+      <motion.div
+        className="absolute top-1/4 left-10 w-12 h-12 opacity-10"
+        animate={{
+          rotate: [0, 45, 0],
+          x: [0, 20, 0]
+        }}
+        transition={{
+          duration: 6,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      >
+        <div className="w-full h-full bg-black transform rotate-45" />
+      </motion.div>
+
+      {/* Animated circles */}
+      <motion.div
+        className="absolute bottom-1/4 right-20 opacity-10"
+        animate={{
+          scale: [1, 1.5, 1],
+          opacity: [0.1, 0.2, 0.1]
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      >
+        <div className="w-8 h-8 border-2 border-black rounded-full" />
+      </motion.div>
+
+      {/* Animated lines */}
+      <motion.div
+        className="absolute top-1/2 left-1/4 opacity-10"
+        animate={{
+          scaleX: [1, 1.5, 1],
+          rotate: [0, 10, 0]
+        }}
+        transition={{
+          duration: 5,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      >
+        <div className="w-24 h-px bg-black" />
+      </motion.div>
+    </div>
+  );
+};
+
+const NetworkLines = () => {
+  const nodes = Array.from({ length: 8 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100
+  }));
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
+      <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {nodes.map((node, i) => (
+          <g key={node.id}>
+            {/* Node */}
+            <motion.circle
+              cx={node.x}
+              cy={node.y}
+              r="0.5"
+              fill="black"
+              animate={{
+                r: [0.3, 0.7, 0.3],
+                opacity: [0.3, 0.8, 0.3]
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                delay: i * 0.5,
+                ease: "easeInOut"
+              }}
+            />
+            
+            {/* Connection lines */}
+            {nodes.slice(i + 1).map((nextNode, j) => (
+              <motion.line
+                key={`${i}-${j}`}
+                x1={node.x}
+                y1={node.y}
+                x2={nextNode.x}
+                y2={nextNode.y}
+                stroke="black"
+                strokeWidth="0.1"
+                animate={{
+                  opacity: [0.1, 0.3, 0.1]
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  delay: (i + j) * 0.3,
+                  ease: "easeInOut"
+                }}
+              />
+            ))}
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
+const MorphingPattern = () => {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
+      <motion.svg
+        className="absolute top-1/3 left-1/3 w-32 h-32"
+        viewBox="0 0 100 100"
+        animate={{
+          rotate: [0, 180, 360],
+          scale: [1, 1.2, 1]
+        }}
+        transition={{
+          duration: 12,
+          repeat: Infinity,
+          ease: "linear"
+        }}
+      >
+        <motion.path
+          d="M50,10 L90,35 L75,85 L25,85 L10,35 Z"
+          fill="black"
+          animate={{
+            d: [
+              "M50,10 L90,35 L75,85 L25,85 L10,35 Z",
+              "M50,5 L95,30 L80,90 L20,90 L5,30 Z",
+              "M50,15 L85,40 L70,80 L30,80 L15,40 Z",
+              "M50,10 L90,35 L75,85 L25,85 L10,35 Z"
+            ]
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+      </motion.svg>
+    </div>
+  );
+};
 
 function Homepage() {
   const { t } = useTranslation();
@@ -235,17 +530,19 @@ function Homepage() {
   useEffect(() => {
     console.log('Homepage useEffect - fetching data');
     
-    fetchRecentJobs();
-    fetchLatestJobs();
-    
     if (user?.type === 'worker') {
-      console.log('User is worker, fetching job count');
+      console.log('User is worker, fetching worker-specific data');
+      fetchLatestJobs(); // This includes workerId for filtering
       fetchJobCount();
       fetchWorkerFinancials();
       fetchJobStats();
       fetchCategoryStats();
+    } else if (user?.type === 'employer') {
+      console.log('User is employer, fetching general job data');
+      fetchRecentJobs(); // General public job display
     } else {
-      console.log('User is not worker or no user:', user?.type);
+      console.log('No user or guest user, fetching minimal public data');
+      fetchRecentJobs(); // Just public job display for homepage
     }
   }, [user, fetchJobCount, fetchWorkerFinancials, fetchJobStats, fetchCategoryStats, fetchLatestJobs]);
 
@@ -322,597 +619,780 @@ function Homepage() {
     setShowJobNotification(false);
   };
 
-  const renderGrameenLinkProfile = () => {
+  const renderUserProfile = () => {
     if (!isAuthenticated) return null;
 
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-3xl mx-auto my-12 px-4"
+        className="max-w-2xl md:max-w-5xl mx-auto my-12 md:my-16 px-3 md:px-4"
       >
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-blue-100">
-          <div className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-white">
+        <div className="bg-white rounded-2xl md:rounded-3xl shadow-xl md:shadow-2xl overflow-hidden border border-gray-100">
+          <div className="relative p-4 md:p-8">
+            {/* Geometric Background Pattern - Hidden on Mobile */}
+            <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 opacity-5 hidden md:block">
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <polygon points="50,0 100,50 50,100 0,50" fill="currentColor"/>
+              </svg>
+            </div>
+            
+            <div className="relative flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+              <div className="flex items-center space-x-4 md:space-x-6">
+                <div className="relative">
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-black rounded-full flex items-center justify-center">
+                    <span className="text-xl md:text-2xl font-bold text-white">
                     {user?.name?.charAt(0)}
                   </span>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">{user?.name}</h3>
-                  <p className="text-sm text-gray-500 capitalize">{user?.type}</p>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-gray-900 rounded-full border-2 border-white"></div>
+                </div>
+                
+                <div className="flex-1">
+                  <h3 className="text-lg md:text-2xl font-light text-gray-900 tracking-wide">{user?.name}</h3>
+                  <p className="text-xs md:text-sm text-gray-500 uppercase tracking-wide md:tracking-widest font-medium">{user?.type}</p>
                   
                   {user?.type === 'worker' && (
-                    <div className="mt-2 flex items-center space-x-4">
-                      <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <Wallet className="w-4 h-4 mr-1" />
-                        {t('common.wallet')}: ₹{workerBalance.toLocaleString()}
+                    <div className="mt-3 md:mt-4 flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-6">
+                      <div className="flex items-center">
+                        <Wallet className="w-4 h-4 mr-2 text-gray-400" />
+                        <span className="text-sm text-gray-700 font-medium">₹{workerBalance.toLocaleString()}</span>
                       </div>
                       
                       {jobCount > 0 && (
-                        <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                          🎯 {jobCount} job{jobCount !== 1 ? 's' : ''} 
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-black rounded-full mr-2"></div>
+                          <span className="text-sm text-gray-700">
+                            {jobCount} jobs
                           {user.location?.state && ` in ${user.location.state}`}
+                          </span>
                         </div>
                       )}
                     </div>
                   )}
                   
                   {user?.type === 'worker' && shaktiScore !== null && (
-                    <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      {t('home.shaktiScore')}: {shaktiScore}
+                    <div className="mt-2 inline-flex items-center">
+                      <span className="text-xs text-gray-500 uppercase tracking-wide md:tracking-widest mr-2">Trust Score</span>
+                      <span className="text-base md:text-lg font-light text-gray-900">{shaktiScore}</span>
                     </div>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <button
+              
+              <div className="flex flex-row md:flex-col gap-2 md:gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   onClick={() => navigate(`/${user.type}/profile`)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex-1 md:flex-none px-4 py-3 md:px-6 bg-black text-white text-xs md:text-sm font-medium tracking-wide hover:bg-gray-800 transition-colors duration-200 touch-manipulation"
                 >
-                  {t('home.viewProfile')}
-                </button>
+                  PROFILE
+                </motion.button>
+                
                 {user.type === 'worker' && jobCount > 0 && (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={handleViewJobs}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                    className="flex-1 md:flex-none px-4 py-3 md:px-6 border border-black text-black text-xs md:text-sm font-medium tracking-wide hover:bg-black hover:text-white transition-all duration-200 touch-manipulation"
                   >
-                    🎯 View Jobs ({jobCount})
-                    {user.location?.state && (
-                      <span className="ml-1 text-xs opacity-90">in {user.location.state}</span>
-                    )}
-                  </button>
+                    JOBS ({jobCount})
+                  </motion.button>
                 )}
               </div>
             </div>
           </div>
           
           {user?.type === 'worker' && recentEarnings.length > 0 && (
-            <div className="px-6 py-4 bg-gradient-to-r from-green-50 to-blue-50 border-t">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">{t('home.recentEarnings')}</h4>
-              <div className="space-y-1">
+            <div className="px-4 py-4 md:px-8 md:py-6 bg-gray-50 border-t">
+              <h4 className="text-xs md:text-sm font-medium text-gray-700 uppercase tracking-wide md:tracking-widest mb-3 md:mb-4">Recent Activity</h4>
+              <div className="space-y-2 md:space-y-3">
                 {recentEarnings.map((earning, index) => (
-                  <div key={index} className="flex justify-between items-center text-xs">
-                    <span className="text-gray-600 truncate">{earning.description}</span>
-                    <span className="font-semibold text-green-600">+₹{earning.amount}</span>
+                  <div key={index} className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm text-gray-600 truncate pr-2">{earning.description}</span>
+                    <span className="text-xs md:text-sm font-medium text-gray-900 flex-shrink-0">+₹{earning.amount}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          
-          <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <p className="text-sm text-gray-600">
-              {user?.type === 'worker'
-                ? t('home.workerMessage')
-                : t('home.employerMessage')}
-            </p>
-          </div>
         </div>
       </motion.div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
-      {/* Enhanced Job Count Popup with Indian Design */}
-      <AnimatePresence>
-        {showJobNotification && user?.type === 'worker' && jobCount > 0 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, x: 100 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.8, x: 100 }}
-            className="fixed bottom-6 right-6 z-50 max-w-sm"
-          >
-            <div className="bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 text-white p-6 rounded-2xl shadow-2xl border-2 border-yellow-400 backdrop-blur-sm relative overflow-hidden">
-              {/* Traditional Border Pattern */}
-              <div className="absolute inset-0 border-4 border-yellow-300 rounded-2xl opacity-30"></div>
-              <div className="absolute -top-1 -left-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
-              <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
-              <div className="absolute -bottom-1 -left-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full"></div>
+    <div className="min-h-screen relative">
+      {/* Multi-layer Background with sophisticated glass-morphism */}
+      <div className="fixed inset-0 bg-gradient-to-br from-gray-50 via-white to-gray-100 -z-10"></div>
+      
+      {/* Animated Pattern Overlay */}
+      <div className="fixed inset-0 -z-5">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(0,0,0,0.02)_0%,transparent_50%)]"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(0,0,0,0.01)_0%,transparent_50%)]"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_48%,rgba(0,0,0,0.01)_49%,rgba(0,0,0,0.01)_51%,transparent_52%)]"></div>
+        <AnimatedGrid opacity={0.02} />
+        <ParticleField count={25} />
+        <NetworkLines />
+        <GeometricOverlay />
+      </div>
+
+      {/* Glass-morphism overlay sections */}
+      <div className="relative z-10 backdrop-blur-sm">
+        {/* Mobile-Optimized Job Notification */}
+        <AnimatePresence>
+          {showJobNotification && user?.type === 'worker' && jobCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 100 }}
+              className="fixed top-20 right-2 md:right-6 z-50 max-w-xs md:max-w-sm touch-manipulation"
+            >
+              <div className="bg-black/95 backdrop-blur-md text-white p-4 md:p-6 shadow-2xl relative mx-2 md:mx-0 rounded-2xl border border-white/10">
+                <button
+                  onClick={handleCloseJobNotification}
+                  className="absolute top-2 right-2 md:top-4 md:right-4 text-gray-400 hover:text-white transition-colors p-2 touch-manipulation"
+                >
+                  <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               
-              <div className="relative">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center animate-pulse border-2 border-yellow-300">
-                      <Briefcase className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-lg flex items-center">
-                        🌟 New Jobs Available!
-                      </h4>
-                      <p className="text-sm text-white/90">
-                        🎯 {stats.totalJobs} job{stats.totalJobs !== 1 ? 's' : ''} 
-                        {user.location?.state ? ` available in ${user.location.state}` : ' waiting for you'}
-                      </p>
-                    </div>
+                <div className="pr-8 md:pr-8">
+                  <h4 className="font-medium text-base md:text-lg mb-2">New Jobs</h4>
+                  <p className="text-sm text-gray-300 mb-4">
+                    {stats.totalJobs} available
+                    {user.location?.state && ` in ${user.location.state}`}
+                  </p>
+                  
+                  <div className="flex gap-2 md:gap-3">
+                    <button
+                      onClick={handleViewJobs}
+                      className="flex-1 bg-white text-black px-3 py-3 md:px-4 md:py-2 text-sm font-medium hover:bg-gray-100 transition-colors touch-manipulation rounded-xl"
+                    >
+                      VIEW ALL
+                    </button>
+                    <button
+                      onClick={handleCloseJobNotification}
+                      className="px-3 py-3 md:px-4 md:py-2 border border-gray-600 text-gray-300 text-sm font-medium hover:border-gray-400 transition-colors touch-manipulation rounded-xl"
+                    >
+                      LATER
+                    </button>
                   </div>
-                  <button
-                    onClick={handleCloseJobNotification}
-                    className="text-white/70 hover:text-white transition-colors p-1 bg-black/20 rounded-full"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleViewJobs}
-                    className="flex-1 bg-white text-orange-600 px-4 py-2.5 rounded-lg font-bold hover:bg-yellow-50 transition-colors shadow-md border-2 border-yellow-300"
-                  >
-                    View All Jobs
-                  </button>
-                  <button
-                    onClick={handleCloseJobNotification}
-                    className="px-4 py-2.5 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors backdrop-blur-sm border border-yellow-300"
-                  >
-                    Later
-                  </button>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Enhanced Hero Section with Indian Cultural Elements */}
-      <div className="relative overflow-hidden">
-        {/* Traditional Pattern Background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-600/5 to-green-600/5"></div>
-        <div className="absolute inset-0" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FF6B35' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }}></div>
-
-        {/* Floating Elements */}
-        <div className="absolute top-20 left-10 w-16 h-16 opacity-10">
-          <div className="w-full h-full bg-gradient-to-br from-orange-400 to-red-500 rounded-full animate-pulse"></div>
-        </div>
-        
-        <div className="absolute bottom-20 right-10 w-20 h-20 opacity-10">
-          <div className="w-full h-full bg-gradient-to-br from-pink-400 to-red-500 transform rotate-45"></div>
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="pt-10 pb-16 md:pt-16 md:pb-20 lg:pt-20 lg:pb-28">
-            <div className="text-center">
+        {/* Hero Section with Glass-morphism */}
+        <div className="relative overflow-hidden bg-white/30 backdrop-blur-sm">
+          {/* Floating geometric shapes */}
+          {Array.from({ length: 12 }, (_, i) => (
+            <FloatingGeometry key={i} delay={i * 0.5} />
+          ))}
+          
+          {/* Enhanced geometric background with glass effect */}
+          <div className="absolute inset-0 opacity-5">
+            <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
+              <defs>
+                <pattern id="stairs" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+                  <path d="M0,0 L20,0 L20,20 L40,20 L40,40 L60,40 L60,60 L80,60 L80,80 L100,80 L100,100 L0,100 Z" fill="black" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#stairs)" />
+            </svg>
+          </div>
+          
+          <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            <div className="pt-16 pb-16 md:pt-24 md:pb-24">
+              
+              {/* Mobile-Optimized Welcome Badge with Glass Effect */}
               <AnimatePresence>
                 {isAuthenticated ? (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="mb-8 inline-flex items-center px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full shadow-2xl border-2 border-yellow-300"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center mb-8 md:mb-12"
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-4 h-4 bg-yellow-300 rounded-full animate-pulse"></div>
-                      <span className="font-bold text-lg">
-                        🙏 Welcome back, {user.name || user.company?.name}!
-                      </span>
+                    <div className="flex flex-col sm:inline-flex sm:flex-row items-center px-4 py-3 md:px-6 bg-black/90 backdrop-blur-md text-white mx-2 sm:mx-0 rounded-2xl border border-white/10">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-white rounded-full mr-2 md:mr-3"></div>
+                        <span className="text-xs md:text-sm font-medium tracking-wide uppercase">
+                          Welcome, {user.name?.split(' ')[0] || user.company?.name}
+                        </span>
+                      </div>
                       {user?.type === 'worker' && stats.totalJobs > 0 && (
-                        <div className="ml-3 px-4 py-2 bg-white/20 rounded-full text-sm border border-yellow-300">
-                          🎯 {stats.totalJobs} job{stats.totalJobs !== 1 ? 's' : ''} 
-                          {user.location?.state && ` in ${user.location.state}`}
+                        <div className="mt-2 sm:mt-0 sm:ml-4 px-3 py-1 bg-white/90 backdrop-blur-sm text-black text-xs font-medium tracking-wide rounded-xl">
+                          {stats.totalJobs} JOBS
+                          {user.location?.state && ` IN ${user.location.state.toUpperCase()}`}
                         </div>
                       )}
                     </div>
                   </motion.div>
                 ) : (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="mb-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full shadow-lg"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center mb-8 md:mb-12"
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                      <span className="font-semibold">{t('home.welcome')}</span>
+                    <div className="flex flex-col sm:inline-flex sm:flex-row items-center px-4 py-3 md:px-6 border border-gray-300/50 mx-2 sm:mx-0 rounded-2xl bg-white/40 backdrop-blur-sm">
+                      <div className="flex items-center">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-2 md:mr-3"></div>
+                        <span className="text-xs md:text-sm font-medium tracking-wide uppercase text-gray-700">
+                          Welcome to INDUS
+                        </span>
+                      </div>
                       <button
                         onClick={() => navigate('/login')}
-                        className="ml-4 px-4 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm transition-colors"
+                        className="mt-2 sm:mt-0 sm:ml-4 px-4 py-2 md:px-3 md:py-1 bg-black/90 backdrop-blur-sm text-white text-xs font-medium tracking-wide hover:bg-gray-800 transition-colors touch-manipulation rounded-xl"
                       >
-                        {t('home.loginRegister')}
+                        GET STARTED
                       </button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Enhanced Main Title */}
+              {/* Mobile-Optimized Main Title */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="mb-8 relative"
+                className="text-center mb-12 md:mb-16"
               >
-                {/* Decorative Elements */}
-                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-8 h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
-                    <div className="w-4 h-4 bg-yellow-400 transform rotate-45"></div>
-                    <div className="w-8 h-1 bg-gradient-to-r from-red-500 to-orange-400"></div>
-                  </div>
-                </div>
-
-                <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-4">
-                  <span className="bg-gradient-to-r from-orange-600 to-orange-600 bg-clip-text text-transparent">
-                    I N D U S
-                  </span>
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
+                              <div className="relative mb-6 md:mb-8">
+                <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold text-gray-900 tracking-wide md:tracking-wider">
+                  INDUS
                 </h1>
-                <h2 className="text-2xl md:text-3xl font-semibold text-gray-700 mb-6">
-                  🌾 {t('home.tagline')} 🌾
+                <div className="absolute -bottom-1 md:-bottom-2 left-1/2 transform -translate-x-1/2 w-16 md:w-24 h-px bg-black"></div>
+              </div>
+
+                <h2 className="text-lg md:text-xl lg:text-2xl font-light text-gray-600 tracking-wide mb-6 md:mb-8 px-4 md:px-0">
+                  Digital Employment Platform
                 </h2>
-                <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                  {t('home.description')}
-                </p>
               </motion.div>
 
-              {/* Enhanced Stats Cards */}
+              {/* Mobile-Optimized Action Buttons with Glass Effect */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 max-w-5xl mx-auto"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.05, rotateY: 5 }}
-                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-orange-200 relative overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
-                  <div className="flex items-center justify-center mb-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center shadow-lg">
-                      <Briefcase className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.totalJobs}</div>
-                  <div className="text-sm text-gray-700 font-medium">{t('stats.activeJobs')}</div>
-                  {user?.type === 'worker' && stats.totalJobs > 0 && (
-                    <div className="mt-2 text-xs text-green-700 font-bold bg-green-100 rounded-full px-3 py-1">
-                      🎯 {user.location?.state ? `Available in ${user.location.state}` : 'Available now!'}
-                    </div>
-                  )}
-                </motion.div>
-
-                <motion.div
-                  whileHover={{ scale: 1.05, rotateY: 5 }}
-                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-green-200 relative overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
-                  <div className="flex items-center justify-center mb-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                      <Users className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.activeWorkers.toLocaleString()}</div>
-                  <div className="text-sm text-gray-700 font-medium">{t('stats.activeWorkers')}</div>
-                </motion.div>
-
-                <motion.div
-                  whileHover={{ scale: 1.05, rotateY: 5 }}
-                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-purple-200 relative overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-400 to-pink-500"></div>
-                  <div className="flex items-center justify-center mb-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
-                      <TrendingUp className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.successfulMatches.toLocaleString()}</div>
-                  <div className="text-sm text-gray-700 font-medium">{t('stats.successfulMatches')}</div>
-                </motion.div>
-
-                <motion.div
-                  whileHover={{ scale: 1.05, rotateY: 5 }}
-                  className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-xl border-2 border-yellow-200 relative overflow-hidden"
-                >
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-orange-500"></div>
-                  <div className="flex items-center justify-center mb-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
-                      <Star className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.averageRating}</div>
-                  <div className="text-sm text-gray-700 font-medium">{t('stats.averageRating')}</div>
-                </motion.div>
-              </motion.div>
-
-              {/* Enhanced Action Buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="flex flex-col sm:flex-row gap-8 justify-center items-center max-w-3xl mx-auto"
+                className="flex flex-col gap-4 md:gap-6 justify-center items-center max-w-lg md:max-w-4xl mx-auto mb-12 md:mb-16 px-4 md:px-0"
               >
                 <motion.button
-                  whileHover={{ 
-                    scale: 1.05, 
-                    boxShadow: "0 25px 50px rgba(59, 130, 246, 0.4)"
-                  }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   onClick={handleFindWork}
-                  className="group relative w-full sm:w-auto px-12 py-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl shadow-xl font-bold text-lg transition-all duration-300 overflow-hidden"
+                  className="group relative w-full md:w-auto px-8 py-4 md:px-12 bg-black/90 backdrop-blur-md text-white font-medium tracking-wide md:tracking-widest overflow-hidden touch-manipulation rounded-2xl border border-white/10"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-blue-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="relative flex items-center justify-center space-x-3">
-                    <Briefcase className="w-6 h-6" />
-                    <span>{user?.type === 'worker' ? t('home.findJobs') : t('home.findWork')}</span>
+                  <div className="absolute inset-0 bg-gray-800 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                  <div className="relative flex items-center justify-center space-x-2 md:space-x-3">
+                    <span className="text-sm md:text-base">
+                      {user?.type === 'worker' ? 'FIND WORK' : 'FIND WORKERS'}
+                    </span>
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
                     {user?.type === 'worker' && stats.totalJobs > 0 && (
-                      <span className="ml-2 px-2 py-1 bg-white/20 rounded-full text-sm">
-                        🎯 {stats.totalJobs}
+                      <span className="ml-1 md:ml-2 px-2 py-1 bg-white/90 backdrop-blur-sm text-black text-xs font-medium rounded-lg">
+                        {stats.totalJobs}
                       </span>
                     )}
                   </div>
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ 
-                    scale: 1.05, 
-                    boxShadow: "0 25px 50px rgba(34, 197, 94, 0.4)"
-                  }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   onClick={handlePostJob}
-                  className="group relative w-full sm:w-auto px-12 py-6 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-2xl shadow-xl font-bold text-lg transition-all duration-300 overflow-hidden"
+                  className="group relative w-full md:w-auto px-8 py-4 md:px-12 border border-black/30 text-black font-medium tracking-wide md:tracking-widest overflow-hidden touch-manipulation rounded-2xl bg-white/40 backdrop-blur-sm"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-700 to-green-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <div className="relative flex items-center justify-center space-x-3">
-                    <Users className="w-6 h-6" />
-                    <span>{user?.type === 'employer' ? t('home.postJob') : t('home.hireWorkers')}</span>
+                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                  <div className="relative flex items-center justify-center space-x-2 md:space-x-3 group-hover:text-white transition-colors duration-300">
+                    <span className="text-sm md:text-base">
+                      {user?.type === 'employer' ? 'POST JOB' : 'HIRE WORKERS'}
+                    </span>
+                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => navigate('/chat-mode')}
+                  className="group relative w-full md:w-auto px-8 py-4 md:px-12 bg-gray-900/90 backdrop-blur-md text-white font-medium tracking-wide md:tracking-widest overflow-hidden touch-manipulation rounded-2xl border border-white/10"
+                >
+                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                  <div className="relative flex items-center justify-center space-x-2 md:space-x-3">
+                    <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
+                    <span className="text-sm md:text-base">AI ASSISTANT</span>
+                    <span className="ml-1 md:ml-2 px-2 py-1 bg-white/90 backdrop-blur-sm text-black text-xs font-medium tracking-normal rounded-lg">
+                      NEW
+                    </span>
                   </div>
                 </motion.button>
               </motion.div>
+            </div>
+          </div>
+        </div>
 
-              {/* Quick Contact for Rural Users */}
-              {!isAuthenticated && (
+        {/* User Profile Section */}
+        {renderUserProfile()}
+
+        {/* Mobile-Optimized AI Assistant Highlight with Glass Effect */}
+        <div className="py-8 md:py-12 bg-white/20 backdrop-blur-sm relative overflow-hidden">
+          {/* AI Assistant Background Patterns */}
+          <div className="absolute inset-0 opacity-5">
+            <motion.div
+              className="absolute top-1/4 right-1/4 w-24 h-24"
+              animate={{
+                rotate: [0, 360],
+                scale: [1, 1.2, 1]
+              }}
+              transition={{
+                duration: 20,
+                repeat: Infinity,
+                ease: "linear"
+              }}
+            >
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <circle cx="50" cy="50" r="30" fill="none" stroke="black" strokeWidth="1" />
+                <circle cx="50" cy="50" r="15" fill="none" stroke="black" strokeWidth="0.5" />
+                <circle cx="50" cy="50" r="5" fill="black" />
+              </svg>
+            </motion.div>
+
+            <motion.div
+              className="absolute bottom-1/4 left-1/4 w-20 h-20"
+              animate={{
+                rotate: [360, 0],
+                x: [0, 15, 0]
+              }}
+              transition={{
+                duration: 15,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            >
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <rect x="25" y="25" width="50" height="50" fill="none" stroke="black" strokeWidth="1" transform="rotate(45 50 50)" />
+                <rect x="35" y="35" width="30" height="30" fill="none" stroke="black" strokeWidth="0.5" transform="rotate(45 50 50)" />
+              </svg>
+            </motion.div>
+            
+            {/* Floating AI particles */}
+            {Array.from({ length: 8 }, (_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-1 h-1 bg-black rounded-full"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                }}
+                animate={{
+                  y: [0, -20, 0],
+                  opacity: [0.2, 0.6, 0.2],
+                  scale: [1, 1.5, 1]
+                }}
+                transition={{
+                  duration: Math.random() * 5 + 4,
+                  repeat: Infinity,
+                  delay: Math.random() * 3,
+                  ease: "easeInOut"
+                }}
+              />
+            ))}
+          </div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="max-w-md md:max-w-2xl mx-auto text-center px-4 md:px-0 relative z-10"
+          >
+            <div className="p-6 md:p-8 border border-gray-200/30 bg-white/30 backdrop-blur-md relative overflow-hidden rounded-2xl">
+              {/* Inner pattern overlay */}
+              <div className="absolute inset-0 opacity-5">
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.8 }}
-                  className="mt-12 p-6 bg-white/80 backdrop-blur-sm rounded-2xl border border-white/30 max-w-md mx-auto shadow-lg"
+                  className="absolute top-2 right-2 w-8 h-8"
+                  animate={{
+                    rotate: [0, 180, 360],
+                    scale: [1, 1.1, 1]
+                  }}
+                  transition={{
+                    duration: 8,
+                    repeat: Infinity,
+                    ease: "linear"
+                  }}
                 >
-                  <div className="text-center">
-                    <Phone className="w-8 h-8 text-green-600 mx-auto mb-3" />
-                    <h3 className="font-semibold text-gray-900 mb-2">{t('support.needHelp')}</h3>
-                    <p className="text-sm text-gray-600 mb-4">{t('support.callSupport')}</p>
-                    <a
-                      href="tel:+911800123456"
-                      className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"
-                    >
-                      <Phone className="w-4 h-4 mr-2" />
-                      {t('support.phoneNumber')}
-                    </a>
-                  </div>
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <polygon points="50,10 90,50 50,90 10,50" fill="black" />
+                  </svg>
                 </motion.div>
-              )}
+              </div>
+
+              <div className="relative z-10">
+                <motion.div
+                  className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mx-auto mb-4 md:mb-6 flex items-center justify-center rounded-2xl"
+                  animate={{
+                    scale: [1, 1.05, 1]
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </motion.div>
+                <h3 className="text-lg md:text-xl font-light text-gray-900 mb-3 md:mb-4 tracking-wide">AI ASSISTANT</h3>
+                <p className="text-sm md:text-base text-gray-600 font-light leading-relaxed mb-4 md:mb-6">
+                  Instant help with jobs and platform guidance.
+                </p>
+                <button
+                  onClick={() => navigate('/chat-mode')}
+                  className="inline-flex items-center px-4 py-3 md:px-6 bg-black/90 backdrop-blur-md text-white text-sm font-medium tracking-wide md:tracking-widest hover:bg-gray-800 transition-colors touch-manipulation rounded-2xl"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  TRY AI ASSISTANT
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Mobile-Optimized Stats Grid with Glass Effect */}
+        <div className="py-8 md:py-12 bg-white/10 backdrop-blur-sm relative overflow-hidden">
+          {/* Stats Section Background Patterns */}
+          <div className="absolute inset-0 opacity-5">
+            <AnimatedGrid opacity={0.03} />
+            
+            <motion.div
+              className="absolute top-1/4 left-1/4 w-16 h-16"
+              animate={{
+                rotate: [0, 90, 180, 270, 360],
+                scale: [1, 1.1, 1]
+              }}
+              transition={{
+                duration: 25,
+                repeat: Infinity,
+                ease: "linear"
+              }}
+            >
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <rect x="10" y="10" width="80" height="80" fill="none" stroke="black" strokeWidth="1" />
+                <rect x="25" y="25" width="50" height="50" fill="none" stroke="black" strokeWidth="0.5" />
+                <rect x="40" y="40" width="20" height="20" fill="black" />
+              </svg>
+            </motion.div>
+
+            <motion.div
+              className="absolute bottom-1/4 right-1/4 w-20 h-20"
+              animate={{
+                rotate: [360, 0],
+                y: [0, -10, 0]
+              }}
+              transition={{
+                duration: 18,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+            >
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="black" strokeWidth="1" />
+                <circle cx="50" cy="50" r="25" fill="none" stroke="black" strokeWidth="0.5" />
+                <circle cx="50" cy="50" r="10" fill="black" />
+              </svg>
+            </motion.div>
+          </div>
+
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="text-center mb-10 md:mb-16"
+            >
+              <h2 className="text-2xl md:text-4xl font-light text-gray-900 tracking-wide mb-3 md:mb-4">
+                Platform Stats
+              </h2>
+              <div className="w-12 md:w-16 h-px bg-black mx-auto mb-4 md:mb-8"></div>
+              <p className="text-base md:text-xl text-gray-600 max-w-2xl mx-auto font-light px-4 md:px-0">
+                Connecting communities across India
+              </p>
+            </motion.div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+              <motion.div
+                whileHover={{ y: -2 }}
+                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              >
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                  <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.totalJobs}</h3>
+                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Active Jobs</p>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ y: -2 }}
+                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              >
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                  <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.activeWorkers}</h3>
+                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Active Workers</p>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ y: -2 }}
+                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              >
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                  <Briefcase className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.successfulMatches}</h3>
+                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Successful Matches</p>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ y: -2 }}
+                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              >
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                  <Star className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.averageRating}</h3>
+                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Average Rating</p>
+              </motion.div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* GrameenLink Profile */}
-      {renderGrameenLinkProfile()}
-
-      {/* Shakti Score Section */}
-      {user?.type === 'worker' && shaktiScore !== null && (
-        <div className="py-12 bg-gradient-to-r from-purple-500 to-indigo-600">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-                {t('home.yourShaktiScore')}
-              </h2>
-              <div className="mt-8 flex justify-center">
-                <motion.div 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                  className="bg-white rounded-full p-8 shadow-xl transform hover:scale-105 transition-transform duration-300"
-                >
-                  <div className="text-6xl font-bold text-purple-600">{shaktiScore}</div>
-                  <p className="mt-2 text-gray-600">{t('home.yourTrustScore')}</p>
-                </motion.div>
-              </div>
-              <p className="mt-4 text-xl text-white">
-                {t('home.higherScoreMessage')}
-              </p>
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-white">{t('home.jobPriority')}</h3>
-                  <p className="text-white/80">{t('home.jobPriorityDesc')}</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-white">{t('home.trustBadge')}</h3>
-                  <p className="text-white/80">{t('home.trustBadgeDesc')}</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-white">{t('home.betterPay')}</h3>
-                  <p className="text-white/80">{t('home.betterPayDesc')}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Local Matching Section with Glass Effect */}
+      <section className="py-12 md:py-20 bg-white/15 backdrop-blur-sm relative overflow-hidden">
+        {/* Local Matching Background Patterns */}
+        <div className="absolute inset-0 opacity-5">
+          <MorphingPattern />
+          
+          <motion.svg
+            className="absolute top-1/4 left-1/4 w-32 h-32"
+            viewBox="0 0 100 100"
+            animate={{
+              rotate: [0, 360],
+              scale: [1, 1.1, 1]
+            }}
+            transition={{
+              duration: 30,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          >
+            <motion.path
+              d="M50,10 L90,30 L80,70 L50,90 L20,70 L10,30 Z"
+              fill="none"
+              stroke="black"
+              strokeWidth="1"
+              animate={{
+                strokeDasharray: ["0,200", "100,200", "200,200"],
+                strokeDashoffset: [0, -50, -100]
+              }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                delay: 1.5,
+                ease: "easeInOut"
+              }}
+            />
+          </motion.svg>
         </div>
-      )}
-
-      {/* GrameenLink Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-green-50 to-blue-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 flex items-center justify-center gap-3">
-              <span>🧑‍🌾</span> {t('grameenlink.title')}
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-10 md:mb-16">
+            <h2 className="text-2xl md:text-4xl font-light text-gray-900 tracking-wide mb-3 md:mb-4">
+              Local Matching
             </h2>
-            <div className="w-24 h-1 bg-green-600 mx-auto my-4"></div>
-            <p className="text-xl text-gray-700 max-w-3xl mx-auto font-medium">
-              {t('grameenlink.subtitle')}
+            <div className="w-12 md:w-16 h-px bg-black mx-auto mb-4 md:mb-8"></div>
+            <p className="text-base md:text-xl text-gray-600 max-w-3xl mx-auto font-light px-4 md:px-0">
+              Connecting communities efficiently
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
             <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
+              whileHover={{ y: -2 }}
+              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
             >
-              <div className="text-green-600 mb-4 text-3xl">🎤</div>
-              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.voiceResumes')}</h3>
-              <p className="text-gray-600">{t('grameenlink.voiceResumesDesc')}</p>
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                <div className="text-white text-lg md:text-xl">🏘️</div>
+              </div>
+              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Hyperlocal</h3>
+              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">Village-level job matching</p>
             </motion.div>
 
             <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
+              whileHover={{ y: -2 }}
+              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
             >
-              <div className="text-green-600 mb-4 text-3xl">🏷️</div>
-              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.skillTagging')}</h3>
-              <p className="text-gray-600">{t('grameenlink.skillTaggingDesc')}</p>
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                <div className="text-white text-lg md:text-xl">🤝</div>
+              </div>
+              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Direct Connect</h3>
+              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">No middleman approach</p>
             </motion.div>
 
             <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
+              whileHover={{ y: -2 }}
+              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
             >
-              <div className="text-green-600 mb-4 text-3xl">✅</div>
-              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.localVerification')}</h3>
-              <p className="text-gray-600">{t('grameenlink.localVerificationDesc')}</p>
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                <div className="text-white text-lg md:text-xl">💼</div>
+              </div>
+              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Local Hiring</h3>
+              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">Community-based recruitment</p>
             </motion.div>
 
             <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-green-100"
+              whileHover={{ y: -2 }}
+              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
             >
-              <div className="text-green-600 mb-4 text-3xl">🌟</div>
-              <h3 className="text-xl font-semibold mb-2">{t('grameenlink.localPride')}</h3>
-              <p className="text-gray-600">{t('grameenlink.localPrideDesc')}</p>
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
+                <div className="text-white text-lg md:text-xl">🌱</div>
+              </div>
+              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Growth</h3>
+              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">Economic development focus</p>
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* ShramSaathi Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-50 to-green-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 flex items-center justify-center gap-3">
-              <span>📢</span> {t('shramSaathi.title')}
-            </h2>
-            <div className="w-24 h-1 bg-blue-600 mx-auto my-4"></div>
-            <p className="text-xl text-gray-700 max-w-3xl mx-auto font-medium">
-              {t('shramSaathi.subtitle')}
-            </p>
-          </div>
+      {/* Mobile-Optimized Recent Jobs Section with Glass Effect */}
+      <div className="py-12 md:py-20 bg-white/10 backdrop-blur-sm relative overflow-hidden">
+        {/* Recent Jobs Background Patterns */}
+        <div className="absolute inset-0 opacity-5">
+          <WavePattern />
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <motion.div
+            className="absolute top-1/4 right-1/4 w-28 h-28"
+            animate={{
+              rotate: [0, 360],
+              scale: [1, 1.1, 1],
+              x: [0, 10, 0]
+            }}
+            transition={{
+              duration: 25,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          >
+            <svg viewBox="0 0 100 100" className="w-full h-full">
+              <rect x="15" y="15" width="70" height="70" fill="none" stroke="black" strokeWidth="1" />
+              <rect x="25" y="25" width="50" height="50" fill="none" stroke="black" strokeWidth="0.5" />
+              <rect x="35" y="35" width="30" height="30" fill="none" stroke="black" strokeWidth="0.5" />
+              <rect x="42" y="42" width="16" height="16" fill="black" />
+            </svg>
+          </motion.div>
+          
+          <motion.div
+            className="absolute bottom-1/4 left-1/4 w-24 h-24"
+            animate={{
+              rotate: [360, 0],
+              y: [0, -15, 0],
+              scale: [1, 1.15, 1]
+            }}
+            transition={{
+              duration: 20,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            <svg viewBox="0 0 100 100" className="w-full h-full">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="black" strokeWidth="0.5" />
+              <circle cx="50" cy="50" r="30" fill="none" stroke="black" strokeWidth="1" />
+              <circle cx="50" cy="50" r="15" fill="none" stroke="black" strokeWidth="0.5" />
+              <circle cx="50" cy="50" r="5" fill="black" />
+              <rect x="47" y="5" width="6" height="90" fill="none" stroke="black" strokeWidth="0.5" />
+              <rect x="5" y="47" width="90" height="6" fill="none" stroke="black" strokeWidth="0.5" />
+            </svg>
+          </motion.div>
+          
+          {/* Job cards floating pattern */}
+          {Array.from({ length: 6 }, (_, i) => (
             <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
-            >
-              <div className="text-blue-600 mb-4 text-3xl">🏘️</div>
-              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.hyperlocalMatching')}</h3>
-              <p className="text-gray-600">{t('shramSaathi.hyperlocalMatchingDesc')}</p>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
-            >
-              <div className="text-blue-600 mb-4 text-3xl">🤝</div>
-              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.directConnection')}</h3>
-              <p className="text-gray-600">{t('shramSaathi.directConnectionDesc')}</p>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
-            >
-              <div className="text-blue-600 mb-4 text-3xl">💼</div>
-              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.localHiring')}</h3>
-              <p className="text-gray-600">{t('shramSaathi.localHiringDesc')}</p>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="bg-white p-6 rounded-lg shadow-sm border border-blue-100"
-            >
-              <div className="text-blue-600 mb-4 text-3xl">🌱</div>
-              <h3 className="text-xl font-semibold mb-2">{t('shramSaathi.communityGrowth')}</h3>
-              <p className="text-gray-600">{t('shramSaathi.communityGrowthDesc')}</p>
-            </motion.div>
-          </div>
+              key={i}
+              className="absolute w-4 h-3 bg-black opacity-20"
+              style={{
+                left: `${20 + (i * 12)}%`,
+                top: `${30 + Math.sin(i) * 20}%`,
+              }}
+              animate={{
+                y: [0, -10, 0],
+                x: [0, 5, 0],
+                opacity: [0.1, 0.3, 0.1]
+              }}
+              transition={{
+                duration: Math.random() * 4 + 3,
+                repeat: Infinity,
+                delay: i * 0.5,
+                ease: "easeInOut"
+              }}
+            />
+          ))}
         </div>
-      </section>
-
-      {/* Recent Jobs Section */}
-      <div className="py-12 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-              {t('recentJobs.title')}
+        
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-10 md:mb-16">
+            <h2 className="text-2xl md:text-4xl font-light text-gray-900 tracking-wide mb-3 md:mb-4">
+              Recent Jobs
             </h2>
-            <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-              {t('recentJobs.subtitle')}
+            <div className="w-12 md:w-16 h-px bg-black mx-auto mb-4 md:mb-8"></div>
+            <p className="text-base md:text-xl text-gray-600 max-w-2xl mx-auto font-light px-4 md:px-0">
+              Latest opportunities from trusted employers
             </p>
           </div>
 
           {loading ? (
-            <div className="mt-10 flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+            <div className="flex justify-center">
+              <div className="w-6 h-6 md:w-8 md:h-8 border border-gray-300 border-t-black rounded-full animate-spin"></div>
             </div>
           ) : recentJobs.length > 0 ? (
-            <div className="mt-10 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {recentJobs.map((job) => (
                 <motion.div
                   key={job._id}
-                  whileHover={{ scale: 1.02 }}
-                  className="bg-white overflow-hidden shadow rounded-lg"
+                  whileHover={{ y: -2 }}
+                  className="bg-white/40 backdrop-blur-sm border border-gray-100/30 shadow-sm group touch-manipulation rounded-2xl"
                 >
-                  <div className="px-4 py-5 sm:p-6">
-                    <h3 className="text-lg font-medium text-gray-900">{job.title}</h3>
-                    <p className="mt-1 text-sm text-gray-500">{job.companyName || job.company}</p>
-                    <div className="mt-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {job.location?.city ? `${job.location.city}, ${job.location.state}` : 'Location not specified'}
-                      </span>
-                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        ₹{job.salary?.toLocaleString() || 'Salary not specified'}
-                      </span>
+                  <div className="p-4 md:p-8">
+                    <h3 className="text-lg md:text-xl font-medium text-gray-900 mb-1 md:mb-2 tracking-wide line-clamp-2">{job.title}</h3>
+                    <p className="text-xs md:text-sm text-gray-500 uppercase tracking-wide md:tracking-widest mb-4 md:mb-6 truncate">{job.companyName || job.company}</p>
+                    
+                    <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
+                      <div className="flex items-center text-xs md:text-sm text-gray-600">
+                        <MapPin className="w-3 h-3 md:w-4 md:h-4 mr-2 flex-shrink-0" />
+                        <span className="truncate">{job.location?.city ? `${job.location.city}, ${job.location.state}` : 'Remote'}</span>
+                      </div>
+                      <div className="flex items-center text-xs md:text-sm text-gray-600">
+                        <Wallet className="w-3 h-3 md:w-4 md:h-4 mr-2 flex-shrink-0" />
+                        <span>₹{job.salary?.toLocaleString() || 'Negotiable'}</span>
+                      </div>
                     </div>
-                    <div className="mt-4">
-                      <button
-                        onClick={() => {
-                          navigate(`/jobs/${job._id}`);
-                        }}
-                        className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                      >
-                        {t('recentJobs.viewDetails')}
-                      </button>
-                    </div>
+                    
+                    <button
+                      onClick={() => navigate(`/jobs/${job._id}`)}
+                      className="w-full bg-black/90 backdrop-blur-sm text-white py-3 md:py-3 text-xs md:text-sm font-medium tracking-wide md:tracking-widest hover:bg-gray-800 transition-colors group-hover:bg-gray-800 touch-manipulation rounded-2xl"
+                    >
+                      VIEW DETAILS
+                    </button>
                   </div>
                 </motion.div>
               ))}
             </div>
           ) : (
-            <div className="mt-10 text-center">
-              <p className="text-gray-500">{t('recentJobs.noJobs')}</p>
+            <div className="text-center px-4 md:px-0">
+              <p className="text-sm md:text-base text-gray-500 font-light">No jobs available at the moment</p>
             </div>
           )}
         </div>

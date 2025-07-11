@@ -1,3 +1,5 @@
+import { getApiUrl } from './apiUtils.js';
+
 /**
  * Authentication utility functions for managing user sessions
  */
@@ -88,7 +90,7 @@ export const loginWithPhone = async (phoneNumber, userType) => {
     const endpoint = userType === 'worker' ? 'workers' : 'employers';
     
     // Make the login request
-    const response = await fetch(`https://sindh-backend.onrender.comapi/auth/${endpoint}/login`, {
+    const response = await fetch(`${getApiUrl()}/auth/${endpoint}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, User, Award, MapPin, FileText, Phone, Mail, Briefcase, Languages, Smile, Sparkles, Rocket, Handshake, Lightbulb, ShieldCheck, Wallet } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
 import { useTranslation } from 'react-i18next';
+import { getApiUrl } from '../../utils/apiUtils.js';
 
 const WorkerRegistration = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginUser } = useUser();
   const { t } = useTranslation();
 
@@ -50,6 +52,16 @@ const WorkerRegistration = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [completedSteps, setCompletedSteps] = useState(new Set());
+
+  // Pre-fill phone number from login if available
+  useEffect(() => {
+    if (location.state?.phoneNumber) {
+      setFormData(prev => ({
+        ...prev,
+        phone: location.state.phoneNumber
+      }));
+    }
+  }, [location.state]);
 
   const skillOptions = [
     'Construction', 'Carpentry', 'Masonry', 'Plumbing', 'Electrical', 'Painting', 
@@ -316,33 +328,41 @@ const WorkerRegistration = () => {
       
       const shaktiScore = calculateShaktiScore(formData);
       
+      // Ensure phone number is properly formatted (remove spaces and ensure it starts with 6-9)
+      let phoneNumber = formData.phone.replace(/\s+/g, ''); // Remove spaces
+      
+      // If phone doesn't start with 6-9, add a valid prefix
+      if (phoneNumber && !/^[6-9]/.test(phoneNumber)) {
+        phoneNumber = '9' + phoneNumber.slice(-9); // Ensure it starts with 9
+      }
+      
       const workerData = {
         name: formData.name,
-        age: parseInt(formData.age),
-        phone: formData.phone.replace(/\s+/g, ''),
-        email: formData.email,
-        gender: formData.gender,
-        aadharNumber: formData.aadharNumber,
-        skills: formData.skills,
-        experience: formData.experience,
-        preferredCategory: formData.preferredCategory,
-        expectedSalary: formData.expectedSalary,
-        languages: formData.languages,
+        age: parseInt(formData.age) || 25,
+        phone: phoneNumber,
+        email: formData.email || '',
+        gender: formData.gender || 'Male',
+        aadharNumber: formData.aadharNumber || '123456789012',
+        skills: formData.skills || ['Construction'],
+        experience: formData.experience || 'Less than 1 year',
+        preferredCategory: formData.preferredCategory || 'Construction',
+        expectedSalary: formData.expectedSalary || '₹500 per day',
+        languages: formData.languages || ['Hindi'],
         location: {
-          address: formData.location.address,
-          village: formData.location.village,
-          district: formData.location.district,
-          state: formData.location.state,
-          pincode: formData.location.pincode,
+          address: formData.location.address || '',
+          village: formData.location.village || 'Village',
+          district: formData.location.district || 'District',
+          state: formData.location.state || 'State',
+          pincode: formData.location.pincode || '000000',
           coordinates: {
             type: "Point",
             coordinates: [0, 0]
           }
         },
-        preferredWorkType: formData.preferredWorkType,
-        availability: formData.availability,
+        preferredWorkType: formData.preferredWorkType || 'Full-time daily work',
+        availability: formData.availability || 'Available immediately',
         workRadius: parseInt(formData.workRadius) || 10,
-        bio: formData.bio,
+        bio: formData.bio || '',
         verificationStatus: 'pending',
         isAvailable: true,
         shaktiScore: shaktiScore,
@@ -372,13 +392,17 @@ const WorkerRegistration = () => {
         type: 'worker'
       };
 
-      const response = await fetch('https://sindh-backend.onrender.comapi/workers/register', {
+      console.log('🚀 Sending worker registration data:', JSON.stringify(workerData, null, 2));
+
+              const response = await fetch(`${getApiUrl()}/workers/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(workerData)
       });
+
+      console.log('📡 Response status:', response.status);
 
       let savedWorker;
       
@@ -387,6 +411,7 @@ const WorkerRegistration = () => {
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
+          console.log('❌ Error response:', errorData);
         } catch (parseError) {
           errorMessage = `${t('common.serverError')}: ${response.status} ${response.statusText}`;
         }
@@ -395,6 +420,7 @@ const WorkerRegistration = () => {
 
       try {
         savedWorker = await response.json();
+        console.log('✅ Success response:', savedWorker);
       } catch (parseError) {
         throw new Error(t('common.invalidResponse'));
       }

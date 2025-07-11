@@ -14,15 +14,21 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     const loadUserData = () => {
       try {
+        console.log('🔍 UserContext: Loading user data from localStorage');
         const userData = getCurrentUser();
+        console.log('🔍 UserContext: Retrieved user data:', userData);
+        
         if (userData) {
           setUser(userData);
-          console.log('User loaded from localStorage:', userData.type);
+          console.log('✅ UserContext: User loaded successfully:', userData.type, userData.name);
+        } else {
+          console.log('ℹ️ UserContext: No user data found in localStorage');
         }
       } catch (error) {
-        console.error('Failed to load user from localStorage:', error);
+        console.error('❌ UserContext: Failed to load user from localStorage:', error);
       } finally {
         setIsLoadingUser(false);
+        console.log('✅ UserContext: Finished loading user, isLoadingUser set to false');
       }
     };
     

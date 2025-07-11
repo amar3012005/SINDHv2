@@ -11,6 +11,7 @@ import {
   XCircle
 } from 'lucide-react';
 import PaymentModal from './PaymentModal';
+import { getApiUrl } from '../../utils/apiUtils.js';
 
 const JobApplicationManager = ({ jobId }) => {
   const [applications, setApplications] = useState([]);
@@ -24,7 +25,7 @@ const JobApplicationManager = ({ jobId }) => {
 
   const fetchApplications = async () => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/job/${jobId}`);
+      const response = await fetch(`${getApiUrl()}/job-applications/job/${jobId}`);
       if (response.ok) {
         const data = await response.json();
         setApplications(data.data || []);
@@ -38,7 +39,7 @@ const JobApplicationManager = ({ jobId }) => {
 
   const updateApplicationStatus = async (applicationId, status) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/status`, {
+      const response = await fetch(`${getApiUrl()}/job-applications/${applicationId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

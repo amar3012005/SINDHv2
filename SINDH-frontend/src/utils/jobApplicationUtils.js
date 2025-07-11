@@ -1,3 +1,5 @@
+import { getApiUrl } from './apiUtils.js';
+
 /**
  * Job Applications utility to track applied jobs in localStorage
  */
@@ -239,7 +241,7 @@ export const updateApplicationStatus = async (jobId, status, additionalData = {}
     
     // First update status in backend
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${jobId}/status`, {
+      const response = await fetch(`${getApiUrl()}/job-applications/${jobId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +255,7 @@ export const updateApplicationStatus = async (jobId, status, additionalData = {}
 
       // If it's a completion request, use the complete endpoint
       if (status === 'completed') {
-        const completeResponse = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${jobId}/complete`, {
+        const completeResponse = await fetch(`${getApiUrl()}/job-applications/${jobId}/complete`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -335,7 +337,7 @@ export const clearUserJobData = (userId) => {
  */
 export const fetchCurrentJobs = async (workerId) => {
   try {
-    const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/worker/${workerId}/current`);
+    const response = await fetch(`${getApiUrl()}/job-applications/worker/${workerId}/current`);
     if (!response.ok) {
       throw new Error('Failed to fetch current jobs');
     }
@@ -373,7 +375,7 @@ export const fetchCurrentJobs = async (workerId) => {
  */
 export const fetchPastJobs = async (workerId) => {
   try {
-    const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/worker/${workerId}/past`);
+    const response = await fetch(`${getApiUrl()}/job-applications/worker/${workerId}/past`);
     if (!response.ok) {
       throw new Error('Failed to fetch past jobs');
     }

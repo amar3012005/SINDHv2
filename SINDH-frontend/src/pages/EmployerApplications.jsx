@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { getApiUrl } from '../utils/apiUtils.js';
 
 const EmployerApplications = () => {
   const [applications, setApplications] = useState([]);
@@ -18,7 +19,7 @@ const EmployerApplications = () => {
 
   const fetchApplications = async (id) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/employer/${id}`);
+      const response = await fetch(`${getApiUrl()}/job-applications/employer/${id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch applications');
       }
@@ -34,7 +35,7 @@ const EmployerApplications = () => {
 
   const handleStatusUpdate = async (applicationId, newStatus) => {
     try {
-      const response = await fetch(`https://sindh-backend.onrender.comapi/job-applications/${applicationId}/status`, {
+      const response = await fetch(`${getApiUrl()}/job-applications/${applicationId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

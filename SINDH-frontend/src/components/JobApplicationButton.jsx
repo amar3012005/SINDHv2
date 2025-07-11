@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { getApiUrl } from '../utils/apiUtils.js';
 
 const JobApplicationButton = ({ jobId, workerId, onApplicationSubmit }) => {
   const [isApplied, setIsApplied] = useState(false);
@@ -9,7 +10,7 @@ const JobApplicationButton = ({ jobId, workerId, onApplicationSubmit }) => {
   const handleApply = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('https://sindh-backend.onrender.comapi/job-applications/apply', {
+      const response = await fetch(`${getApiUrl()}/job-applications/apply`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

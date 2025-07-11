@@ -14,6 +14,34 @@ const app = express();
 // Use Render's dynamic port or fallback to 10000 for local development
 const PORT = process.env.PORT || 10000;
 
+// Dynamic CORS configuration based on environment
+const getCorsOrigins = () => {
+  const origins = [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'http://localhost:5173',
+    'http://localhost:8080', // For Capacitor development
+    'capacitor://localhost', // For Capacitor iOS
+    'ionic://localhost' // For Capacitor Android
+  ];
+  
+  // Add production origins
+  if (process.env.NODE_ENV === 'production') {
+    origins.push(
+      'https://splendid-travesseiro-45ebea.netlify.app',
+      'https://sindh-frontend.netlify.app',
+      'https://sindh-app.netlify.app'
+    );
+  }
+  
+  // Add custom origins from environment variables
+  if (process.env.ALLOWED_ORIGINS) {
+    origins.push(...process.env.ALLOWED_ORIGINS.split(','));
+  }
+  
+  return origins;
+};
+
 // Initialize server with database connection
 const initializeServer = async () => {
   try {
@@ -22,7 +50,7 @@ const initializeServer = async () => {
 
     // CORS configuration - Allow frontend connections
     app.use(cors({
-      origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'https://splendid-travesseiro-45ebea.netlify.app'],
+      origin: getCorsOrigins(),
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
       allowedHeaders: ['Content-Type', 'Authorization', 'User-Type', 'User-ID']
@@ -38,7 +66,9 @@ const initializeServer = async () => {
         services: {
           database: 'connected',
           server: 'running'
-        }
+        },
+        environment: process.env.NODE_ENV || 'development',
+        corsOrigins: getCorsOrigins()
       });
     });
 
@@ -60,6 +90,7 @@ const initializeServer = async () => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Server running on port ${PORT}`);
       console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🔗 Allowed CORS origins:`, getCorsOrigins());
       
       if (process.env.NODE_ENV === 'production') {
         console.log(`📡 API available at https://sindh-backend.onrender.com/api`);
