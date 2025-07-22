@@ -4,6 +4,13 @@ const Worker = require('../models/Worker');
 const JobMatchingService = require('../services/JobMatchingService');
 const JobApplication = require('../models/JobApplication');
 const logger = require('../config/logger');
+const { 
+  AppError, 
+  ValidationError, 
+  NotFoundError, 
+  AuthenticationError,
+  asyncHandler 
+} = require('../middleware/errorHandler');
 
 // Test endpoint to confirm backend connectivity
 router.post('/initiate-registration', async (req, res) => {
@@ -17,442 +24,478 @@ router.post('/initiate-registration', async (req, res) => {
 });
 
 // Register a new worker
-router.post('/register', async (req, res) => {
+router.post('/register', asyncHandler(async (req, res) => {
+  console.log('🎯 /register endpoint hit');
   logger.info('Worker registration request');
-  try {
-    const worker = new Worker(req.body);
-    await worker.validate();
-    await worker.save();
-    logger.info(`Worker registered successfully: ${worker.name}`);
-    res.status(201).json({ 
-      success: true,
-      message: 'Worker registered successfully',
+  
+  console.log('📝 Request body received:', JSON.stringify(req.body, null, 2));
+  const { name, age, phone, email, gender, aadharNumber, skills, experience, preferredCategory, expectedSalary, languages, location, preferredWorkType, availability, workRadius, bio } = req.body;
+
+  console.log('🔍 Checking for existing worker with phone:', phone);
+  let worker = await Worker.findOne({ phone });
+  if (worker) {
+    console.log('❌ Worker already exists with phone:', phone);
+    logger.warn(`Worker already exists with phone: ${phone}`);
+    throw new ValidationError('Worker already exists with this phone number');
+  }
+  console.log('✅ No existing worker found, proceeding with registration');
+
+  // Format location data
+  const formattedLocation = {
+    address: location?.address || '',
+    village: location?.village || '',
+    district: location?.district || '',
+    state: location?.state || '',
+    pincode: location?.pincode || '',
+    coordinates: {
+      type: "Point",
+      coordinates: [0, 0]
+    }
+  };
+
+  // Calculate ShaktiScore
+  const calculateShaktiScore = (data) => {
+    let score = 0;
+    
+    // Basic Information (25 points)
+    if (data.name) score += 5;
+    if (data.phone) score += 5;
+    if (data.email) score += 3;
+    if (data.age >= 18 && data.age <= 65) score += 7;
+    if (data.gender) score += 5;
+
+    // Skills & Experience (30 points)
+    if (data.skills?.length > 0) score += 10;
+    if (data.skills?.length >= 3) score += 5; // Bonus for multiple skills
+    if (data.experience) score += 8;
+    if (data.expectedSalary) score += 4;
+    if (data.preferredCategory) score += 3;
+
+    // Languages (15 points)
+    if (data.languages?.length > 0) score += 8;
+    if (data.languages?.length >= 2) score += 4; // Bonus for multilingual
+    if (data.languages?.includes('English')) score += 3; // English bonus
+
+    // Location (15 points)
+    if (data.location?.village) score += 4;
+    if (data.location?.district) score += 4;
+    if (data.location?.state) score += 4;
+    if (data.location?.pincode) score += 3;
+
+    // Work Preferences (10 points)
+    if (data.availability) score += 3;
+    if (data.preferredWorkType) score += 3;
+    if (data.workRadius) score += 2;
+    if (data.bio && data.bio.length > 50) score += 2;
+
+    // Verification (5 points)
+    if (data.aadharNumber && data.aadharNumber.length === 12) score += 5;
+
+    return Math.min(score, 100); // Cap at 100
+  };
+
+  const shaktiScore = calculateShaktiScore({
+    name, age, phone, email, gender, aadharNumber, skills, experience, 
+    preferredCategory, expectedSalary, languages, location: formattedLocation,
+    preferredWorkType, availability, workRadius, bio
+  });
+
+  worker = new Worker({
+    name,
+    age: parseInt(age) || 25,
+    phone,
+    email: email || '',
+    gender: gender || 'Male',
+    aadharNumber: aadharNumber || '123456789012',
+    skills: skills || ['Construction'],
+    experience: experience || 'Less than 1 year',
+    preferredCategory: preferredCategory || 'Construction',
+    expectedSalary: expectedSalary || '₹500 per day',
+    languages: languages || ['Hindi'],
+    location: formattedLocation,
+    preferredWorkType: preferredWorkType || 'Full-time daily work',
+    availability: availability || 'Available immediately',
+    workRadius: parseInt(workRadius) || 10,
+    bio: bio || '',
+    verificationStatus: 'pending',
+    isAvailable: true,
+    shaktiScore: shaktiScore,
+    rating: { average: 0, count: 0, reviews: [] },
+    registrationDate: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+    isLoggedIn: 1,
+    profileCompletionPercentage: 100, // Assuming all required fields are filled
+    documents: [],
+    workHistory: [],
+    activeJobs: 0,
+    completedJobs: 0,
+    emailNotifications: true,
+    smsNotifications: true,
+    profilePicture: '',
+    bankDetails: {
+      accountNumber: '',
+      ifscCode: '',
+      bankName: '',
+      accountHolderName: ''
+    },
+    emergencyContact: {
+      name: '',
+      phone: '',
+      relation: ''
+    },
+    type: 'worker'
+  });
+
+  console.log('🔧 Creating worker object with data:', JSON.stringify(worker, null, 2));
+  await worker.validate();
+  console.log('✅ Validation passed');
+  await worker.save();
+  console.log('💾 Worker saved to database');
+  logger.info(`Worker registered successfully: ${worker.name}`);
+  console.log('🎉 Worker created:', worker);
+
+  const responseData = {
+    success: true,
+    message: 'Worker registered successfully',
+    worker: {
+      ...worker.toObject(),
+      id: worker._id,
+      _id: worker._id,
+      type: 'worker',
+      isLoggedIn: 1
+    }
+  };
+
+  res.status(201).json(responseData);
+}));
+
+// Get all workers
+router.get('/', asyncHandler(async (req, res) => {
+  const workers = await Worker.find({});
+  res.json(workers);
+}));
+
+// Get worker by ID
+router.get('/:id', asyncHandler(async (req, res) => {
+  const worker = await Worker.findById(req.params.id);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
+  }
+  res.json(worker);
+}));
+
+// Update worker
+router.put('/:id', asyncHandler(async (req, res) => {
+  const worker = await Worker.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  );
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
+  }
+  logger.info(`Worker profile updated: ${worker.name}`);
+  res.json(worker);
+}));
+
+// Delete worker
+router.delete('/:id', asyncHandler(async (req, res) => {
+  const worker = await Worker.findByIdAndDelete(req.params.id);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
+  }
+  logger.info(`Worker deleted: ${worker.name}`);
+  res.json({ message: 'Worker deleted successfully' });
+}));
+
+// Get matching jobs for a worker
+router.get('/:id/jobs', asyncHandler(async (req, res) => {
+  const worker = await Worker.findById(req.params.id);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
+  }
+  
+  logger.info(`Finding matching jobs for worker: ${worker.name}`);
+  const matchingJobs = await JobMatchingService.findMatchingJobs(worker);
+  res.json(matchingJobs);
+}));
+
+// Update worker availability
+router.patch('/:id/availability', asyncHandler(async (req, res) => {
+  const worker = await Worker.findById(req.params.id);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
+  }
+  
+  worker.isAvailable = req.body.isAvailable;
+  await worker.save();
+  logger.info(`Worker availability updated for ${worker.name}`);
+  res.json(worker);
+}));
+
+// Update work radius
+router.patch('/:id/work-radius', asyncHandler(async (req, res) => {
+  const worker = await Worker.findById(req.params.id);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
+  }
+  
+  worker.workRadius = req.body.workRadius;
+  await worker.save();
+  logger.info(`Worker work radius updated for ${worker.name}`);
+  res.json(worker);
+}));
+
+// Get worker profile with job history
+router.get('/:id/profile', asyncHandler(async (req, res) => {
+  const worker = await Worker.findById(req.params.id);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
+  }
+
+  const jobApplications = await JobApplication.find({ worker: worker._id })
+    .populate('job')
+    .populate('employer', 'company.name')
+    .sort({ updatedAt: -1 });
+
+  const currentJobs = jobApplications.filter(app => 
+    ['pending', 'accepted'].includes(app.status)
+  );
+  const pastJobs = jobApplications.filter(app => 
+    app.status === 'completed'
+  );
+
+  res.json({
+    worker: {
+      ...worker.toObject(),
+      jobHistory: {
+        current: currentJobs,
+        past: pastJobs
+      }
+    }
+  });
+}));
+
+// Worker login
+router.post('/login', asyncHandler(async (req, res) => {
+  const { phone } = req.body;
+
+  if (!phone) {
+    throw new ValidationError('Phone number is required');
+  }
+
+  const worker = await Worker.findOne({ phone });
+  
+  if (!worker) {
+    throw new NotFoundError('Worker not found. Please register first.');
+  }
+  
+  worker.lastLogin = new Date();
+  worker.isLoggedIn = 1;
+  await worker.save();
+
+  logger.info(`Worker login successful: ${worker.name}`);
+  res.json({
+    success: true,
+    message: 'Login successful',
+    data: {
       worker: {
         ...worker.toObject(),
         id: worker._id,
-        _id: worker._id,
-        type: 'worker',
-        isLoggedIn: 1
+        type: 'worker'
       }
-    });
-  } catch (error) {
-    logger.error('Worker registration failed', { error: error.message, stack: error.stack });
-    if (error.code === 11000) {
-      res.status(409).json({ success: false, message: 'Phone number already registered' });
-    } else if (error.name === 'ValidationError') {
-      res.status(400).json({ success: false, message: 'Invalid data provided' });
-    } else {
-      res.status(500).json({ success: false, message: 'Internal server error' });
     }
-  }
-});
-
-// Get all workers
-router.get('/', async (req, res) => {
-  try {
-    const workers = await Worker.find({});
-    res.json(workers);
-  } catch (error) {
-    logger.error('Error fetching workers', { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get worker by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const worker = await Worker.findById(req.params.id);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    res.json(worker);
-  } catch (error) {
-    logger.error(`Error fetching worker by ID: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Update worker
-router.put('/:id', async (req, res) => {
-  try {
-    const worker = await Worker.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    logger.info(`Worker profile updated: ${worker.name}`);
-    res.json(worker);
-  } catch (error) {
-    logger.error(`Error updating worker: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Delete worker
-router.delete('/:id', async (req, res) => {
-  try {
-    const worker = await Worker.findByIdAndDelete(req.params.id);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    logger.info(`Worker deleted: ${worker.name}`);
-    res.json({ message: 'Worker deleted successfully' });
-  } catch (error) {
-    logger.error(`Error deleting worker: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get matching jobs for a worker
-router.get('/:id/jobs', async (req, res) => {
-  try {
-    const worker = await Worker.findById(req.params.id);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    
-    logger.info(`Finding matching jobs for worker: ${worker.name}`);
-    const matchingJobs = await JobMatchingService.findMatchingJobs(worker);
-    res.json(matchingJobs);
-  } catch (error) {
-    logger.error(`Error finding matching jobs for worker: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Update worker availability
-router.patch('/:id/availability', async (req, res) => {
-  try {
-    const worker = await Worker.findById(req.params.id);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    
-    worker.isAvailable = req.body.isAvailable;
-    await worker.save();
-    logger.info(`Worker availability updated for ${worker.name}`);
-    res.json(worker);
-  } catch (error) {
-    logger.error(`Error updating worker availability: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Update work radius
-router.patch('/:id/work-radius', async (req, res) => {
-  try {
-    const worker = await Worker.findById(req.params.id);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    
-    worker.workRadius = req.body.workRadius;
-    await worker.save();
-    logger.info(`Worker work radius updated for ${worker.name}`);
-    res.json(worker);
-  } catch (error) {
-    logger.error(`Error updating worker work radius: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Get worker profile with job history
-router.get('/:id/profile', async (req, res) => {
-  try {
-    const worker = await Worker.findById(req.params.id);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-
-    const jobApplications = await JobApplication.find({ worker: worker._id })
-      .populate('job')
-      .populate('employer', 'company.name')
-      .sort({ updatedAt: -1 });
-
-    const currentJobs = jobApplications.filter(app => 
-      ['pending', 'accepted'].includes(app.status)
-    );
-    const pastJobs = jobApplications.filter(app => 
-      app.status === 'completed'
-    );
-
-    res.json({
-      worker: {
-        ...worker.toObject(),
-        jobHistory: {
-          current: currentJobs,
-          past: pastJobs
-        }
-      }
-    });
-  } catch (error) {
-    logger.error(`Error fetching worker profile: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Worker login
-router.post('/login', async (req, res) => {
-  try {
-    const { phone } = req.body;
-
-    if (!phone) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Phone number is required' 
-      });
-    }
-
-    const worker = await Worker.findOne({ phone });
-    
-    if (!worker) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Worker not found. Please register first.' 
-      });
-    }
-    
-    worker.lastLogin = new Date();
-    worker.isLoggedIn = 1;
-    await worker.save();
-
-    logger.info(`Worker login successful: ${worker.name}`);
-    res.json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        worker: {
-          ...worker.toObject(),
-          id: worker._id,
-          type: 'worker'
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Worker login failed', { error: error.message, stack: error.stack });
-    res.status(500).json({ 
-      success: false,
-      message: 'Login failed. Please try again.',
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
-});
+  });
+}));
 
 // Get worker balance and earnings
-router.get('/:id/balance', async (req, res) => {
-  try {
-    const worker = await Worker.findById(req.params.id).select('balance earnings name');
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    
-    res.json({
-      balance: worker.balance || 0,
-      earnings: worker.earnings || []
-    });
-  } catch (error) {
-    logger.error(`Error fetching worker balance: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
+router.get('/:id/balance', asyncHandler(async (req, res) => {
+  const worker = await Worker.findById(req.params.id).select('balance earnings name');
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
   }
-});
+  
+  res.json({
+    balance: worker.balance || 0,
+    earnings: worker.earnings || []
+  });
+}));
 
 // Manually process payment for completed job
-router.post('/:workerId/process-payment/:applicationId', async (req, res) => {
-  try {
-    const { amount } = req.body;
-    
-    const worker = await Worker.findById(req.params.workerId);
-    if (worker) {
-      worker.balance += amount;
-      worker.earnings.push({
-        jobId: application.job._id,
-        amount: amount,
-        description: `Payment for: ${application.job.title}`,
-        date: new Date()
-      });
-      await worker.save();
-    }
-    
-    application.paymentStatus = 'paid';
-    application.paymentAmount = amount;
-    application.paymentDate = new Date();
-    await application.save();
-    logger.info(`Payment processed for worker: ${worker.name}`);
-  } catch (error) {
-    logger.error('Error processing payment', { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
+router.post('/:workerId/process-payment/:applicationId', asyncHandler(async (req, res) => {
+  const { amount } = req.body;
+  
+  const worker = await Worker.findById(req.params.workerId);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
   }
-});
+  
+  const application = await JobApplication.findById(req.params.applicationId);
+  if (!application) {
+    throw new NotFoundError('Job application not found');
+  }
+  
+  worker.balance += amount;
+  worker.earnings.push({
+    jobId: application.job._id,
+    amount: amount,
+    description: `Payment for: ${application.job.title}`,
+    date: new Date()
+  });
+  await worker.save();
+  
+  application.paymentStatus = 'paid';
+  application.paymentAmount = amount;
+  application.paymentDate = new Date();
+  await application.save();
+  
+  logger.info(`Payment processed for worker: ${worker.name}`);
+  res.json({
+    success: true,
+    message: 'Payment processed successfully',
+    newBalance: worker.balance
+  });
+}));
 
 // Recalculate and sync worker balance based on completed jobs
-router.post('/:id/sync-balance', async (req, res) => {
-  try {
-    const workerId = req.params.id;
-    
-    const worker = await Worker.findById(workerId);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    
-    const JobApplication = require('../models/JobApplication');
-    const completedApplications = await JobApplication.find({
-      worker: workerId,
-      status: 'completed',
-      paymentStatus: 'paid'
-    }).populate('job');
-    
-    const totalEarned = completedApplications.reduce((sum, app) => {
-      const amount = app.paymentAmount || app.job?.salary || 0;
-      return sum + amount;
-    }, 0);
-    
-    worker.balance = totalEarned;
-    
-    worker.earnings = completedApplications.map(app => ({
-      jobId: app.job._id,
-      amount: app.paymentAmount || app.job?.salary || 0,
-      description: `Payment for: ${app.job?.title || 'Job'}`,
-      date: app.paymentDate || app.updatedAt || new Date()
-    }));
-    
-    await worker.save();
-    
-    logger.info(`Balance synced successfully for worker: ${worker.name}`);
-    res.json({
-      success: true,
-      message: 'Balance synchronized successfully',
-      worker: {
-        name: worker.name,
-        balance: worker.balance,
-        earningsCount: worker.earnings.length,
-        totalEarned: totalEarned
-      }
-    });
-    
-  } catch (error) {
-    logger.error(`Error syncing worker balance: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
+router.post('/:id/sync-balance', asyncHandler(async (req, res) => {
+  const workerId = req.params.id;
+  
+  const worker = await Worker.findById(workerId);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
   }
-});
+  
+  const JobApplication = require('../models/JobApplication');
+  const completedApplications = await JobApplication.find({
+    worker: workerId,
+    status: 'completed',
+    paymentStatus: 'paid'
+  }).populate('job');
+  
+  const totalEarned = completedApplications.reduce((sum, app) => {
+    const amount = app.paymentAmount || app.job?.salary || 0;
+    return sum + amount;
+  }, 0);
+  
+  worker.balance = totalEarned;
+  
+  worker.earnings = completedApplications.map(app => ({
+    jobId: app.job._id,
+    amount: app.paymentAmount || app.job?.salary || 0,
+    description: `Payment for: ${app.job?.title || 'Job'}`,
+    date: app.paymentDate || app.updatedAt || new Date()
+  }));
+  
+  await worker.save();
+  
+  logger.info(`Balance synced successfully for worker: ${worker.name}`);
+  res.json({
+    success: true,
+    message: 'Balance synchronized successfully',
+    worker: {
+      name: worker.name,
+      balance: worker.balance,
+      earningsCount: worker.earnings.length,
+      totalEarned: totalEarned
+    }
+  });
+}));
 
 // Get worker wallet data
-router.get('/:id/wallet', async (req, res) => {
-  try {
-    const workerId = req.params.id;
-    
-    const worker = await Worker.findById(workerId);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    
-    const JobApplication = require('../models/JobApplication');
-    const completedApplications = await JobApplication.find({
-      worker: workerId,
-      status: 'completed',
-      paymentStatus: 'paid'
-    }).populate('job');
-    
-    const totalEarned = completedApplications.reduce((sum, app) => {
-      return sum + (app.paymentAmount || app.job?.salary || 0);
-    }, 0);
-    
-    const withdrawals = worker.withdrawals || [];
-    const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, 0);
-    
-    const transactions = [
-      ...completedApplications.map(app => ({
-        id: app._id.toString(),
-        type: 'earning',
-        amount: app.paymentAmount || app.job?.salary || 0,
-        description: `Payment for: ${app.job?.title || 'Job'}`,
-        date: app.paymentDate || app.updatedAt,
-        status: 'completed',
-        jobTitle: app.job?.title
-      })),
-      ...withdrawals.map((w, index) => ({
-        id: w._id ? w._id.toString() : `withdrawal_${index}`,
-        type: 'withdrawal',
-        amount: w.amount,
-        description: `Withdrawal to ${w.method || 'bank account'}`,
-        date: w.date,
-        status: w.status || 'completed'
-      }))
-    ].sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    const currentBalance = totalEarned - totalWithdrawn;
-    if (worker.balance !== currentBalance) {
-      worker.balance = currentBalance;
-      await worker.save();
-      logger.info(`Updated worker balance from ${worker.balance} to ${currentBalance}`);
-    }
-    
-    res.json({
-      balance: currentBalance,
-      totalEarned: totalEarned,
-      totalSpent: totalWithdrawn,
-      transactions: transactions
-    });
-    
-  } catch (error) {
-    logger.error(`Error fetching wallet data: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ 
-      message: error.message,
-      balance: 0,
-      totalEarned: 0,
-      totalSpent: 0,
-      transactions: []
-    });
+router.get('/:id/wallet', asyncHandler(async (req, res) => {
+  const workerId = req.params.id;
+  
+  const worker = await Worker.findById(workerId);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
   }
-});
+  
+  const JobApplication = require('../models/JobApplication');
+  const completedApplications = await JobApplication.find({
+    worker: workerId,
+    status: 'completed',
+    paymentStatus: 'paid'
+  }).populate('job');
+  
+  const totalEarned = completedApplications.reduce((sum, app) => {
+    return sum + (app.paymentAmount || app.job?.salary || 0);
+  }, 0);
+  
+  const withdrawals = worker.withdrawals || [];
+  const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, 0);
+  
+  const transactions = [
+    ...completedApplications.map(app => ({
+      id: app._id.toString(),
+      type: 'earning',
+      amount: app.paymentAmount || app.job?.salary || 0,
+      description: `Payment for: ${app.job?.title || 'Job'}`,
+      date: app.paymentDate || app.updatedAt,
+      status: 'completed',
+      jobTitle: app.job?.title
+    })),
+    ...withdrawals.map((w, index) => ({
+      id: w._id ? w._id.toString() : `withdrawal_${index}`,
+      type: 'withdrawal',
+      amount: w.amount,
+      description: `Withdrawal to ${w.method || 'bank account'}`,
+      date: w.date,
+      status: w.status || 'completed'
+    }))
+  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  const currentBalance = totalEarned - totalWithdrawn;
+  if (worker.balance !== currentBalance) {
+    worker.balance = currentBalance;
+    await worker.save();
+    logger.info(`Updated worker balance from ${worker.balance} to ${currentBalance}`);
+  }
+  
+  res.json({
+    balance: currentBalance,
+    totalEarned: totalEarned,
+    totalSpent: totalWithdrawn,
+    transactions: transactions
+  });
+}));
 
 // Process withdrawal request
-router.post('/:id/withdraw', async (req, res) => {
-  try {
-    const workerId = req.params.id;
-    const { amount, method } = req.body;
-    
-    const worker = await Worker.findById(workerId);
-    if (!worker) {
-      return res.status(404).json({ message: 'Worker not found' });
-    }
-    
-    if (amount > worker.balance) {
-      return res.status(400).json({ message: 'Insufficient balance' });
-    }
-    
-    if (!Array.isArray(worker.withdrawals)) {
-      worker.withdrawals = [];
-    }
-    
-    const withdrawal = {
-      amount: amount,
-      method: method || 'bank_transfer',
-      date: new Date(),
-      status: 'pending'
-    };
-    
-    worker.withdrawals.push(withdrawal);
-    worker.balance -= amount;
-    
-    await worker.save();
-    
-    logger.info(`Withdrawal processed: ${worker.name} - ₹${amount}`);
-    res.json({
-      success: true,
-      message: 'Withdrawal request submitted successfully',
-      newBalance: worker.balance
-    });
-    
-  } catch (error) {
-    logger.error(`Error processing withdrawal: ${req.params.id}`, { error: error.message, stack: error.stack });
-    res.status(500).json({ message: error.message });
+router.post('/:id/withdraw', asyncHandler(async (req, res) => {
+  const workerId = req.params.id;
+  const { amount, method } = req.body;
+  
+  const worker = await Worker.findById(workerId);
+  if (!worker) {
+    throw new NotFoundError('Worker not found');
   }
-});
+  
+  if (amount > worker.balance) {
+    throw new ValidationError('Insufficient balance');
+  }
+  
+  if (!Array.isArray(worker.withdrawals)) {
+    worker.withdrawals = [];
+  }
+  
+  const withdrawal = {
+    amount: amount,
+    method: method || 'bank_transfer',
+    date: new Date(),
+    status: 'pending'
+  };
+  
+  worker.withdrawals.push(withdrawal);
+  worker.balance -= amount;
+  
+  await worker.save();
+  
+  logger.info(`Withdrawal processed: ${worker.name} - ₹${amount}`);
+  res.json({
+    success: true,
+    message: 'Withdrawal request submitted successfully',
+    newBalance: worker.balance
+  });
+}));
 
 module.exports = router;

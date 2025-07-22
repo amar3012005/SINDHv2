@@ -1,8 +1,8 @@
-import { getApiUrl } from '../utils/apiUtils';
+import { buildApiUrl } from '../utils/apiUtils';
 
 class JobService {
   constructor() {
-    this.baseUrl = getApiUrl('/api');
+    this.baseUrl = buildApiUrl('');
   }
 
   // Fetch all available jobs

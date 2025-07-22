@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, User, Award, MapPin, FileText, Phone, Mail, Briefcase, Languages, Smile, Sparkles, Rocket, Handshake, Lightbulb, ShieldCheck, Wallet } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -6,15 +6,96 @@ import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
 import { useTranslation } from 'react-i18next';
 import { getApiUrl } from '../../utils/apiUtils.js';
+import { useSpring, animated as a } from '@react-spring/web';
+import Logo from '../../assets/logo.svg';
 
-const WorkerRegistration = () => {
+// --- Animated Organic Blob Background (React Spring) ---
+const AnimatedBlob = ({ style, className }) => {
+  const blobSpring = useSpring({
+    from: { x: 0, y: 0 },
+    to: async (next) => {
+      while (1) {
+        await next({ x: Math.random() * 40 - 20, y: Math.random() * 40 - 20 });
+      }
+    },
+    config: { mass: 2, tension: 60, friction: 30 },
+  });
+  return (
+    <a.svg
+      style={{ ...blobSpring, ...style, position: 'absolute', zIndex: 0 }}
+      className={className}
+      aria-hidden="true"
+      viewBox="0 0 200 200"
+      width="320"
+      height="320"
+      fill="currentColor"
+    >
+      <path d="M44.8,-70.2C57.2,-62.2,65.7,-47.2,72.2,-32.1C78.7,-17,83.2,-1.8,80.2,11.7C77.2,25.2,66.7,36.9,55.1,47.2C43.5,57.5,30.8,66.3,16.2,71.2C1.6,76.1,-14.9,77.1,-29.2,71.2C-43.5,65.3,-55.6,52.5,-65.2,38.2C-74.8,23.9,-81.9,8.1,-80.2,-7.7C-78.5,-23.5,-68,-39.2,-55.2,-47.7C-42.4,-56.2,-27.2,-57.5,-12.2,-63.2C2.8,-68.9,17.6,-79.1,32.2,-78.2C46.8,-77.3,61.2,-65.2,44.8,-70.2Z" transform="translate(100 100)" />
+    </a.svg>
+  );
+};
+
+// --- Animated Progress Dots ---
+const ProgressDots = ({ current, total }) => {
+  return (
+    <div className="flex items-center justify-center gap-2 py-4">
+      {[...Array(total)].map((_, i) => (
+        <motion.div
+          key={i}
+          className={`w-3 h-3 rounded-full ${i <= current ? 'bg-orange-400' : 'bg-white/30'} shadow transition-colors`}
+          initial={{ scale: 0.7, opacity: 0.5 }}
+          animate={{ scale: i === current ? 1.2 : 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+        />
+      ))}
+      <div className="absolute w-full h-1 top-1/2 left-0 -z-10 flex items-center">
+        <div className="w-full h-1 bg-gradient-to-r from-orange-400 to-orange-200 opacity-30 rounded-full" />
+      </div>
+    </div>
+  );
+};
+
+// --- Glassmorphic Card Wrapper ---
+const GlassCard = ({ children, className }) => (
+  <div className={`backdrop-blur-lg bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-4 md:p-8 ${className}`} style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}>
+    {children}
+  </div>
+);
+
+// --- Animated Emoji/Blob Avatar ---
+const BotAvatar = ({ animate = false }) => (
+  <motion.span
+    className="w-12 h-12 flex items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-300 text-3xl shadow-lg border-4 border-white/20"
+    initial={{ scale: 0.9 }}
+    animate={{ scale: animate ? [1, 1.15, 1] : 1, rotate: animate ? [0, 8, -8, 0] : 0 }}
+    transition={{ duration: 1, repeat: animate ? Infinity : 0, repeatType: 'loop' }}
+    aria-label="Bot"
+  >
+    🟠
+  </motion.span>
+);
+
+const EnhancedWorkerRegistration = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { loginUser } = useUser();
   const { t } = useTranslation();
+  const messagesEndRef = useRef(null);
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [showProfile, setShowProfile] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [currentInput, setCurrentInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [isWaitingForInput, setIsWaitingForInput] = useState(false);
+  const [userResponses, setUserResponses] = useState({});
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [currentSuggestions, setCurrentSuggestions] = useState([]);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessMsg, setShowSuccessMsg] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
+
+  // Keep the same form data structure as original
   const [formData, setFormData] = useState({
     name: '',
     age: '',
@@ -53,16 +134,6 @@ const WorkerRegistration = () => {
   const [otpVerified, setOtpVerified] = useState(false);
   const [completedSteps, setCompletedSteps] = useState(new Set());
 
-  // Pre-fill phone number from login if available
-  useEffect(() => {
-    if (location.state?.phoneNumber) {
-      setFormData(prev => ({
-        ...prev,
-        phone: location.state.phoneNumber
-      }));
-    }
-  }, [location.state]);
-
   const skillOptions = [
     'Construction', 'Carpentry', 'Masonry', 'Plumbing', 'Electrical', 'Painting', 
     'Welding', 'Farming', 'Agriculture', 'Landscaping', 'Cleaning', 'Cooking',
@@ -75,81 +146,694 @@ const WorkerRegistration = () => {
     'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Odia', 'Urdu'
   ];
 
-  const steps = [
+  // Convert the original steps to chat-style questions
+  const chatQuestions = [
     {
-      title: t('register.step1Title'),
-      icon: User,
-      description: t('register.personalInfoDesc'),
-      fields: [
-        { name: 'name', label: t('register.name'), type: 'text', required: true, placeholder: t('register.nameHint') },
-        { name: 'age', label: t('register.age'), type: 'number', required: true, placeholder: t('register.ageHint'), min: 18, max: 70 },
-        { name: 'phone', label: t('register.mobile'), type: 'tel', required: true, placeholder: t('register.mobileHint') },
-        { name: 'email', label: t('register.email'), type: 'email', required: false, placeholder: t('register.emailHint') },
-        { name: 'gender', label: t('register.gender'), type: 'select', required: true, options: [t('register.male'), t('register.female'), t('register.other')] }
-      ]
+      id: 'welcome',
+      type: 'system',
+      text: "👋 Welcome to SINDH! I'm here to help you create your worker profile so you can start finding jobs and earning. Ready to get started?",
+      field: null,
+      suggestions: ['Yes, let\'s start!', 'I\'m ready to begin']
     },
     {
-      title: t('register.step2Title'),
-      icon: ShieldCheck,
-      description: t('register.aadharVerificationDesc'),
-      fields: [
-        { name: 'aadharNumber', label: t('register.aadharNumber'), type: 'text', required: true, placeholder: t('register.aadharHint'), maxLength: 12 }
-      ]
+      id: 'name',
+      type: 'question',
+      text: "Great! Let's start with your full name?",
+      field: 'name',
+      validation: (value) => value.trim().length >= 2 ? null : "Please enter your full name"
     },
     {
-      title: t('register.step3Title'),
-      icon: Award,
-      description: t('register.skillsExperienceDesc'),
-      fields: [
-        { name: 'skills', label: t('register.skills'), type: 'multiselect', required: true, options: skillOptions },
-        { name: 'experience', label: t('register.experience'), type: 'select', required: true, options: [
-          t('register.exp1'), t('register.exp2'), t('register.exp3'), t('register.exp4'), t('register.exp5')
-        ]},
-        { name: 'preferredCategory', label: t('register.preferredCategory'), type: 'select', required: true, options: [
-          t('register.cat1'), t('register.cat2'), t('register.cat3'), t('register.cat4'), t('register.cat5'), t('register.cat6'), t('register.cat7')
-        ]},
-        { name: 'expectedSalary', label: t('register.expectedSalary'), type: 'text', required: true, placeholder: t('register.expectedSalaryHint') }
-      ]
+      id: 'age',
+      type: 'question',
+      text: "What's your age? (Must be between 18-70 years)",
+      field: 'age',
+      validation: (value) => {
+        const age = parseInt(value);
+        return age >= 18 && age <= 70 ? null : "Please enter a valid age between 18-70 years";
+      }
     },
     {
-      title: t('register.step4Title'),
-      icon: Languages,
-      description: t('register.languagesDesc'),
-      fields: [
-        { name: 'languages', label: t('register.languages'), type: 'multiselect', required: true, options: languageOptions }
-      ]
+      id: 'phone',
+      type: 'question',
+      text: "What's your mobile number? Please enter 10 digits without country code (like 9876543210)",
+      field: 'phone',
+      validation: (value) => {
+        const cleaned = value.replace(/[^\d]/g, '');
+        return cleaned.length === 10 ? null : "Please enter a valid 10-digit mobile number";
+      }
     },
     {
-      title: t('register.step5Title'),
-      icon: MapPin,
-      description: t('register.locationDesc'),
-      fields: [
-        { name: 'location.address', label: t('register.fullAddress'), type: 'textarea', required: false, placeholder: t('register.fullAddressHint') },
-        { name: 'location.village', label: t('register.villageTown'), type: 'text', required: true, placeholder: t('register.villageTownHint') },
-        { name: 'location.district', label: t('register.district'), type: 'text', required: true, placeholder: t('register.districtHint') },
-        { name: 'location.state', label: t('register.state'), type: 'text', required: true, placeholder: t('register.stateHint') },
-        { name: 'location.pincode', label: t('register.pincode'), type: 'text', required: true, placeholder: t('register.pincodeHint'), maxLength: 6 }
-      ]
+      id: 'email',
+      type: 'question',
+      text: "What's your email address? (Optional but recommended for notifications)",
+      field: 'email',
+      validation: (value) => {
+        if (!value.trim()) return null; // Optional field
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(value) ? null : "Please enter a valid email address";
+      }
     },
     {
-      title: t('register.step6Title'),
-      icon: Briefcase,
-      description: t('register.workPreferencesDesc'),
-      fields: [
-        { name: 'preferredWorkType', label: t('register.preferredWorkType'), type: 'select', required: true, options: [
-          t('register.workType1'), t('register.workType2'), t('register.workType3'), t('register.workType4'), t('register.workType5')
-        ]},
-        { name: 'availability', label: t('register.availability'), type: 'select', required: true, options: [
-          t('register.avail1'), t('register.avail2'), t('register.avail3'), t('register.avail4')
-        ]},
-        { name: 'workRadius', label: t('register.workRadius'), type: 'select', required: true, options: [
-          '5', '10', '15', '20', '25', '50+'
-        ]},
-        { name: 'bio', label: t('register.bio'), type: 'textarea', required: false, placeholder: t('register.bioHint') }
-      ]
+      id: 'gender',
+      type: 'question',
+      text: "What's your gender?",
+      field: 'gender',
+      suggestions: ['Male', 'Female', 'Other'],
+      validation: (value) => value.trim() ? null : "Please select your gender"
+    },
+    {
+      id: 'aadhar',
+      type: 'question',
+      text: "For verification, please enter your 12-digit Aadhar number:",
+      field: 'aadharNumber',
+      validation: (value) => {
+        const cleaned = value.replace(/[^\d]/g, '');
+        return cleaned.length === 12 ? null : "Please enter a valid 12-digit Aadhar number";
+      }
+    },
+    {
+      id: 'skills',
+      type: 'question',
+      text: "What skills do you have? Select all that apply:",
+      field: 'skills',
+      suggestions: skillOptions,
+      validation: (value) => value && value.length > 0 ? null : "Please select at least one skill"
+    },
+    {
+      id: 'experience',
+      type: 'question',
+      text: "How much work experience do you have?",
+      field: 'experience',
+      suggestions: [
+        'Less than 1 year',
+        '1-2 years',
+        '2-5 years',
+        '5-10 years',
+        'More than 10 years'
+      ],
+      validation: (value) => value.trim() ? null : "Please select your experience level"
+    },
+    {
+      id: 'preferredCategory',
+      type: 'question',
+      text: "What type of work do you prefer?",
+      field: 'preferredCategory',
+      suggestions: [
+        'Construction',
+        'Agriculture',
+        'Household',
+        'Transportation',
+        'Manufacturing',
+        'Services',
+        'Other'
+      ],
+      validation: (value) => value.trim() ? null : "Please select your preferred work category"
+    },
+    {
+      id: 'expectedSalary',
+      type: 'question',
+      text: "What's your expected daily salary? (e.g., ₹500 per day)",
+      field: 'expectedSalary',
+      validation: (value) => value.trim() ? null : "Please enter your expected salary"
+    },
+    {
+      id: 'languages',
+      type: 'question',
+      text: "What languages do you speak? Select all that apply:",
+      field: 'languages',
+      suggestions: languageOptions,
+      validation: (value) => value && value.length > 0 ? null : "Please select at least one language"
+    },
+    {
+      id: 'village',
+      type: 'question',
+      text: "Which village or town do you live in?",
+      field: 'village',
+      validation: (value) => value.trim() ? null : "Please enter your village/town"
+    },
+    {
+      id: 'district',
+      type: 'question',
+      text: "Which district?",
+      field: 'district',
+      validation: (value) => value.trim() ? null : "Please enter your district"
+    },
+    {
+      id: 'state',
+      type: 'question',
+      text: "Which state?",
+      field: 'state',
+      validation: (value) => value.trim() ? null : "Please enter your state"
+    },
+    {
+      id: 'pincode',
+      type: 'question',
+      text: "What's your area pincode?",
+      field: 'pincode',
+      validation: (value) => {
+        const cleaned = value.replace(/[^\d]/g, '');
+        return cleaned.length === 6 ? null : "Please enter a valid 6-digit pincode";
+      }
+    },
+    {
+      id: 'preferredWorkType',
+      type: 'question',
+      text: "What type of work arrangement do you prefer?",
+      field: 'preferredWorkType',
+      suggestions: [
+        'Full-time daily work',
+        'Part-time work',
+        'Contract work',
+        'Seasonal work',
+        'On-demand work'
+      ],
+      validation: (value) => value.trim() ? null : "Please select your preferred work type"
+    },
+    {
+      id: 'availability',
+      type: 'question',
+      text: "When are you available to start work?",
+      field: 'availability',
+      suggestions: [
+        'Available immediately',
+        'Available next week',
+        'Available next month',
+        'Available on specific dates'
+      ],
+      validation: (value) => value.trim() ? null : "Please select your availability"
+    },
+    {
+      id: 'workRadius',
+      type: 'question',
+      text: "How far are you willing to travel for work?",
+      field: 'workRadius',
+      suggestions: ['5', '10', '15', '20', '25', '50+'],
+      validation: (value) => value.trim() ? null : "Please select your work radius"
+    },
+    {
+      id: 'bio',
+      type: 'question',
+      text: "Tell me about yourself and your work experience. This helps employers understand you better!",
+      field: 'bio',
+      validation: (value) => value.trim().length >= 10 ? null : "Please provide a brief description about yourself"
+    },
+    {
+      id: 'summary',
+      type: 'summary',
+      text: "📋 Here's a summary of your registration details. Please review and submit:",
+      field: null
+    },
+    {
+      id: 'complete',
+      type: 'system',
+      text: "🎉 Excellent! Your worker profile has been created successfully!",
+      field: null
     }
   ];
 
+  // Pre-fill phone number from login if available
+  useEffect(() => {
+    if (location.state?.phoneNumber) {
+      setUserResponses(prev => ({
+        ...prev,
+        phone: location.state.phoneNumber
+      }));
+      
+      // Find the phone question and skip it
+      const phoneQuestionIndex = chatQuestions.findIndex(q => q.field === 'phone');
+      if (phoneQuestionIndex > 0) {
+        // Start with welcome, then skip to after phone
+        addBotMessage(
+          `👋 Welcome back! I see you're registering with ${location.state.phoneNumber}. Let's create your worker profile together!`,
+          ['Yes, let\'s start!']
+        );
+        return;
+      }
+    }
+
+    // Start normal conversation
+    addBotMessage(chatQuestions[0].text, chatQuestions[0].suggestions);
+  }, [location.state]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const addBotMessage = (text, suggestions = null, delay = 1000) => {
+    setIsTyping(true);
+    setTimeout(() => {
+      setMessages(prev => {
+        if (prev.length > 0 && prev[prev.length - 1].text === text && prev[prev.length - 1].sender === 'bot') {
+          setIsTyping(false);
+          if (suggestions) {
+            setCurrentSuggestions(suggestions);
+            setShowSuggestions(true);
+          }
+          setIsWaitingForInput(true);
+          return prev;
+        }
+        return [
+        ...prev,
+          {
+            id: Date.now(),
+            text,
+            sender: 'bot',
+            timestamp: new Date()
+          }
+        ];
+      });
+      setIsTyping(false);
+      if (suggestions) {
+        setCurrentSuggestions(suggestions);
+        setShowSuggestions(true);
+      }
+      setIsWaitingForInput(true);
+    }, delay);
+  };
+
+  const addUserMessage = (text) => {
+    setMessages(prev => [...prev, {
+      id: Date.now(),
+      text,
+      sender: 'user',
+      timestamp: new Date()
+    }]);
+    setCurrentInput('');
+    setShowSuggestions(false);
+    setIsWaitingForInput(false);
+  };
+
+  const processUserResponse = async (response) => {
+    let question = chatQuestions[currentQuestion];
+    
+    // Handle submit button click
+    if (response === 'Submit Registration') {
+      await submitRegistration();
+      return;
+    }
+    
+    // Call backend when user starts (after welcome message)
+    if (question.id === 'welcome' && (response === "Yes, let's start!" || response === "I'm ready to begin")) {
+      try {
+        console.log("🎉 Worker registration initiated!");
+        console.log("Calling API:", `${getApiUrl()}/api/workers/initiate-registration`);
+        
+        // Call backend to log registration initiated
+        const apiResponse = await fetch(`${getApiUrl()}/api/workers/initiate-registration`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'initiate' })
+        });
+
+        console.log("Response status:", apiResponse.status);
+        console.log("Response ok:", apiResponse.ok);
+
+        if (apiResponse.ok) {
+          const result = await apiResponse.json();
+          console.log('Backend response:', result);
+          
+          // Show success message
+          setTimeout(() => {
+            addBotMessage("🎉 Worker registration initiated! Backend is responding. Let's gather your information...", null, 800);
+          }, 500);
+        } else {
+          const errorText = await apiResponse.text();
+          console.error('Response error:', errorText);
+          throw new Error(`Backend responded with status: ${apiResponse.status}`);
+        }
+      } catch (error) {
+        console.error('Error calling backend:', error);
+        console.error('Error details:', error.message);
+        setTimeout(() => {
+          addBotMessage(`❌ Backend connection failed: ${error.message}. Please check if the server is running.`, ['Try Again'], 800);
+        }, 500);
+        return;
+      }
+    }
+    
+    // Handle phone number pre-fill case
+    if (location.state?.phoneNumber && currentQuestion === 0) {
+      // Skip to name question after welcome
+      const nameQuestionIndex = chatQuestions.findIndex(q => q.field === 'name');
+      if (nameQuestionIndex > 0) {
+        setCurrentQuestion(nameQuestionIndex);
+        question = chatQuestions[nameQuestionIndex];
+      }
+    }
+    
+    if (question.field) {
+      let processedResponse = response;
+      
+      // Handle special field processing
+      if (question.field === 'phone') {
+        processedResponse = response.replace(/[^\d]/g, '');
+      } else if (question.field === 'aadharNumber') {
+        processedResponse = response.replace(/[^\d]/g, '');
+      } else if (question.field === 'pincode') {
+        processedResponse = response.replace(/[^\d]/g, '');
+      } else if (question.field === 'age') {
+        processedResponse = response.replace(/[^\d]/g, '');
+      }
+      
+      // Update both userResponses and formData
+      setUserResponses(prev => ({
+        ...prev,
+        [question.field]: processedResponse
+      }));
+      
+      // Update formData with the same structure as original
+      if (question.field === 'name') {
+        setFormData(prev => ({ ...prev, name: processedResponse }));
+      } else if (question.field === 'age') {
+        setFormData(prev => ({ ...prev, age: processedResponse }));
+      } else if (question.field === 'phone') {
+        setFormData(prev => ({ ...prev, phone: processedResponse }));
+      } else if (question.field === 'email') {
+        setFormData(prev => ({ ...prev, email: processedResponse }));
+      } else if (question.field === 'gender') {
+        setFormData(prev => ({ ...prev, gender: processedResponse }));
+      } else if (question.field === 'aadharNumber') {
+        setFormData(prev => ({ ...prev, aadharNumber: processedResponse }));
+      } else if (question.field === 'skills') {
+        setFormData(prev => ({ ...prev, skills: [processedResponse] }));
+      } else if (question.field === 'experience') {
+        setFormData(prev => ({ ...prev, experience: processedResponse }));
+      } else if (question.field === 'preferredCategory') {
+        setFormData(prev => ({ ...prev, preferredCategory: processedResponse }));
+      } else if (question.field === 'expectedSalary') {
+        setFormData(prev => ({ ...prev, expectedSalary: processedResponse }));
+      } else if (question.field === 'languages') {
+        setFormData(prev => ({ ...prev, languages: [processedResponse] }));
+      } else if (question.field === 'village') {
+        setFormData(prev => ({ 
+          ...prev, 
+          location: { 
+            ...prev.location, 
+            village: processedResponse 
+          } 
+        }));
+      } else if (question.field === 'district') {
+        setFormData(prev => ({ 
+          ...prev, 
+          location: { 
+            ...prev.location, 
+            district: processedResponse 
+          } 
+        }));
+      } else if (question.field === 'state') {
+        setFormData(prev => ({ 
+          ...prev, 
+          location: { 
+            ...prev.location, 
+            state: processedResponse 
+          } 
+        }));
+      } else if (question.field === 'pincode') {
+        setFormData(prev => ({ 
+          ...prev, 
+          location: { 
+            ...prev.location, 
+            pincode: processedResponse 
+          } 
+        }));
+      } else if (question.field === 'preferredWorkType') {
+        setFormData(prev => ({ ...prev, preferredWorkType: processedResponse }));
+      } else if (question.field === 'availability') {
+        setFormData(prev => ({ ...prev, availability: processedResponse }));
+      } else if (question.field === 'workRadius') {
+        setFormData(prev => ({ ...prev, workRadius: parseInt(processedResponse) }));
+      } else if (question.field === 'bio') {
+        setFormData(prev => ({ ...prev, bio: processedResponse }));
+      }
+    }
+
+    // Move to next question
+    let nextQuestionIndex = currentQuestion + 1;
+    
+    // Skip phone question if we already have it
+    if (location.state?.phoneNumber && chatQuestions[nextQuestionIndex]?.field === 'phone') {
+      nextQuestionIndex += 1;
+    }
+    
+    if (nextQuestionIndex < chatQuestions.length && nextQuestionIndex !== currentQuestion) {
+      setCurrentQuestion(nextQuestionIndex);
+      
+      // Check if we're moving to the summary step
+      const nextQ = chatQuestions[nextQuestionIndex];
+      if (nextQ.id === 'summary') {
+        // Just move to summary step, UI will handle the display
+        setIsWaitingForInput(false);
+      } else {
+        // Enable input for the next question if it requires input
+        setIsWaitingForInput(!!nextQ.field);
+      }
+    }
+  };
+
+  // Function to submit registration
+  const submitRegistration = async () => {
+    console.log('🚀 Submit registration called');
+    setIsSubmitting(true);
+    try {
+      // Debug: Log current form data
+      console.log('🔍 Current formData:', formData);
+      console.log('🔍 Current userResponses:', userResponses);
+      
+      // Ensure phone number is properly formatted (remove spaces and ensure it starts with 6-9)
+      let phoneNumber = formData.phone || userResponses.phone;
+      console.log('🔍 Raw phone number:', phoneNumber);
+      
+      if (!phoneNumber) {
+        throw new Error('Phone number is missing. Please go back and provide your phone number.');
+      }
+      
+      phoneNumber = phoneNumber ? phoneNumber.replace(/\s+/g, '') : '';
+      if (phoneNumber && !/^[6-9]/.test(phoneNumber)) {
+        phoneNumber = '9' + phoneNumber.slice(-9);
+      }
+      
+      console.log('🔍 Processed phone number:', phoneNumber);
+
+      // Build the exact schema expected by backend
+      const registrationData = {
+        name: formData.name || userResponses.name,
+        age: parseInt(formData.age || userResponses.age) || 25,
+        phone: phoneNumber,
+        email: formData.email || userResponses.email || '',
+        gender: formData.gender || userResponses.gender || 'Male',
+        aadharNumber: formData.aadharNumber || userResponses.aadharNumber || '123456789012',
+        skills: formData.skills || [userResponses.skills] || ['Construction'],
+        experience: formData.experience || userResponses.experience || 'Less than 1 year',
+        preferredCategory: formData.preferredCategory || userResponses.preferredCategory || 'Construction',
+        expectedSalary: formData.expectedSalary || userResponses.expectedSalary || '₹500 per day',
+        languages: formData.languages || [userResponses.languages] || ['Hindi'],
+        location: {
+          address: formData.location?.address || '',
+          village: formData.location?.village || userResponses.village || 'Village',
+          district: formData.location?.district || userResponses.district || 'District',
+          state: formData.location?.state || userResponses.state || 'State',
+          pincode: formData.location?.pincode || userResponses.pincode || '000000',
+          coordinates: {
+            type: "Point",
+            coordinates: [0, 0]
+          }
+        },
+        preferredWorkType: formData.preferredWorkType || userResponses.preferredWorkType || 'Full-time daily work',
+        availability: formData.availability || userResponses.availability || 'Available immediately',
+        workRadius: parseInt(formData.workRadius || userResponses.workRadius) || 10,
+        bio: formData.bio || userResponses.bio || '',
+        verificationStatus: 'pending',
+        isAvailable: true,
+        shaktiScore: calculateShaktiScore(formData),
+        rating: { average: 0, count: 0, reviews: [] },
+        registrationDate: new Date().toISOString(),
+        lastLogin: new Date().toISOString(),
+        isLoggedIn: 1,
+        profileCompletionPercentage: calculateProfileCompletion(formData),
+        documents: [],
+        workHistory: [],
+        activeJobs: 0,
+        completedJobs: 0,
+        emailNotifications: true,
+        smsNotifications: true,
+        profilePicture: '',
+        bankDetails: {
+          accountNumber: '',
+          ifscCode: '',
+          bankName: '',
+          accountHolderName: ''
+        },
+        emergencyContact: {
+          name: '',
+          phone: '',
+          relation: ''
+        },
+        type: 'worker'
+      };
+
+      console.log('🚀 Sending worker registration data:', JSON.stringify(registrationData, null, 2));
+      const apiUrl = `${getApiUrl()}/workers/register`;
+      console.log('🔗 API URL:', apiUrl);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registrationData),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+          const errorData = await response.json();
+          console.log('❌ Error response:', errorData);
+        throw new Error(errorData.message || 'Registration failed');
+      }
+
+      const result = await response.json();
+      console.log('✅ Success response:', result);
+      const worker = result.worker || result;
+
+      // Store worker data in localStorage
+      localStorage.setItem('user', JSON.stringify({
+        id: worker._id,
+        _id: worker._id,
+        name: worker.name,
+        email: worker.email,
+        phone: worker.phone,
+        location: worker.location,
+        type: 'worker',
+        isLoggedIn: 1
+      }));
+      localStorage.setItem('worker', JSON.stringify(worker));
+      localStorage.setItem('workerProfile', JSON.stringify(worker));
+      localStorage.setItem('workerId', worker._id);
+      localStorage.setItem('userType', 'worker');
+
+      if (loginUser) {
+        loginUser({
+          id: worker._id,
+          _id: worker._id,
+          name: worker.name,
+          email: worker.email,
+          phone: worker.phone,
+        type: 'worker',
+          isLoggedIn: 1
+        });
+      }
+
+      // Move to complete step
+      setCurrentQuestion(chatQuestions.length - 1);
+      setShowSuccessMsg(true);
+      setIsCompleted(true);
+      
+      setTimeout(() => {
+        window.location.href = '/worker/profile';
+      }, 1500);
+    } catch (error) {
+      console.error('Registration error:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        cause: error.cause
+      });
+      
+      let errorMessage = 'Registration failed. Please try again.';
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. Please check your internet connection and try again.';
+      } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      addBotMessage(`❌ ${errorMessage}`, ['Try Again'], 1000);
+    } finally {
+      setIsSubmitting(false);
+      setIsWaitingForInput(false);
+    }
+  };
+
+  const handleSuggestionClick = async (suggestion) => {
+    addUserMessage(suggestion);
+    
+    let question = chatQuestions[currentQuestion];
+    
+    // Handle phone number pre-fill case
+    if (location.state?.phoneNumber && currentQuestion === 0) {
+      // Skip to name question after welcome
+      const nameQuestionIndex = chatQuestions.findIndex(q => q.field === 'name');
+      if (nameQuestionIndex > 0) {
+        setCurrentQuestion(nameQuestionIndex);
+        question = chatQuestions[nameQuestionIndex];
+      }
+    }
+    
+    // Validate the response
+    if (question.validation) {
+      const error = question.validation(suggestion);
+      if (error) {
+        setTimeout(() => {
+          addBotMessage(`❌ ${error}. Please try again:`, question.suggestions, 500);
+        }, 300);
+        return;
+      }
+    }
+    
+    await processUserResponse(suggestion);
+  };
+
+  // --- Step Progress Bar ---
+  const StepProgress = ({ current, total }) => (
+    <div className="w-full h-1 bg-[#e0e0e0] rounded-full overflow-hidden mb-8">
+      <motion.div
+        className="h-1 bg-[#222] rounded-full"
+        initial={{ width: 0 }}
+        animate={{ width: `${(current / total) * 100}%` }}
+        transition={{ duration: 0.4 }}
+        aria-label="Progress"
+      />
+    </div>
+  );
+
+  // --- Main Stepper UI ---
+  const currentQ = chatQuestions[currentQuestion];
+  const isLastStep = currentQ.id === 'complete';
+
+  // --- Input error state for shake animation ---
+  const [inputError, setInputError] = useState(false);
+  const handleInputSubmit = async (e) => {
+    e.preventDefault();
+    if (!currentInput.trim() || !isWaitingForInput) return;
+    if (currentQ.validation) {
+      const error = currentQ.validation(currentInput);
+      if (error) {
+        setInputError(true);
+        setTimeout(() => setInputError(false), 500);
+        return;
+      }
+    }
+    addUserMessage(currentInput);
+    await processUserResponse(currentInput);
+  };
+
+  // Helper functions from original component
   const calculateShaktiScore = (data) => {
     let score = 0;
     
@@ -190,639 +874,6 @@ const WorkerRegistration = () => {
     return Math.min(score, 100); // Cap at 100
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === 'phone') {
-      const cleanPhone = value.replace(/[^\d+]/g, '');
-      setFormData(prev => ({
-        ...prev,
-        [name]: cleanPhone
-      }));
-      return;
-    }
-    
-    if (name.includes('.')) {
-      const [parent, child] = name.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
-  };
-
-  const handleMultiSelect = (name, option) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: prev[name].includes(option)
-        ? prev[name].filter(item => item !== option)
-        : [...prev[name], option]
-    }));
-  };
-
-  const validateStep = (step) => {
-    const currentFields = steps[step - 1].fields;
-    let isValid = true;
-    
-    for (const field of currentFields) {
-      if (field.required) {
-        let value;
-        if (field.name.includes('.')) {
-          const [parent, child] = field.name.split('.');
-          value = formData[parent]?.[child];
-        } else {
-          value = formData[field.name];
-        }
-
-        if (field.type === 'multiselect') {
-          if (!value || !Array.isArray(value) || value.length === 0) {
-            isValid = false;
-          }
-        } else if (!value || (typeof value === 'string' && value.trim() === '')) {
-          isValid = false;
-        }
-      }
-    }
-    
-    if (step === 1) {
-      if (formData.age && (formData.age < 18 || formData.age > 70)) {
-        isValid = false;
-        toast.error(t('register.ageError'));
-      }
-      if (formData.phone && formData.phone.length !== 10) {
-        isValid = false;
-        toast.error(t('register.mobileError'));
-      }
-    }
-    
-    return isValid;
-  };
-
-  const handleSendOTP = () => {
-    if (!formData.aadharNumber || formData.aadharNumber.length !== 12) {
-      toast.error(t('register.aadharError'));
-      return;
-    }
-    setOtpSent(true);
-    toast.success(t('register.otpSent'));
-  };
-
-  const handleVerifyOTP = () => {
-    if (!formData.otp?.code) {
-      toast.error(t('register.otpRequired'));
-      return;
-    }
-
-    if (formData.otp.code === '0000') { // For demo purposes
-      setOtpVerified(true);
-      setCompletedSteps(prev => new Set([...prev, 2]));
-      toast.success(t('register.otpVerified'));
-      setTimeout(() => handleNext(), 1000);
-    } else {
-      toast.error(t('register.invalidOtp'));
-    }
-  };
-
-  const handleNext = () => {
-    if (currentStep === 2 && !otpVerified) {
-      toast.error(t('register.verifyOtpFirst'));
-      return;
-    }
-
-    if (validateStep(currentStep)) {
-      setCompletedSteps(prev => new Set([...prev, currentStep]));
-      setCurrentStep(prev => prev + 1);
-    } else {
-      toast.error(t('register.fillRequired'));
-    }
-  };
-
-  const handleBack = () => {
-    setCurrentStep(prev => prev - 1);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateStep(currentStep)) {
-      toast.error(t('register.fillRequired'));
-      return;
-    }
-
-    if (!otpVerified) {
-      setCurrentStep(2);
-      toast.error(t('register.verifyAadharFirst'));
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      
-      const shaktiScore = calculateShaktiScore(formData);
-      
-      // Ensure phone number is properly formatted (remove spaces and ensure it starts with 6-9)
-      let phoneNumber = formData.phone.replace(/\s+/g, ''); // Remove spaces
-      
-      // If phone doesn't start with 6-9, add a valid prefix
-      if (phoneNumber && !/^[6-9]/.test(phoneNumber)) {
-        phoneNumber = '9' + phoneNumber.slice(-9); // Ensure it starts with 9
-      }
-      
-      const workerData = {
-        name: formData.name,
-        age: parseInt(formData.age) || 25,
-        phone: phoneNumber,
-        email: formData.email || '',
-        gender: formData.gender || 'Male',
-        aadharNumber: formData.aadharNumber || '123456789012',
-        skills: formData.skills || ['Construction'],
-        experience: formData.experience || 'Less than 1 year',
-        preferredCategory: formData.preferredCategory || 'Construction',
-        expectedSalary: formData.expectedSalary || '₹500 per day',
-        languages: formData.languages || ['Hindi'],
-        location: {
-          address: formData.location.address || '',
-          village: formData.location.village || 'Village',
-          district: formData.location.district || 'District',
-          state: formData.location.state || 'State',
-          pincode: formData.location.pincode || '000000',
-          coordinates: {
-            type: "Point",
-            coordinates: [0, 0]
-          }
-        },
-        preferredWorkType: formData.preferredWorkType || 'Full-time daily work',
-        availability: formData.availability || 'Available immediately',
-        workRadius: parseInt(formData.workRadius) || 10,
-        bio: formData.bio || '',
-        verificationStatus: 'pending',
-        isAvailable: true,
-        shaktiScore: shaktiScore,
-        rating: { average: 0, count: 0, reviews: [] },
-        registrationDate: new Date().toISOString(),
-        lastLogin: new Date().toISOString(),
-        isLoggedIn: 1,
-        profileCompletionPercentage: calculateProfileCompletion(formData),
-        documents: [],
-        workHistory: [],
-        activeJobs: 0,
-        completedJobs: 0,
-        emailNotifications: true,
-        smsNotifications: true,
-        profilePicture: '',
-        bankDetails: {
-          accountNumber: '',
-          ifscCode: '',
-          bankName: '',
-          accountHolderName: ''
-        },
-        emergencyContact: {
-          name: '',
-          phone: '',
-          relation: ''
-        },
-        type: 'worker'
-      };
-
-      console.log('🚀 Sending worker registration data:', JSON.stringify(workerData, null, 2));
-
-              const response = await fetch(`${getApiUrl()}/workers/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(workerData)
-      });
-
-      console.log('📡 Response status:', response.status);
-
-      let savedWorker;
-      
-      if (!response.ok) {
-        let errorMessage = t('register.failed');
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-          console.log('❌ Error response:', errorData);
-        } catch (parseError) {
-          errorMessage = `${t('common.serverError')}: ${response.status} ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      try {
-        savedWorker = await response.json();
-        console.log('✅ Success response:', savedWorker);
-      } catch (parseError) {
-        throw new Error(t('common.invalidResponse'));
-      }
-      
-      // Update form data with saved worker ID and shaktiScore
-      setFormData(prev => ({
-        ...prev,
-        id: savedWorker.worker?.id || savedWorker.worker?._id || prev.id,
-        shaktiScore
-      }));
-      
-      // Let UserContext handle login state and localStorage persistence
-      // Pass the essential data needed for loginUser to fetch the full profile
-      await loginUser({
-        id: savedWorker.worker?.id || savedWorker.worker?._id,
-        type: 'worker',
-        phone: formData.phone.replace(/\s+/g, '') // Ensure phone is clean for login
-      });
-      
-      setCompletedSteps(prev => new Set([...prev, currentStep]));
-      
-      toast.success(t('register.success'));
-      
-      setTimeout(() => {
-        setShowProfile(true);
-      }, 1500);
-
-    } catch (error) {
-      console.error('Registration error:', error);
-      toast.error(`${t('register.failed')}: ${error.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const renderField = (field) => {
-    const getFieldValue = (fieldName) => {
-      if (fieldName.includes('.')) {
-        const [parent, child] = fieldName.split('.');
-        return formData[parent]?.[child] || '';
-      }
-      return formData[fieldName] || '';
-    };
-
-    const baseClasses = "w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white";
-
-    switch (field.type) {
-      case 'select':
-        return (
-          <motion.select
-            name={field.name}
-            value={getFieldValue(field.name)}
-            onChange={handleInputChange}
-            className={baseClasses}
-            required={field.required}
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-          >
-            <option value="">{t('common.select')} {field.label}</option>
-            {field.options.map(option => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </motion.select>
-        );
-      case 'multiselect':
-        return (
-          <motion.div
-            className="grid grid-cols-2 gap-2"
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-          >
-            {field.options.map(option => (
-              <motion.button
-                key={option}
-                type="button"
-                onClick={() => handleMultiSelect(field.name, option)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`p-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  getFieldValue(field.name).includes(option)
-                    ? 'bg-blue-500 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {option}
-              </motion.button>
-            ))}
-          </motion.div>
-        );
-      case 'textarea':
-        return (
-          <motion.textarea
-            name={field.name}
-            value={getFieldValue(field.name)}
-            onChange={handleInputChange}
-            className={baseClasses}
-            rows="4"
-            required={field.required}
-            placeholder={field.placeholder}
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-          />
-        );
-      default:
-        return (
-          <motion.input
-            type={field.type}
-            name={field.name}
-            value={getFieldValue(field.name)}
-            onChange={handleInputChange}
-            className={baseClasses}
-            required={field.required}
-            placeholder={field.placeholder}
-            min={field.min}
-            max={field.max}
-            maxLength={field.maxLength}
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-          />
-        );
-    }
-  };
-
-  const renderAadharVerification = () => (
-    <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {t('register.aadharNumber')} <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          name="aadharNumber"
-          value={formData.aadharNumber}
-          onChange={handleInputChange}
-          maxLength="12"
-          placeholder={t('register.aadharHint')}
-          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-          required
-        />
-      </motion.div>
-
-      {!otpSent ? (
-        <motion.button
-          type="button"
-          onClick={handleSendOTP}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium shadow-lg"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          {t('register.sendOtp')} 🚀
-        </motion.button>
-      ) : (
-        <motion.div
-          className="space-y-4"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {t('register.enterOtp')} (0000 {t('register.forDemo')})
-            </label>
-            <input
-              type="text"
-              name="otp.code"
-              value={formData.otp?.code || ''}
-              onChange={handleInputChange}
-              maxLength="4"
-              placeholder="0000"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 text-center text-lg font-mono"
-              required
-            />
-          </div>
-          <motion.button
-            type="button"
-            onClick={handleVerifyOTP}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 font-medium shadow-lg"
-          >
-            {otpVerified ? (
-              <div className="flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 mr-2" />
-                {t('register.verified')} 🎉
-              </div>
-            ) : (
-              t('register.verifyOtp')
-            )}
-          </motion.button>
-        </motion.div>
-      )}
-    </div>
-  );
-
-  const WorkerProfileDisplay = ({ workerData }) => (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5 }}
-      className="bg-white rounded-2xl shadow-xl p-8"
-    >
-      <div className="text-center mb-8">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="w-24 h-24 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"
-        >
-          <Sparkles className="w-12 h-12 text-white" />
-        </motion.div>
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="text-3xl font-bold text-gray-900"
-        >
-          {t('register.welcome')}, {workerData.name}! 👋
-        </motion.h2>
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="text-gray-600 mt-2"
-        >
-          {t('register.profileCreated')}
-        </motion.p>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="mt-4"
-        >
-          <div className="text-4xl font-bold text-blue-600">{workerData.shaktiScore}</div>
-          <div className="text-sm text-gray-500">{t('home.shaktiScore')}</div>
-        </motion.div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.6 }}
-          className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <User className="w-5 h-5 mr-2 text-blue-600" />
-            {t('register.personalInfo')}
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center">
-              <Phone className="w-4 h-4 mr-3 text-gray-500" />
-              <span className="text-gray-700">{workerData.phone}</span>
-            </div>
-            {workerData.email && (
-              <div className="flex items-center">
-                <Mail className="w-4 h-4 mr-3 text-gray-500" />
-                <span className="text-gray-700">{workerData.email}</span>
-              </div>
-            )}
-            <div className="text-sm text-gray-600">
-              {t('register.age')}: {workerData.age} • {t('register.gender')}: {workerData.gender}
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.7 }}
-          className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Award className="w-5 h-5 mr-2 text-green-600" />
-            {t('register.skillsExperience')}
-          </h3>
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-1">
-              {workerData.skills.slice(0, 3).map(skill => (
-                <span key={skill} className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                  {skill}
-                </span>
-              ))}
-              {workerData.skills.length > 3 && (
-                <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                  +{workerData.skills.length - 3} {t('common.more')}
-                </span>
-              )}
-            </div>
-            <div className="text-sm text-gray-600">
-              {t('register.experience')}: {workerData.experience}
-            </div>
-            <div className="text-sm text-gray-600">
-              {t('register.expected')}: {workerData.expectedSalary}
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.8 }}
-          className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <MapPin className="w-5 h-5 mr-2 text-purple-600" />
-            {t('register.location')}
-          </h3>
-          <div className="space-y-2">
-            <div className="text-gray-700">
-              {workerData.location.village}, {workerData.location.district}
-            </div>
-            <div className="text-sm text-gray-600">
-              {workerData.location.state} - {workerData.location.pincode}
-            </div>
-            <div className="text-sm text-gray-600">
-              {t('register.workRadius')}: {workerData.workRadius} km
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.9 }}
-          className="bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Languages className="w-5 h-5 mr-2 text-orange-600" />
-            {t('register.languages')} & {t('register.availability')}
-          </h3>
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-1">
-              {workerData.languages.map(lang => (
-                <span key={lang} className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full">
-                  {lang}
-                </span>
-              ))}
-            </div>
-            <div className="text-sm text-gray-600">
-              {workerData.availability}
-            </div>
-            <div className="text-sm text-gray-600">
-              {workerData.preferredWorkType}
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {workerData.bio && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.0 }}
-          className="mt-6 p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl"
-        >
-          <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
-            <FileText className="w-5 h-5 mr-2 text-gray-600" />
-            {t('register.aboutMe')}
-          </h3>
-          <p className="text-gray-700 leading-relaxed">
-            {workerData.bio}
-          </p>
-        </motion.div>
-      )}
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.1 }}
-        className="mt-8 flex justify-center space-x-4"
-      >
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/jobs')}
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-        >
-          {t('home.findJobs')} 🚀
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => navigate('/worker/wallet')}
-          className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-        >
-          {t('common.view')} {t('common.wallet')} 💰
-        </motion.button>
-      </motion.div>
-    </motion.div>
-  );
-
   const calculateProfileCompletion = (data) => {
     const requiredFields = [
       'name', 'age', 'phone', 'gender', 'aadharNumber',
@@ -849,265 +900,162 @@ const WorkerRegistration = () => {
     return Math.round((completedFields / requiredFields.length) * 100);
   };
 
-  if (showProfile) {
+  // --- Minimal, mobile-first, conversational stepper UI ---
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <WorkerProfileDisplay workerData={formData} />
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-xl p-8"
-        >
-          <div className="text-center mb-8">
-            <motion.h2
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent"
-            >
-              {t('register.title')} ✨
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mt-2 text-gray-600"
-            >
-              {t('register.step')} {currentStep} {t('register.of')} {steps.length} - {steps[currentStep - 1].description}
-            </motion.p>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              {steps.map((step, index) => {
-                const StepIcon = step.icon;
-                const isCompleted = completedSteps.has(index + 1);
-                const isCurrent = index + 1 === currentStep;
-                
-                return (
-                  <motion.div
-                    key={index}
-                    className="flex flex-col items-center"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-                        isCompleted
-                          ? 'bg-green-500 text-white shadow-lg'
-                          : isCurrent
-                          ? 'bg-blue-500 text-white shadow-lg ring-4 ring-blue-200'
-                          : 'bg-gray-200 text-gray-400'
-                      }`}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle className="w-6 h-6" />
-                      ) : (
-                        <StepIcon className="w-6 h-6" />
-                      )}
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f5f6fa] px-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+      `}</style>
+      {/* Logo at the top */}
+      <div className="w-full flex flex-col items-center justify-center pt-8 pb-2">
+        <div className="flex items-center gap-3">
+          {Logo ? (
+            <img src={Logo} alt="Logo" className="h-10 md:h-12 mb-2" style={{ maxWidth: 120 }} />
+          ) : (
+            <span className="text-2xl font-bold tracking-wide text-[#222] mb-2">LOGO</span>
+          )}
+          <span className="text-2xl font-extrabold tracking-widest text-[#222] mb-2">I N D U S</span>
                     </div>
-                    <span className={`mt-2 text-xs font-medium text-center max-w-20 ${
-                      isCurrent ? 'text-blue-600' : 'text-gray-500'
-                    }`}>
-                      {step.title}
-                    </span>
-                  </motion.div>
-                );
-              })}
+        <span className="text-base font-semibold text-[#ff6b35] mt-1">Worker Registration</span>
             </div>
-            <div className="flex justify-between">
-              {steps.map((_, index) => (
+      <div className="w-full max-w-md mx-auto flex flex-col justify-center min-h-screen">
+        {/* Progress Bar */}
+        <StepProgress current={currentQuestion} total={chatQuestions.length - 1} />
+        {/* Step Content */}
                 <motion.div
-                  key={index}
-                  className={`flex-1 h-2 mx-1 rounded-full transition-all duration-500 ${
-                    index + 1 <= currentStep ? 'bg-gradient-to-r from-green-500 to-blue-500' : 'bg-gray-200'
-                  }`}
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ delay: index * 0.1, duration: 0.5 }}
-                />
+          key={currentQ.id}
+          initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -30 }}
+          transition={{ duration: 0.4, type: 'spring' }}
+          className="flex flex-col gap-10 md:gap-12"
+        >
+          {/* Question/Prompt */}
+          <div className="text-left">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-[#222] mb-3 leading-tight" style={{ letterSpacing: '-0.5px' }}>
+              {currentQ.text.split(/[.!?]/)[0].toUpperCase()}
+            </h2>
+            {currentQ.text.split(/[.!?]/)[1] && (
+              <p className="text-lg md:text-xl text-[#222]/70 mt-2">{currentQ.text.split(/[.!?]/)[1]}</p>
+            )}
+                          </div>
+          {/* Input or Suggestions */}
+          {currentQ.suggestions && currentQ.suggestions.length > 0 ? (
+            <div className="flex flex-col gap-6">
+              {currentQ.suggestions.map((suggestion, idx) => (
+                <motion.button
+                  key={idx}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  aria-label={suggestion}
+                >
+                  {suggestion}
+                  <span className="ml-2">→</span>
+                </motion.button>
               ))}
             </div>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentStep}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="text-center mb-6">
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                    {steps[currentStep - 1].title} {currentStep === 1 ? '👋' : currentStep === 2 ? '🛡️' : currentStep === 3 ? '💪' : currentStep === 4 ? '🗣️' : currentStep === 5 ? '📍' : '💼'}
-                  </h3>
-                  <p className="text-gray-600">
-                    {steps[currentStep - 1].description}
-                  </p>
+          ) : currentQ.id === 'summary' ? (
+            <div className="flex flex-col gap-8">
+              {/* Simple "All set!" message */}
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#ff6b35] flex items-center justify-center text-white text-4xl">
+                  ✓
                 </div>
-
-                {currentStep === 2 ? (
-                  renderAadharVerification()
-                ) : (
-                  <div className="space-y-6">
-                    {steps[currentStep - 1].fields.map((field, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                      >
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {field.label}
-                          {field.required && <span className="text-red-500 ml-1">*</span>}
-                        </label>
-                        {renderField(field)}
-                        {field.name === 'skills' && formData.skills.length > 0 && (
-                          <div className="mt-2 text-sm text-gray-600">
-                            {t('common.selected')}: {formData.skills.join(', ')}
-                          </div>
-                        )}
-                        {field.name === 'languages' && formData.languages.length > 0 && (
-                          <div className="mt-2 text-sm text-gray-600">
-                            {t('common.selected')}: {formData.languages.join(', ')}
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            </AnimatePresence>
-
-            <motion.div
-              className="mt-8 flex justify-between"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              {currentStep > 1 && (
-                <motion.button
-                  type="button"
-                  onClick={handleBack}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-200 font-medium"
-                >
-                  {t('common.back')}
-                </motion.button>
-              )}
+                <h3 className="text-2xl font-bold text-[#222] mb-2">All set!</h3>
+                <p className="text-lg text-[#666]">Ready to create your worker profile</p>
+              </div>
               
-              {currentStep < steps.length ? (
+              {/* Submit Button */}
                 <motion.button
-                  type="button"
-                  onClick={handleNext}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={!validateStep(currentStep) || (currentStep === 2 && !otpVerified)}
-                  className={`ml-auto px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
-                    validateStep(currentStep) && (currentStep !== 2 || otpVerified)
-                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-lg'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                >
-                  {t('common.next')} {currentStep === 1 ? '➡️' : currentStep === 2 ? '➡️' : currentStep === 3 ? '➡️' : currentStep === 4 ? '➡️' : currentStep === 5 ? '➡️' : ''}
+                onClick={submitRegistration}
+                disabled={isSubmitting}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full py-5 px-6 bg-[#ff6b35] text-white rounded-xl text-xl font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 disabled:bg-[#e0e0e0] disabled:text-[#aaa]"
+                aria-label="Submit Registration"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+                    SUBMITTING...
+                  </>
+                ) : (
+                  <>
+                    SUBMIT REGISTRATION
+                    <span className="ml-2">🚀</span>
+                  </>
+                )}
                 </motion.button>
-              ) : (
+            </div>
+          ) : (
+            <form onSubmit={handleInputSubmit} className="flex flex-col gap-8">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={currentInput}
+                  onChange={(e) => setCurrentInput(e.target.value)}
+                  placeholder=" "
+                  disabled={!isWaitingForInput || isSubmitting}
+                  className={`w-full py-5 px-4 text-xl bg-transparent border-b-2 border-[#e0e0e0] text-[#222] focus:outline-none focus:border-[#ff6b35] transition-all duration-300 peer rounded-none ${inputError ? 'animate-shake border-red-500' : ''}`}
+                  aria-label="Type your response"
+                  autoFocus
+                />
+                <label className="absolute left-4 top-1/2 -translate-y-1/2 text-[#222]/60 text-xl pointer-events-none transition-all duration-300 peer-focus:top-0 peer-focus:text-sm peer-focus:text-[#ff6b35] peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-xl peer-placeholder-shown:text-[#222]/60">
+                  {isWaitingForInput ? "Type your response..." : ""}
+                </label>
+              </div>
                 <motion.button
                   type="submit"
-                  disabled={submitting || !validateStep(currentStep) || !otpVerified}
-                  whileHover={{ scale: submitting ? 1 : 1.02 }}
-                  whileTap={{ scale: submitting ? 1 : 0.98 }}
-                  className={`ml-auto px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
-                    submitting || !validateStep(currentStep) || !otpVerified
-                      ? 'bg-gray-400 cursor-not-allowed text-white'
-                      : 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg'
-                  }`}
-                >
-                  {submitting ? (
-                    <motion.div
-                      className="flex items-center"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
-                      <motion.div
-                        className="w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-3"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      />
-                      {t('register.creatingProfile')}...
-                    </motion.div>
-                  ) : (
-                    t('register.completeRegistration') + ' 🎉'
-                  )}
+                disabled={!currentInput.trim() || !isWaitingForInput || isSubmitting}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 disabled:bg-[#e0e0e0] disabled:text-[#aaa]"
+                aria-label="Continue"
+              >
+                CONTINUE <span className="ml-2">→</span>
                 </motion.button>
+            </form>
               )}
             </motion.div>
-          </form>
-
-          {/* Progress Summary */}
-          {currentStep === steps.length && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="mt-8 p-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200"
-            >
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">{t('register.summary')}</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">{t('register.name')}:</span> {formData.name}
                 </div>
-                <div>
-                  <span className="font-medium">{t}('register.phone'):</span> {formData.phone}
+      {/* Debug Panel (only in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed top-4 right-4 bg-black/80 text-white p-4 rounded-lg text-xs max-w-xs z-50">
+          <div className="font-bold mb-2">Debug Info:</div>
+          <div>Current Question: {currentQuestion}</div>
+          <div>Is Submitting: {isSubmitting ? 'Yes' : 'No'}</div>
+          <div>Is Waiting: {isWaitingForInput ? 'Yes' : 'No'}</div>
+          <div>Is Completed: {isCompleted ? 'Yes' : 'No'}</div>
+          <div>Form Data Keys: {Object.keys(formData).join(', ')}</div>
+          <div>User Responses Keys: {Object.keys(userResponses).join(', ')}</div>
+          <div>API URL: {getApiUrl()}</div>
                 </div>
-                <div>
-                  <span className="font-medium">{t('register.skills')}:</span> {formData.skills.length} {t('common.selected')}
-                </div>
-                <div>
-                  <span className="font-medium">{t('register.languages')}:</span> {formData.languages.length} {t('common.selected')}
-                </div>
-                <div>
-                  <span className="font-medium">{t('register.experience')}:</span> {formData.experience}
-                </div>
-                <div>
-                  <span className="font-medium">{t('register.location')}:</span> {formData.location.village}, {formData.location.district}
-                </div>
-              </div>
+      )}
+      
+      {/* Slide-in success message (Framer Motion) */}
+      {showSuccessMsg && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.8, type: "spring", stiffness: 150 }}
-                className="mt-4 pt-4 border-t border-green-200 flex items-center justify-between"
-              >
-                <div>
-                  <span className="font-medium">{t('register.estimatedShaktiScore')}:</span>
-                  <div className="text-3xl font-bold text-blue-600">{calculateShaktiScore(formData)} <Sparkles className="inline-block w-6 h-6 text-yellow-500" /></div>
-                </div>
-                <p className="text-xs text-gray-600 mt-1 max-w-[50%]">
-                  {t('register.shaktiScoreDesc')}
-                </p>
-              </motion.div>
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#222] text-white px-6 py-4 rounded-2xl shadow-lg z-50 text-lg font-semibold"
+          style={{ minWidth: 280, textAlign: 'center' }}
+        >
+          🎉 Worker registration successful!
             </motion.div>
           )}
-        </motion.div>
-      </div>
     </div>
   );
 };
 
-export default WorkerRegistration;
+export default EnhancedWorkerRegistration;

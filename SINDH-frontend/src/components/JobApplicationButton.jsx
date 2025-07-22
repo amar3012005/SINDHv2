@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { getApiUrl } from '../utils/apiUtils.js';
 
-const JobApplicationButton = ({ jobId, workerId, onApplicationSubmit }) => {
+const JobApplicationButton = ({ jobId, workerId, onApplicationSubmit, onRefresh }) => {
   const [isApplied, setIsApplied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,9 +19,11 @@ const JobApplicationButton = ({ jobId, workerId, onApplicationSubmit }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to apply for job');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to apply for job');
       }
 
+      const result = await response.json();
       setIsApplied(true);
       toast.success('Application submitted successfully!');
       
@@ -40,12 +42,29 @@ const JobApplicationButton = ({ jobId, workerId, onApplicationSubmit }) => {
         document.body.removeChild(successAnimation);
       }, 2000);
 
+      // Call both callbacks if provided
       if (onApplicationSubmit) {
         onApplicationSubmit();
       }
+      
+      if (onRefresh) {
+        onRefresh();
+      }
+      
+      // Trigger localStorage refresh for MyApplications page
+      localStorage.setItem('refreshApplications', 'true');
+      
+      // Dispatch custom event for immediate refresh
+      window.dispatchEvent(new CustomEvent('applicationSubmitted', {
+        detail: { jobId, workerId }
+      }));
     } catch (error) {
+      let errorMsg = 'Failed to apply for job';
+      if (error.message) {
+        errorMsg = error.message;
+      }
       console.error('Error applying for job:', error);
-      toast.error('Failed to apply for job');
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }

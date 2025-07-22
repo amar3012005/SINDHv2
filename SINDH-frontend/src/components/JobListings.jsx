@@ -160,7 +160,7 @@ const JobListings = () => {
       <div className="relative z-10 max-w-7xl mx-auto pt-20 px-4 pb-10">
         <div className="mb-8">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="mb-8 px-4 py-2 border border-white/20 font-mono text-xs flex items-center"
           >
             <span>&#8592;</span>

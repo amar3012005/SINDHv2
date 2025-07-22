@@ -30,7 +30,15 @@ const getCorsOrigins = () => {
     'http://localhost:5173',
     'http://localhost:8080', // For Capacitor development
     'capacitor://localhost', // For Capacitor iOS
-    'ionic://localhost' // For Capacitor Android
+    'ionic://localhost', // For Capacitor Android
+    'http://10.0.2.2:3000', // Android Emulator localhost
+    'http://10.0.2.2:3001',
+    'http://10.0.2.2:5173',
+    'http://10.0.2.2:8080',
+    'http://10.0.3.2:3000', // Genymotion Emulator localhost
+    'http://10.0.3.2:3001',
+    'http://10.0.3.2:5173',
+    'http://10.0.3.2:8080'
   ];
   
   // Add production origins
@@ -110,11 +118,10 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/job-applications', jobApplicationRoutes);
 app.use('/api/notifications', notificationRoutes);
 
+const { errorHandler } = require('./middleware/errorHandler');
+
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
-});
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

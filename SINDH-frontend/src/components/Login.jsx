@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useTranslation } from 'react-i18next';
 import { API_BASE_URL } from '../config';
+import { Phone, Shield, User, ArrowRight, ArrowLeft, Loader2, ChevronDown, Briefcase, HardHat } from 'lucide-react';
 
 const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -15,9 +16,20 @@ const Login = () => {
   const [otpError, setOtpError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [showUserTypeSelector, setShowUserTypeSelector] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { loginUser } = useUser();
   const { t } = useTranslation();
+
+  // Set user type from URL if provided
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const type = searchParams.get('type');
+    if (type && ['worker', 'employer'].includes(type)) {
+      setUserType(type);
+    }
+  }, [location]);
 
   // Handle phone number submission and OTP request
   const handleLogin = async () => {
@@ -81,6 +93,16 @@ const Login = () => {
       const data = await response.json();
       console.log('Login response:', data);
 
+      // If user doesn't exist, redirect to registration
+      if (data.newUser) {
+        console.log('New user detected, redirecting to registration');
+        navigate(`/${userType}/register`, { 
+          state: { phoneNumber },
+          replace: true 
+        });
+        return;
+      }
+
       // Successful login - existing user
       if (response.ok && data.success) {
         const userData = {
@@ -114,7 +136,7 @@ const Login = () => {
         toast.success(t('login.success'));
 
         // Redirect existing users to homepage
-        navigate('/');
+        navigate('/home');
       }
       // User doesn't exist - redirect to registration
       else if (response.status === 404 || data.newUser) {
@@ -129,7 +151,10 @@ const Login = () => {
       }
     } catch (error) {
       console.error('OTP verification error:', error);
-      toast.error('Error verifying OTP. Please try again.');
+      
+      // Handle any unexpected errors
+      const errorMessage = error.message || 'Error verifying OTP. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setIsVerifying(false);
     }
@@ -160,146 +185,319 @@ const Login = () => {
     setCountdown(0);
   };
 
+  // Get user type display name
+  const getUserTypeDisplay = (type) => {
+    return type === 'worker' ? 'Worker' : 'Employer';
+  };
+
+  // Get user type icon
+  const getUserTypeIcon = (type) => {
+    return type === 'worker' ? (
+      <HardHat className="w-5 h-5 mr-2" />
+    ) : (
+      <Briefcase className="w-5 h-5 mr-2" />
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg"
-      >
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {t('login.welcome')}
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {showOtpInput ? t('login.enterOtp') : t('login.enterPhone')}
-          </p>
-        </div>
-
-        <div className="mt-8 space-y-6">
-          {!showOtpInput ? (
-            // Phone number input form
-            <>
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={() => setUserType('worker')}
-                  className={`px-4 py-2 rounded-md ${
-                    userType === 'worker'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  {t('login.worker')}
-                </button>
-                <button
-                  onClick={() => setUserType('employer')}
-                  className={`px-4 py-2 rounded-md ${
-                    userType === 'employer'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  {t('login.employer')}
-                </button>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center p-4 sm:p-6">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={showOtpInput ? 'otp' : 'phone'}
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.98 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-md bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden border border-white/20"
+        >
+          {/* Header */}
+          <div className="px-8 pt-8 pb-6 text-center">
+            <div className="flex justify-center mb-2">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                {getUserTypeIcon(userType)}
               </div>
+            </div>
+            <h2 className="mt-4 text-2xl font-bold text-gray-900">
+              {showOtpInput ? 'Verify OTP' : `Login as ${getUserTypeDisplay(userType)}`}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {showOtpInput 
+                ? `We've sent a 4-digit code to ${phoneNumber}`
+                : 'Enter your phone number to continue'}
+            </p>
+          </div>
 
-              <div className="rounded-md shadow-sm -space-y-px">
-                <input
-                  id="phone-number"
-                  name="phone"
-                  type="tel"
-                  required
-                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder={t('login.phonePlaceholder')}
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-
-              <button
-                onClick={handleLogin}
-                disabled={loading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-              >
-                {loading ? (
-                  <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </span>
-                ) : null}
-                {t('login.sendOtp')}
-              </button>
-            </>
-          ) : (
-            // OTP verification form
-            <>
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-4">
-                  {t('login.otpSentTo')} {phoneNumber}
-                </p>
-                <button
-                  onClick={handleBackToPhone}
-                  className="text-sm text-blue-600 hover:text-blue-500"
-                >
-                  {t('login.changePhone')}
-                </button>
-              </div>
-
-              <div className="rounded-md shadow-sm -space-y-px">
-                <input
-                  id="otp"
-                  name="otp"
-                  type="text"
-                  pattern="[0-9]{4}"
-                  maxLength="4"
-                  required
-                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm text-center text-lg tracking-widest"
-                  placeholder={t('login.otpPlaceholder')}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').substring(0, 4))}
-                  disabled={isVerifying}
-                />
-              </div>
-
-              {otpError && (
-                <div className="text-red-600 text-sm text-center">
-                  {otpError}
+          {/* Main Content */}
+          <div className="px-8 pb-8">
+            {!showOtpInput ? (
+              // Phone Number Form
+              <div className="space-y-6">
+                {/* User Type Selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowUserTypeSelector(!showUserTypeSelector)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <div className="flex items-center">
+                      {getUserTypeIcon(userType)}
+                      <span>{getUserTypeDisplay(userType)}</span>
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${showUserTypeSelector ? 'transform rotate-180' : ''}`} />
+                  </button>
+                  
+                  <AnimatePresence>
+                    {showUserTypeSelector && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute z-10 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+                      >
+                        {['worker', 'employer'].map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => {
+                              setUserType(type);
+                              setShowUserTypeSelector(false);
+                            }}
+                            className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                              userType === type ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'
+                            }`}
+                          >
+                            {getUserTypeIcon(type)}
+                            <span>{getUserTypeDisplay(type)}</span>
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              )}
+
+                {/* Phone Input */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500">+91</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="Enter phone number"
+                    className="block w-full pl-14 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    maxLength="10"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleLogin}
+                  disabled={loading || phoneNumber.length !== 10}
+                  className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl text-white font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all ${
+                    loading || phoneNumber.length !== 10
+                      ? 'bg-indigo-400 cursor-not-allowed'
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    <>
+                      Continue with OTP
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              // OTP input form
+              <div className="space-y-6">
+              <div>
+                <div className="relative flex items-center justify-center space-x-3">
+                  {[0, 1, 2, 3].map((index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength="1"
+                      value={otp[index] || ''}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(-1);
+                        const newOtp = otp.split('');
+                        newOtp[index] = value;
+                        const updatedOtp = newOtp.join('');
+                        setOtp(updatedOtp);
+                        
+                        // Auto-focus next input if value entered
+                        if (value && index < 3) {
+                          const nextInput = e.target.parentNode.children[index + 1];
+                          if (nextInput) {
+                            nextInput.focus();
+                          }
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        // Handle backspace to go to previous input
+                        if (e.key === 'Backspace' && !otp[index] && index > 0) {
+                          const prevInput = e.target.parentNode.children[index - 1];
+                          if (prevInput) {
+                            prevInput.focus();
+                          }
+                        }
+                      }}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+                        if (pastedData.length === 4) {
+                          setOtp(pastedData);
+                          // Focus the last input
+                          const lastInput = e.target.parentNode.children[3];
+                          if (lastInput) {
+                            lastInput.focus();
+                          }
+                        }
+                      }}
+                      className={`w-16 h-16 text-2xl font-bold text-center border-2 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${
+                        otp[index] 
+                          ? 'border-green-500 bg-green-50 text-green-700' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      } ${otpError ? 'border-red-300 bg-red-50' : ''}`}
+                      autoFocus={index === 0}
+                      placeholder="•"
+                    />
+                  ))}
+                </div>
+                
+                {/* OTP Progress Indicator */}
+                <div className="flex justify-center mt-4 space-x-1">
+                  {[0, 1, 2, 3].map((index) => (
+                    <div
+                      key={index}
+                      className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                        index < otp.length 
+                          ? 'bg-green-500 scale-110' 
+                          : 'bg-gray-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+                
+                {/* OTP Completion Status */}
+                {otp.length === 4 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex justify-center mt-2"
+                  >
+                    <span className="text-xs text-green-600 font-medium flex items-center">
+                      <span className="mr-1">✓</span>
+                      OTP Complete
+                    </span>
+                  </motion.div>
+                )}
+                
+                {otpError && (
+                  <p className="mt-3 text-sm text-red-600 text-center flex items-center justify-center">
+                    <span className="mr-1">⚠️</span>
+                    {otpError}
+                  </p>
+                )}
+                
+                {/* Test OTP Hint */}
+                <div className="mt-3 text-center">
+                  <p className="text-xs text-gray-500">
+                    💡 Use <span className="font-mono font-bold text-indigo-600">0000</span> for testing
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleBackToPhone}
+                  className="flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-500 transition-colors hover:bg-indigo-50 px-3 py-2 rounded-lg"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back to phone
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={countdown > 0}
+                  className={`text-sm font-medium flex items-center px-3 py-2 rounded-lg transition-all ${
+                    countdown > 0 
+                      ? 'text-gray-400 cursor-not-allowed' 
+                      : 'text-indigo-600 hover:text-indigo-500 hover:bg-indigo-50'
+                  }`}
+                >
+                  {countdown > 0 ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border-2 border-gray-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                      Resend in {countdown}s
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="w-4 h-4 mr-1" />
+                      Resend OTP
+                    </>
+                  )}
+                </button>
+              </div>
 
               <button
                 onClick={handleVerifyOtp}
                 disabled={isVerifying || otp.length !== 4}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl text-white font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all ${
+                  isVerifying || otp.length !== 4
+                    ? 'bg-indigo-400 cursor-not-allowed'
+                    : otp.length === 4
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
               >
                 {isVerifying ? (
-                  <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </span>
-                ) : null}
-                {t('login.verifyOtp')}
+                  <>
+                    <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                    Verifying...
+                  </>
+                ) : otp.length === 4 ? (
+                  <>
+                    <span className="mr-2">✅</span>
+                    Verify and Continue
+                  </>
+                ) : (
+                  <>
+                    <span className="mr-2">🔒</span>
+                    Enter 4-digit OTP
+                  </>
+                )}
               </button>
-
-              <div className="text-center">
-                <button
-                  onClick={handleResendOtp}
-                  disabled={countdown > 0}
-                  className="text-sm text-blue-600 hover:text-blue-500 disabled:text-gray-400"
-                >
-                  {countdown > 0 ? `${t('login.resendOtpIn')} ${countdown}s` : t('login.resendOtp')}
-                </button>
-              </div>
-            </>
+            </div>
           )}
         </div>
+        
+        {/* Footer */}
+        <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
+          <p className="text-xs text-gray-500">
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </p>
+        </div>
       </motion.div>
+    </AnimatePresence>
+    
+    {/* Background elements */}
+    <div className="fixed inset-0 -z-10 overflow-hidden">
+      <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+      <div className="absolute bottom-1/4 left-1/4 w-72 h-72 bg-purple-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+      <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
     </div>
+  </div>
   );
 };
 

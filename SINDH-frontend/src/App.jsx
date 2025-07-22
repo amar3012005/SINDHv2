@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
 import { UserProvider } from './context/UserContext';
 import { TranslationProvider } from './context/TranslationContext';
@@ -21,6 +21,8 @@ import UnifiedRegistration from './components/UnifiedRegistration';
 import PrivateRoute from './components/PrivateRoute';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import GreetingPage from './components/GreetingPage';
+import InitialRoute from './components/InitialRoute';
 
 // Worker Components
 import WorkerRegistration from './components/worker/WorkerRegistration';
@@ -93,16 +95,36 @@ const ErrorFallback = ({ error, resetErrorBoundary }) => {
 const AppContent = () => {
   const location = useLocation();
   const isChatModePage = location.pathname === '/chat-mode';
+  const isGreetingPage = location.pathname === '/greeting';
+  
+  // Check if user has seen greeting
+  const hasSeenGreeting = localStorage.getItem('hasSeenGreeting') === 'true';
   
   return (
     <div className="min-h-screen bg-gray-50">
-      {!isChatModePage && <Navbar />}
-      <main className={isChatModePage ? "" : "pt-16"}>
+      {!isChatModePage && !isGreetingPage && <Navbar />}
+      <main className={isChatModePage || isGreetingPage ? "" : "pt-16"}>
         <AnimatePresence mode="wait">
           <ErrorBoundary fallback={ErrorFallback}>
             <Routes>
+              {/* Root route - Redirect based on greeting status */}
+              <Route 
+                path="/" 
+                element={hasSeenGreeting ? <Navigate to="/home" replace /> : <Navigate to="/greeting" replace />} 
+              />
+              
+              {/* Greeting Page Route */}
+              <Route 
+                path="/greeting" 
+                element={
+                  hasSeenGreeting 
+                    ? <Navigate to="/home" replace /> 
+                    : <GreetingPage />
+                } 
+              />
+              
               {/* Public Routes */}
-              <Route path="/" element={<Layout><Homepage /></Layout>} />
+              <Route path="/home" element={<Layout><Homepage /></Layout>} />
               <Route path="/register" element={<Layout><UnifiedRegistration /></Layout>} />
               
               {/* Worker Routes */}

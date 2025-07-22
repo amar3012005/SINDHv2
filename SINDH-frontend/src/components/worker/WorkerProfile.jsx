@@ -113,6 +113,8 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
   const [earnings, setEarnings] = useState([]);
   const [loadingFinancials, setLoadingFinancials] = useState(false);
   const [completedJobs, setCompletedJobs] = useState([]); // Add completed jobs state
+  const [applications, setApplications] = useState([]); // Add applications state
+  const [loadingApplications, setLoadingApplications] = useState(false); // Add loading state for applications
 
   // Helper function to extract ID from various formats
   const extractWorkerId = (id) => {
@@ -229,6 +231,7 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
       
       // Fetch additional data
       await fetchWorkerStats(workerId);
+      await fetchWorkerApplications(workerId); // Fetch applications here
       
       return data;
     } catch (error) {
@@ -257,6 +260,35 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
       }
     } catch (error) {
       console.error('Error fetching worker stats:', error);
+    }
+  };
+
+  // Fetch worker applications
+  const fetchWorkerApplications = async (workerId) => {
+    if (!workerId) return;
+    
+    setLoadingApplications(true);
+    try {
+      const response = await fetch(`${getApiUrl()}/jobs/worker/${workerId}/accepted-jobs`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Type': 'worker',
+          'User-ID': workerId
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setApplications(data);
+        console.log('Fetched applications:', data);
+      } else {
+        console.error('Failed to fetch applications:', response.status);
+        setApplications([]);
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      setApplications([]);
+    } finally {
+      setLoadingApplications(false);
     }
   };
 
@@ -433,6 +465,8 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
         if (data) {
           populateFormData(data);
           fetchFinancials();
+          fetchWorkerStats(workerId);
+          fetchWorkerApplications(workerId);
         }
       } catch (error) {
         setError(error.message);
@@ -442,12 +476,46 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
           console.log('Using cached data as fallback');
           populateFormData(userData);
           fetchFinancials();
+          fetchWorkerStats(workerId);
+          fetchWorkerApplications(workerId);
         }
       }
     };
 
     initializeProfile();
   }, [workerId, propWorkerData, fetchWorkerProfile, getWorkerId, populateFormData, getUserData, fetchFinancials]);
+
+  // Listen for application submission events
+  useEffect(() => {
+    const handleApplicationSubmitted = (event) => {
+      console.log('🔄 Application submitted event received in WorkerProfile:', event.detail);
+      const workerId = getWorkerId();
+      if (workerId) {
+        fetchWorkerApplications(workerId);
+        fetchWorkerStats(workerId);
+      }
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'refreshApplications' && e.newValue === 'true') {
+        console.log('🔄 Storage event triggered in WorkerProfile - refreshing applications');
+        localStorage.removeItem('refreshApplications');
+        const workerId = getWorkerId();
+        if (workerId) {
+          fetchWorkerApplications(workerId);
+          fetchWorkerStats(workerId);
+        }
+      }
+    };
+
+    window.addEventListener('applicationSubmitted', handleApplicationSubmitted);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('applicationSubmitted', handleApplicationSubmitted);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [getWorkerId, fetchWorkerApplications, fetchWorkerStats]);
 
   const calculateShaktiScore = (workerData) => {
     let score = 0;
@@ -993,7 +1061,7 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
                     <div className="space-y-3 sm:space-y-4">
                       <div className="flex justify-between items-center p-2 sm:p-3 bg-green-50 rounded-lg">
                         <span className="text-gray-600 text-sm">Applications</span>
-                        <span className="text-green-600 font-bold">{stats.totalApplications}</span>
+                        <span className="text-green-600 font-bold">{applications.length || stats.totalApplications}</span>
                       </div>
                       <div className="flex justify-between items-center p-2 sm:p-3 bg-blue-50 rounded-lg">
                         <span className="text-gray-600 text-sm">Active Jobs</span>
@@ -1178,20 +1246,134 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
 
             {activeTab === 'applications' && (
               <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-6 sm:p-8">
-                <div className="text-center py-12 sm:py-16">
-                  <Briefcase className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 text-gray-300" />
-                  <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">No Applications Yet</h3>
-                  <p className="text-gray-500 mb-6 sm:mb-8 max-w-md mx-auto text-sm sm:text-base">
-                    Start applying for jobs to see your applications here.
-                  </p>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl sm:text-2xl font-semibold text-gray-900">My Applications</h3>
                   <button 
-                    onClick={() => navigate('/worker/find-work')}
-                    className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm sm:text-base"
+                    onClick={() => navigate('/my-applications')}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                   >
-                    <Eye className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    Find Jobs
+                    View All Applications
                   </button>
                 </div>
+                
+                {loadingApplications ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-500 mt-2">Loading applications...</p>
+                  </div>
+                ) : applications.length > 0 ? (
+                  <div className="space-y-4">
+                    {applications.slice(0, 5).map((application) => (
+                      <div key={application._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 mb-1">
+                              {application.job?.title || 'Job Title Not Available'}
+                            </h4>
+                            <p className="text-sm text-gray-600">
+                              {application.job?.companyName || application.employer?.name || 'Company Not Available'}
+                            </p>
+                          </div>
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            application.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            application.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                            application.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                            application.status === 'completed' ? 'bg-purple-100 text-purple-800' :
+                            application.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {application.status === 'pending' ? '⏳ Pending' :
+                             application.status === 'accepted' ? '✅ Accepted' :
+                             application.status === 'in-progress' ? '🔄 In Progress' :
+                             application.status === 'completed' ? '✅ Completed' :
+                             application.status === 'rejected' ? '❌ Rejected' :
+                             '❓ Unknown'}
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div className="flex items-center text-gray-600">
+                            <span className="text-green-600 font-semibold mr-2">₹</span>
+                            <span>
+                              {application.job?.salary?.toLocaleString() || '0'} 
+                              {application.job?.employmentType === 'Full-time' ? '/month' : '/day'}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center text-gray-600">
+                            <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span>
+                              {application.job?.location?.city || 'Location not specified'}, {application.job?.location?.state || 'State not specified'}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center text-gray-600">
+                            <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2h8z" />
+                            </svg>
+                            <span>{application.job?.category || 'General Work'}</span>
+                          </div>
+                          
+                          <div className="flex items-center text-gray-600">
+                            <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span>
+                              Applied: {new Date(application.createdAt || application.appliedAt || Date.now()).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                          <button
+                            onClick={() => window.location.href = `/jobs/${application.job?._id}`}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                          >
+                            View Job
+                          </button>
+                          
+                          {application.status === 'accepted' && (
+                            <button
+                              onClick={() => window.location.href = `/chat/${application._id}`}
+                              className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 transition-colors"
+                            >
+                              Contact Employer
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {applications.length > 5 && (
+                      <div className="text-center pt-4">
+                        <button 
+                          onClick={() => navigate('/my-applications')}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          View All {applications.length} Applications →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 sm:py-16">
+                    <Briefcase className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 text-gray-300" />
+                    <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">No Applications Yet</h3>
+                    <p className="text-gray-500 mb-6 sm:mb-8 max-w-md mx-auto text-sm sm:text-base">
+                      Start applying for jobs to see your applications here.
+                    </p>
+                    <button 
+                      onClick={() => navigate('/worker/find-work')}
+                      className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium text-sm sm:text-base"
+                    >
+                      <Eye className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                      Find Jobs
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

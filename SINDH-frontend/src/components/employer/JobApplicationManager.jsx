@@ -8,10 +8,12 @@ import {
   Phone, 
   MapPin,
   Star,
-  XCircle
+  XCircle,
+  TrendingUp
 } from 'lucide-react';
 import PaymentModal from './PaymentModal';
 import { getApiUrl } from '../../utils/apiUtils.js';
+import EmployerApplicationProgress from './EmployerApplicationProgress';
 
 const JobApplicationManager = ({ jobId }) => {
   const [applications, setApplications] = useState([]);
@@ -96,137 +98,30 @@ const JobApplicationManager = ({ jobId }) => {
         Job Applications ({applications.length})
       </h3>
 
+      {/* Progress Tracking Component */}
       {applications.length === 0 ? (
         <div className="text-center py-8 bg-gray-50 rounded-lg">
           <User className="w-12 h-12 mx-auto mb-3 text-gray-300" />
           <p className="text-gray-500">No applications yet</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {applications.map((application) => (
-            <motion.div
-              key={application._id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              {/* Application Header */}
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      {application.worker?.name || application.workerDetails?.name}
-                    </h4>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Phone className="w-4 h-4 mr-1" />
-                      {application.worker?.phone || application.workerDetails?.phone}
-                    </div>
-                  </div>
-                </div>
-                
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(application.status)}`}>
-                  {application.status?.charAt(0).toUpperCase() + application.status?.slice(1)}
-                </span>
-              </div>
-
-              {/* Worker Details */}
-              <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                <div>
-                  <span className="text-gray-500">Skills:</span>
-                  <p className="font-medium">
-                    {application.worker?.skills?.join(', ') || application.workerDetails?.skills?.join(', ') || 'Not specified'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-gray-500">Experience:</span>
-                  <p className="font-medium">
-                    {application.worker?.experience || 'Not specified'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Payment Status */}
-              {application.status === 'completed' && (
-                <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="text-sm text-gray-500">Payment Status:</span>
-                      <p className={`font-medium ${
-                        application.paymentStatus === 'paid' ? 'text-green-600' : 'text-yellow-600'
-                      }`}>
-                        {application.paymentStatus === 'paid' ? 'Paid' : 'Pending Payment'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm text-gray-500">Amount:</span>
-                      <p className="font-bold text-lg">₹{application.paymentAmount || application.job?.salary}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex space-x-3">
-                {application.status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => updateApplicationStatus(application._id, 'accepted')}
-                      className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => updateApplicationStatus(application._id, 'rejected')}
-                      className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Reject
-                    </button>
-                  </>
-                )}
-
-                {application.status === 'accepted' && (
-                  <button
-                    onClick={() => updateApplicationStatus(application._id, 'in-progress')}
-                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
-                  >
-                    <Clock className="w-4 h-4 mr-2" />
-                    Start Work
-                  </button>
-                )}
-
-                {application.status === 'in-progress' && (
-                  <button
-                    onClick={() => updateApplicationStatus(application._id, 'completed')}
-                    className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Mark Complete
-                  </button>
-                )}
-
-                {application.status === 'completed' && application.paymentStatus !== 'paid' && (
-                  <button
-                    onClick={() => handlePayWorker(application)}
-                    className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
-                  >
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Pay Worker
-                  </button>
-                )}
-
-                {application.status === 'completed' && application.paymentStatus === 'paid' && (
-                  <div className="flex-1 px-3 py-2 bg-green-100 text-green-800 rounded-lg text-center flex items-center justify-center">
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Payment Complete
-                  </div>
-                )}
-              </div>
-            </motion.div>
+            <div key={application._id} className="space-y-4">
+              <EmployerApplicationProgress 
+                jobId={jobId}
+                application={application}
+                onStatusChange={(status) => {
+                  setApplications(prev => 
+                    prev.map(app => 
+                      app._id === application._id 
+                        ? { ...app, status } 
+                        : app
+                    )
+                  );
+                }}
+              />
+            </div>
           ))}
         </div>
       )}

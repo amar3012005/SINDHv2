@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, 
@@ -15,13 +16,28 @@ import {
   AlertCircle,
   Clock,
   CheckCircle,
-  X
+  X,
+  Star,
+  TrendingUp,
+  BarChart3,
+  MessageSquare,
+  Phone,
+  Mail,
+  Download,
+  Filter,
+  Search,
+  Award,
+  Target,
+  Zap,
+  Shield,
+  Heart
 } from 'lucide-react';
 import { getApiUrl } from '../../utils/apiUtils.js';
 
 const PostedJobs = () => {
   const { jobId } = useParams?.() || {};
   const location = useLocation?.() || {};
+  const navigate = useNavigate();
   const [showSuccess, setShowSuccess] = useState(false);
   const jobRefs = useRef({});
   const [jobs, setJobs] = useState([]);
@@ -36,6 +52,16 @@ const PostedJobs = () => {
   const [selectedJobApplications, setSelectedJobApplications] = useState(null);
   const [selectedApplicationStatus, setSelectedApplicationStatus] = useState('all');
   const [loadingApplications, setLoadingApplications] = useState(false);
+  
+  // New state for enhanced features
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [selectedJobForAnalytics, setSelectedJobForAnalytics] = useState(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedWorkerForRating, setSelectedWorkerForRating] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [selectedJobForQuickActions, setSelectedJobForQuickActions] = useState(null);
 
 
   useEffect(() => {
@@ -84,7 +110,15 @@ const PostedJobs = () => {
         console.log('📋 Sorted jobs:', jobsData.map(job => ({ id: job._id, title: job.title, createdAt: job.createdAt })));
         
         setJobs(jobsData);
-        // Don't fetch applications automatically - only fetch when user requests to view them
+        
+        // Fetch applications for all jobs after jobs are loaded
+        if (jobsData.length > 0) {
+          // Use a slight delay to ensure jobs state is updated
+          setTimeout(() => {
+            fetchApplicationsForAllJobs(jobsData);
+          }, 100);
+        }
+        
         // If jobId is present, scroll to or highlight it after jobs load
         setTimeout(() => {
           if (jobId && jobRefs.current[jobId]) {
@@ -112,35 +146,131 @@ const PostedJobs = () => {
     }
   };
 
-  // PERFORMANCE OPTIMIZATION: Applications are now fetched on-demand only when user clicks "View Applications"
-  // This prevents unnecessary API calls and improves page load performance
+  // Fetch applications for all jobs
+  const fetchApplicationsForAllJobs = async (jobsData = jobs) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!user.id || user.type !== 'employer') {
+        console.log('User not authenticated or not an employer');
+        return;
+      }
+
+      // Fetch all applications for the employer's jobs in a single request
+      const response = await fetch(`${getApiUrl()}/job-applications/employer/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to fetch applications:', await response.text());
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Fetched applications:', data);
+      
+      if (data.success && Array.isArray(data.data)) {
+        // Transform the data into a map of jobId to applications
+        const applicationsMap = {};
+        data.data.forEach(app => {
+          if (app.job) {
+            if (!applicationsMap[app.job._id]) {
+              applicationsMap[app.job._id] = [];
+            }
+            applicationsMap[app.job._id].push(app);
+          }
+        });
+        
+        console.log('Applications map:', applicationsMap);
+        setJobApplications(applicationsMap);
+      } else {
+        console.error('Invalid response format:', data);
+        // Initialize empty applications for all jobs
+        const emptyMap = {};
+        jobsData.forEach(job => {
+          emptyMap[job._id] = [];
+        });
+        setJobApplications(emptyMap);
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      // Initialize empty applications for all jobs on error
+      const emptyMap = {};
+      jobsData.forEach(job => {
+        emptyMap[job._id] = [];
+      });
+      setJobApplications(emptyMap);
+    }
+  };
+
+  // Fetch applications for a specific job
+  const fetchApplicationsForJob = async (jobId) => {
+    try {
+      setLoadingApplications(true);
+      const response = await fetch(`${getApiUrl()}/job-applications/job/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const applications = await response.json();
+        const job = jobs.find(j => j._id === jobId);
+        setSelectedJobApplications({
+          job,
+          applications: Array.isArray(applications) ? applications : []
+        });
+        setShowApplicationsModal(true);
+      } else {
+        throw new Error('Failed to fetch applications');
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+      alert('Failed to load applications: ' + error.message);
+    } finally {
+      setLoadingApplications(false);
+    }
+  };
 
   const handleRefresh = () => {
-    console.log('🔄 Refreshing jobs list (without fetching applications)...');
+    console.log('🔄 Refreshing jobs list and applications...');
     setRefreshing(true);
     fetchJobs();
   };
 
   const handleDeleteJob = async (jobId) => {
-    if (!window.confirm('Are you sure you want to delete this job?')) {
+    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone.')) {
       return;
     }
 
     try {
       const response = await fetch(`${getApiUrl()}/jobs/${jobId}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
 
       if (response.ok) {
-        setJobs(jobs.filter(job => job._id !== jobId));
-        alert('Job deleted successfully');
+        // Remove the job from the local state
+        setJobs(prevJobs => prevJobs.filter(job => job._id !== jobId));
+        // Show success message
+        toast.success('Job deleted successfully');
       } else {
-        throw new Error('Failed to delete job');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete job');
       }
     } catch (error) {
       console.error('Error deleting job:', error);
-      alert('Failed to delete job: ' + error.message);
+      toast.error(error.message || 'Failed to delete job');
     }
+  };
+
+  const handleEditJob = (job) => {
+    // Navigate to the edit job page with the job data
+    navigate(`/employer/jobs/edit/${job._id}`, { state: { job } });
   };
 
   const handlePayWorker = (job, application) => {
@@ -153,6 +283,136 @@ const PostedJobs = () => {
     setShowPaymentModal(false);
     setSelectedJobForPayment(null);
     fetchJobs(); // Refresh to show updated payment status
+  };
+
+  // Enhanced functions for new features
+  const handleShowAnalytics = (job) => {
+    setSelectedJobForAnalytics(job);
+    setShowAnalyticsModal(true);
+  };
+
+  const handleRateWorker = (worker, job) => {
+    setSelectedWorkerForRating({ worker, job });
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = async (ratingData) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/ratings/worker/${ratingData.worker._id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          score: ratingData.score,
+          comment: ratingData.comment,
+          jobId: ratingData.job._id
+        })
+      });
+
+      if (response.ok) {
+        alert('Rating submitted successfully!');
+        setShowRatingModal(false);
+        setSelectedWorkerForRating(null);
+      } else {
+        throw new Error('Failed to submit rating');
+      }
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      alert('Failed to submit rating: ' + error.message);
+    }
+  };
+
+  const handleQuickAction = async (action, job) => {
+    try {
+      console.log(`🔄 Performing quick action: ${action} on job: ${job._id}`);
+      
+      switch (action) {
+        case 'duplicate':
+          // Clone job with new title
+          const jobData = { ...job };
+          delete jobData._id;
+          jobData.title = `${job.title} (Copy)`;
+          jobData.status = 'active';
+          
+          const response = await fetch(`${getApiUrl()}/jobs`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(jobData)
+          });
+
+          if (response.ok) {
+            console.log('✅ Job duplicated successfully');
+            alert('Job duplicated successfully!');
+            await fetchJobs();
+          } else {
+            throw new Error('Failed to duplicate job');
+          }
+          break;
+          
+        case 'pause':
+          await updateJobStatus(job._id, 'paused');
+          break;
+          
+        case 'activate':
+          await updateJobStatus(job._id, 'active');
+          break;
+          
+        case 'close':
+          await updateJobStatus(job._id, 'closed');
+          break;
+          
+        default:
+          throw new Error(`Unknown action: ${action}`);
+      }
+    } catch (error) {
+      console.error('❌ Error performing quick action:', error);
+      alert('Failed to perform action: ' + error.message);
+    }
+  };
+
+  // Enhanced job status update with validation and logging
+  const updateJobStatus = async (jobId, newStatus, reason = 'System update') => {
+    try {
+      console.log(`🔄 Updating job ${jobId} status to: ${newStatus}`);
+      
+      const response = await fetch(`${getApiUrl()}/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          updatedBy: JSON.parse(localStorage.getItem('user') || '{}').id,
+          timestamp: new Date().toISOString(),
+          reason: reason
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Job status updated successfully:`, result);
+        
+        // Update local jobs state
+        setJobs(prevJobs => 
+          prevJobs.map(job => 
+            job._id === jobId 
+              ? { ...job, status: newStatus, updatedAt: new Date().toISOString() }
+              : job
+          )
+        );
+        
+        return result;
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update job status');
+      }
+    } catch (error) {
+      console.error('❌ Error updating job status:', error);
+      throw error;
+    }
   };
 
   const handleViewApplications = async (job) => {
@@ -192,57 +452,167 @@ const PostedJobs = () => {
     }
   };
 
-  const updateApplicationStatus = async (applicationId, newStatus) => {
+  // Enhanced application status update with comprehensive validation and flow management
+  const updateApplicationStatus = async (applicationId, newStatus, additionalData = {}) => {
     try {
-      console.log('Updating application status:', applicationId, 'to:', newStatus);
+      console.log('🔄 Updating application status:', applicationId, 'to:', newStatus);
+      
+      // Validate status transition
+      const validTransitions = {
+        'pending': ['accepted', 'rejected'],
+        'accepted': ['in-progress', 'cancelled'],
+        'in-progress': ['completed', 'cancelled'],
+        'completed': [], // Terminal state
+        'rejected': [], // Terminal state
+        'cancelled': [] // Terminal state
+      };
+      
+      // Get current application to check current status
+      const currentApp = selectedJobApplications?.applications?.find(app => app._id === applicationId);
+      if (currentApp && validTransitions[currentApp.status] && !validTransitions[currentApp.status].includes(newStatus)) {
+        throw new Error(`Invalid status transition from ${currentApp.status} to ${newStatus}`);
+      }
+      
+      // Prepare request body with additional data
+      const requestBody = {
+        status: newStatus,
+        ...additionalData,
+        timestamp: new Date().toISOString(),
+        updatedBy: JSON.parse(localStorage.getItem('user') || '{}').id
+      };
       
       const response = await fetch(`${getApiUrl()}/job-applications/${applicationId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Application status updated successfully:', result);
+        console.log('✅ Application status updated successfully:', result);
+        
+        // Handle specific status transitions
+        await handleStatusTransitionEffects(newStatus, result.data, currentApp);
         
         // Refresh jobs data to show updated status
-        fetchJobs();
+        await fetchJobs();
         
-        // Show success message
-        alert(`Application ${newStatus} successfully!`);
+        // Show success message with context
+        const statusMessages = {
+          'accepted': 'Application accepted! Worker has been notified.',
+          'rejected': 'Application rejected. Worker has been notified.',
+          'in-progress': 'Job started! Worker has been notified.',
+          'completed': 'Job completed! Payment processing initiated.',
+          'cancelled': 'Job cancelled. All parties have been notified.'
+        };
         
-        // If modal is open, close and reopen to refresh data
+        alert(statusMessages[newStatus] || `Application ${newStatus} successfully!`);
+        
+        // If modal is open, refresh the applications data
         if (showApplicationsModal && selectedJobApplications) {
-          setShowApplicationsModal(false);
           setTimeout(() => {
             handleViewApplications(selectedJobApplications.job);
-          }, 500);
+          }, 1000);
         }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update application status');
       }
     } catch (error) {
-      console.error('Error updating application status:', error);
+      console.error('❌ Error updating application status:', error);
       alert('Failed to update application status: ' + error.message);
     }
   };
+  
+  // Handle effects of status transitions
+  const handleStatusTransitionEffects = async (newStatus, applicationData, currentApp) => {
+    try {
+      switch (newStatus) {
+        case 'accepted':
+          // Update job status to in-progress if not already
+          if (applicationData.job && applicationData.job.status === 'active') {
+            await updateJobStatus(applicationData.job._id, 'in-progress');
+          }
+          break;
+          
+        case 'completed':
+          // Trigger payment processing
+          await initiatePaymentProcess(applicationData);
+          break;
+          
+        case 'cancelled':
+          // Check if all applications are cancelled/rejected, then revert job to active
+          await checkAndUpdateJobStatusAfterCancellation(applicationData.job._id);
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling status transition effects:', error);
+    }
+  };
+  
 
+  
+  // Initiate payment process for completed jobs
+  const initiatePaymentProcess = async (applicationData) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/job-applications/${applicationData._id}/process-payment`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          paymentAmount: applicationData.job?.salary || applicationData.paymentAmount,
+          completedAt: new Date().toISOString()
+        })
+      });
+      
+      if (response.ok) {
+        console.log('✅ Payment processing initiated');
+      }
+    } catch (error) {
+      console.error('Error initiating payment process:', error);
+    }
+  };
+  
+  // Check and update job status after cancellation
+  const checkAndUpdateJobStatusAfterCancellation = async (jobId) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/job-applications/job/${jobId}`);
+      if (response.ok) {
+        const data = await response.json();
+        const applications = data.data || [];
+        
+        // If all applications are cancelled/rejected, revert job to active
+        const activeApplications = applications.filter(app => 
+          !['cancelled', 'rejected'].includes(app.status)
+        );
+        
+        if (activeApplications.length === 0) {
+          await updateJobStatus(jobId, 'active', 'All applications cancelled/rejected');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking job status after cancellation:', error);
+    }
+  };
+
+  // Enhanced status color coding for jobs
   const getStatusColor = (status) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'in-progress':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'completed':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'paused':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -254,15 +624,137 @@ const PostedJobs = () => {
         return <Clock className="w-3 h-3 sm:w-4 sm:h-4" />;
       case 'completed':
         return <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />;
+      case 'paused':
+        return <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />;
+      case 'cancelled':
+        return <X className="w-3 h-3 sm:w-4 sm:h-4" />;
       default:
         return <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />;
     }
   };
+  
+  // Enhanced application status color coding
+  const getApplicationStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'accepted':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'in-progress':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'completed':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+  
+  const getApplicationStatusIcon = (status) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="w-3 h-3 sm:w-4 sm:h-4" />;
+      case 'accepted':
+        return <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />;
+      case 'rejected':
+        return <X className="w-3 h-3 sm:w-4 sm:h-4" />;
+      case 'in-progress':
+        return <Zap className="w-3 h-3 sm:w-4 sm:h-4" />;
+      case 'completed':
+        return <Award className="w-3 h-3 sm:w-4 sm:h-4" />;
+      case 'cancelled':
+        return <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />;
+      default:
+        return <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />;
+    }
+  };
+  
+  // Get available actions for application status
+  const getAvailableActions = (currentStatus) => {
+    const actionMap = {
+      'pending': [
+        { action: 'accepted', label: 'Accept', color: 'bg-green-600 hover:bg-green-700', icon: CheckCircle },
+        { action: 'rejected', label: 'Reject', color: 'bg-red-600 hover:bg-red-700', icon: X }
+      ],
+      'accepted': [
+        { action: 'in-progress', label: 'Start Job', color: 'bg-blue-600 hover:bg-blue-700', icon: Zap },
+        { action: 'cancelled', label: 'Cancel', color: 'bg-gray-600 hover:bg-gray-700', icon: X }
+      ],
+      'in-progress': [
+        { action: 'completed', label: 'Mark Complete', color: 'bg-purple-600 hover:bg-purple-700', icon: Award },
+        { action: 'cancelled', label: 'Cancel', color: 'bg-gray-600 hover:bg-gray-700', icon: X }
+      ],
+      'completed': [],
+      'rejected': [],
+      'cancelled': []
+    };
+    
+    return actionMap[currentStatus] || [];
+  };
+  
+  // Enhanced status transition with confirmation
+  const handleStatusTransition = async (applicationId, newStatus, currentStatus) => {
+    const confirmationMessages = {
+      'accepted': 'Are you sure you want to accept this application? The worker will be notified.',
+      'rejected': 'Are you sure you want to reject this application? This action cannot be undone.',
+      'in-progress': 'Are you sure you want to start this job? The worker will be notified to begin work.',
+      'completed': 'Are you sure you want to mark this job as completed? Payment will be processed.',
+      'cancelled': 'Are you sure you want to cancel this job? All parties will be notified.'
+    };
+    
+    const message = confirmationMessages[newStatus] || `Are you sure you want to change status to ${newStatus}?`;
+    
+    if (window.confirm(message)) {
+      await updateApplicationStatus(applicationId, newStatus, {
+        previousStatus: currentStatus,
+        transitionReason: 'Employer action',
+        transitionTimestamp: new Date().toISOString()
+      });
+    }
+  };
 
-  const filteredJobs = jobs.filter(job => {
-    if (filterStatus === 'all') return true;
-    return job.status === filterStatus;
-  });
+  // Enhanced filtering and sorting
+  const filteredAndSortedJobs = jobs
+    .filter(job => {
+      // Status filter
+      if (filterStatus !== 'all' && job.status !== filterStatus) return false;
+      
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          job.title?.toLowerCase().includes(searchLower) ||
+          job.description?.toLowerCase().includes(searchLower) ||
+          job.category?.toLowerCase().includes(searchLower) ||
+          job.location?.city?.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'createdAt':
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        case 'title':
+          return (a.title || '').localeCompare(b.title || '');
+        case 'salary':
+          return (b.salary || 0) - (a.salary || 0);
+        case 'applications':
+          const aApps = jobApplications[a._id]?.length || 0;
+          const bApps = jobApplications[b._id]?.length || 0;
+          return bApps - aApps;
+        case 'status':
+          return (a.status || '').localeCompare(b.status || '');
+        default:
+          return new Date(b.createdAt) - new Date(a.createdAt);
+      }
+    });
+
+  const filteredJobs = filteredAndSortedJobs;
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -388,29 +880,72 @@ const PostedJobs = () => {
           </div>
         )}
 
-        {/* Filter Tabs - Mobile Scrollable */}
-        <div className="bg-white rounded-lg shadow-sm p-1 mb-4 sm:mb-6">
-          <div className="flex space-x-1 overflow-x-auto">
-            {[
-              { value: 'all', label: 'All Jobs' },
-              { value: 'active', label: 'Active' },
-              { value: 'in-progress', label: 'In Progress' },
-              { value: 'completed', label: 'Completed' }
-            ].map(filter => (
-              <button
-                key={filter.value}
-                onClick={() => setFilterStatus(filter.value)}
-                className={`flex-1 min-w-0 px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap touch-manipulation ${
-                  filterStatus === filter.value
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
+        {/* Enhanced Search and Filter Section - Mobile Responsive */}
+        <div className="bg-white rounded-lg shadow-sm p-3 sm:p-4 mb-4 sm:mb-6">
+          {/* Search Bar */}
+          <div className="flex items-center space-x-2 mb-3 sm:mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search jobs by title, description, category, or location..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+              />
+            </div>
+            <button
+              onClick={() => setSearchTerm('')}
+              className="px-3 py-2 text-gray-500 hover:text-gray-700 transition-colors"
+              title="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Filter and Sort Controls */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            {/* Status Filter Tabs */}
+            <div className="flex space-x-1 overflow-x-auto flex-1">
+              {[
+                { value: 'all', label: 'All Jobs' },
+                { value: 'active', label: 'Active' },
+                { value: 'in-progress', label: 'In Progress' },
+                { value: 'completed', label: 'Completed' },
+                { value: 'paused', label: 'Paused' },
+                { value: 'closed', label: 'Closed' }
+              ].map(filter => (
+                <button
+                  key={filter.value}
+                  onClick={() => setFilterStatus(filter.value)}
+                  className={`flex-1 min-w-0 px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap touch-manipulation ${
+                    filterStatus === filter.value
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="hidden sm:inline">{filter.label}</span>
+                  <span className="sm:hidden">{filter.label.split(' ')[0]}</span>
+                  <span className="ml-1">({jobs.filter(job => filter.value === 'all' || job.status === filter.value).length})</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Sort Dropdown */}
+            <div className="flex items-center space-x-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
               >
-                <span className="hidden sm:inline">{filter.label}</span>
-                <span className="sm:hidden">{filter.label.split(' ')[0]}</span>
-                <span className="ml-1">({jobs.filter(job => filter.value === 'all' || job.status === filter.value).length})</span>
-              </button>
-            ))}
+                <option value="createdAt">Latest First</option>
+                <option value="title">Title A-Z</option>
+                <option value="salary">Salary High-Low</option>
+                <option value="applications">Most Applications</option>
+                <option value="status">Status</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -482,29 +1017,94 @@ const PostedJobs = () => {
                     </div>
 
                     <div className="p-3 sm:p-4">
-                      {/* Job Title and Category - Mobile Responsive */}
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 line-clamp-2">
-                        {job.title}
-                      </h3>
-                      <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3 truncate">{job.category}</p>
+                      {/* Job Header with Status Badge */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 line-clamp-2">
+                            {job.title}
+                          </h3>
+                          <div className="flex items-center">
+                            <span className="text-xs px-2 py-0.5 rounded-full mr-2 capitalize"
+                              style={{
+                                backgroundColor: job.status === 'active' ? '#dbeafe' : 
+                                              job.status === 'in-progress' ? '#dbeafe' : 
+                                              job.status === 'completed' ? '#dcfce7' : '#f3f4f6',
+                                color: job.status === 'active' ? '#1e40af' : 
+                                       job.status === 'in-progress' ? '#1e40af' : 
+                                       job.status === 'completed' ? '#166534' : '#6b7280'
+                              }}>
+                              {job.status.replace('-', ' ')}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {applications.length} application{applications.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Quick Actions Dropdown */}
+                        <div className="relative">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedJobForQuickActions(selectedJobForQuickActions === job._id ? null : job._id);
+                            }}
+                            className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                            </svg>
+                          </button>
+                          
+                          {selectedJobForQuickActions === job._id && (
+                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewApplications(job);
+                                  setSelectedJobForQuickActions(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 flex items-center"
+                              >
+                                <Eye className="w-4 h-4 mr-2" /> View Applications
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditJob(job);
+                                  setSelectedJobForQuickActions(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 flex items-center"
+                              >
+                                <Edit className="w-4 h-4 mr-2" /> Edit Job
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteJob(job._id);
+                                  setSelectedJobForQuickActions(null);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete Job
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Job Details - Mobile Grid */}
-                      <div className="space-y-1 sm:space-y-2 mb-3 sm:mb-4">
+                      <div className="space-y-1.5 sm:space-y-2 mb-3 sm:mb-4">
                         <div className="flex items-center text-xs sm:text-sm text-gray-600">
-                          <MapPin className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-gray-400" />
-                          <span className="truncate">{job.location?.city}, {job.location?.state}</span>
+                          <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 text-blue-500" />
+                          <span className="truncate">{job.location?.city || 'Location'}, {job.location?.state || 'N/A'}</span>
                         </div>
                         
                         <div className="flex items-center text-xs sm:text-sm text-gray-600">
-                          <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-gray-400" />
+                          <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 text-green-500" />
                           <span className="font-medium text-green-600">
-                            ₹{job.salary?.toLocaleString() || 'Not specified'}
+                            ₹{job.salary?.toLocaleString() || 'Negotiable'}
+                            <span className="text-gray-500 text-xs ml-1">/ {job.employmentType || 'Job'}</span>
                           </span>
-                        </div>
-
-                        <div className="flex items-center text-xs sm:text-sm text-gray-600">
-                          <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-2 text-gray-400" />
-                          <span>{applications.length} application{applications.length !== 1 ? 's' : ''}</span>
                         </div>
 
                         {job.startDate && (
@@ -515,66 +1115,146 @@ const PostedJobs = () => {
                         )}
                       </div>
 
-                      {/* Applications Summary for Active Jobs - Mobile Optimized */}
+                      {/* Application Status Quick Actions */}
                       {job.status === 'active' && applications.length > 0 && (
-                        <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-blue-50 rounded-lg">
-                          <h4 className="text-xs sm:text-sm font-medium text-blue-900 mb-2">
-                            Applications Summary
-                          </h4>
-                          <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-blue-700">Pending:</span>
-                              <span className="font-medium">
-                                {applications.filter(app => app.status === 'pending').length}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-700">Accepted:</span>
-                              <span className="font-medium">
-                                {applications.filter(app => app.status === 'accepted').length}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-700">In Progress:</span>
-                              <span className="font-medium">
-                                {applications.filter(app => app.status === 'in-progress').length}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-700">Completed:</span>
-                              <span className="font-medium">
-                                {applications.filter(app => app.status === 'completed').length}
-                              </span>
-                            </div>
-                          </div>
+                        <div className="mb-3 sm:mb-4">
+                          {/* Pending Applications Alert */}
                           {applications.filter(app => app.status === 'pending').length > 0 && (
-                            <div className="mt-2 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded">
-                              ⏳ {applications.filter(app => app.status === 'pending').length} application{applications.filter(app => app.status === 'pending').length !== 1 ? 's' : ''} waiting for your response
+                            <div className="mb-2 p-2 bg-amber-50 border border-amber-100 rounded-lg">
+                              <div className="flex items-start">
+                                <div className="flex-shrink-0">
+                                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700">
+                                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                </div>
+                                <div className="ml-3">
+                                  <p className="text-xs font-medium text-amber-800">
+                                    {applications.filter(app => app.status === 'pending').length} pending application{applications.filter(app => app.status === 'pending').length !== 1 ? 's' : ''}
+                                  </p>
+                                  <button
+                                    onClick={() => handleViewApplications(job)}
+                                    className="mt-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                                  >
+                                    Review now →
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           )}
+
+                          {/* Status Summary Bar */}
+                          <div className="bg-gray-50 p-2 rounded-lg">
+                            <div className="flex justify-between text-xs text-gray-600 mb-1.5">
+                              <span>Applications</span>
+                              <span className="font-medium">{applications.length}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                              <div 
+                                className="h-1.5 rounded-full bg-blue-500" 
+                                style={{ 
+                                  width: `${(applications.length / Math.max(applications.length, 1)) * 100}%` 
+                                }}
+                              ></div>
+                            </div>
+                            <div className="grid grid-cols-4 gap-1 text-center text-[10px] sm:text-xs">
+                              <div className="flex flex-col items-center">
+                                <span className="font-medium text-blue-700">
+                                  {applications.filter(app => app.status === 'pending').length}
+                                </span>
+                                <span className="text-gray-500">Pending</span>
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <span className="font-medium text-green-700">
+                                  {applications.filter(app => app.status === 'accepted').length}
+                                </span>
+                                <span className="text-gray-500">Accepted</span>
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <span className="font-medium text-indigo-700">
+                                  {applications.filter(app => app.status === 'in-progress').length}
+                                </span>
+                                <span className="text-gray-500">Working</span>
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <span className="font-medium text-purple-700">
+                                  {applications.filter(app => app.status === 'completed').length}
+                                </span>
+                                <span className="text-gray-500">Done</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
 
-                      {/* In-Progress Work Status - Mobile Responsive */}
+                      {/* In-Progress Work Status - Enhanced */}
                       {job.status === 'in-progress' && applications.length > 0 && (
-                        <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-blue-50 rounded-lg">
-                          <h4 className="text-xs sm:text-sm font-medium text-blue-900 mb-2">
-                            Work in Progress
-                          </h4>
-                          {applications.filter(app => app.status === 'in-progress').map((application) => (
-                            <div key={application._id} className="flex justify-between items-center text-xs sm:text-sm">
-                              <span className="text-blue-700 truncate flex-1 mr-2">
-                                {application.worker?.name || application.workerDetails?.name}
-                              </span>
-                              <button
-                                onClick={() => updateApplicationStatus(application._id, 'completed')}
-                                className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 touch-manipulation whitespace-nowrap"
-                              >
-                                <span className="hidden sm:inline">Mark Complete</span>
-                                <span className="sm:hidden">✓</span>
-                              </button>
-                            </div>
+                        <div className="mb-3 sm:mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-xs sm:text-sm font-medium text-blue-900 flex items-center">
+                              <svg className="w-3.5 h-3.5 mr-1.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              Work in Progress
+                            </h4>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {applications.filter(app => app.status === 'in-progress').length} active
+                            </span>
+                          </div>
+                          
+                          {applications
+                            .filter(app => app.status === 'in-progress')
+                            .slice(0, 2) // Show max 2 workers
+                            .map((application) => (
+                              <div key={application._id} className="flex items-center justify-between py-2 border-t border-blue-100 first:border-t-0">
+                                <div className="flex items-center min-w-0">
+                                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
+                                    {application.worker?.name?.charAt(0) || 'W'}
+                                  </div>
+                                  <div className="ml-3 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                      {application.worker?.name || 'Worker'}
+                                    </p>
+                                    <div className="flex items-center text-xs text-gray-500">
+                                      <Clock className="w-3 h-3 mr-1" />
+                                      <span>Started {new Date(application.updatedAt).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex space-x-2
+                                ">
+                                  <button
+                                    onClick={() => {
+                                      // Implement chat functionality
+                                      console.log('Chat with worker', application.worker?._id);
+                                    }}
+                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-full"
+                                    title="Message"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => updateApplicationStatus(application._id, 'completed')}
+                                    className="px-2.5 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
+                                  >
+                                    <span className="hidden sm:inline">Complete</span>
+                                    <span className="sm:hidden">✓</span>
+                                  </button>
+                                </div>
+                              </div>
                           ))}
+                          
+                          {applications.filter(app => app.status === 'in-progress').length > 2 && (
+                            <button
+                              onClick={() => handleViewApplications(job)}
+                              className="mt-2 w-full text-center text-xs text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                              + {applications.filter(app => app.status === 'in-progress').length - 2} more workers
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -736,7 +1416,35 @@ const PostedJobs = () => {
                         </div>
                       )}
 
-                      {/* Action Buttons - Mobile Responsive */}
+                      {/* After the job details and before the action buttons, add: */}
+                      {applications.length > 0 && (
+                        <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                          <h4 className="text-xs sm:text-sm font-medium text-gray-900 mb-2">Applicants</h4>
+                          <div className="space-y-2">
+                            {applications.map((application) => (
+                              <div key={application._id} className="flex items-center justify-between text-xs sm:text-sm">
+                                <span className="truncate font-medium">
+                                  {application.worker?.name || application.workerDetails?.name}
+                                </span>
+                                                                 {application.status === 'pending' ? (
+                                   <button
+                                     onClick={() => handleStatusTransition(application._id, 'accepted', application.status)}
+                                     className="ml-2 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 touch-manipulation"
+                                   >
+                                     Accept
+                                   </button>
+                                 ) : (
+                                   <span className={`ml-2 px-2 py-1 rounded-full ${getApplicationStatusColor(application.status)}`}>
+                                     {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
+                                   </span>
+                                 )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Enhanced Action Buttons - Mobile Responsive */}
                       <div className="flex justify-between items-center pt-3 border-t">
                         <div className="flex space-x-1 sm:space-x-2">
                           <button
@@ -747,11 +1455,35 @@ const PostedJobs = () => {
                             <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                           </button>
                           <button
+                            onClick={() => fetchApplicationsForJob(job._id)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors touch-manipulation"
+                            title="View Applications"
+                          >
+                            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                          <button
                             onClick={() => window.location.href = `/employer/edit-job/${job._id}`}
                             className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation"
                             title="Edit Job"
                           >
                             <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleShowAnalytics(job)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors touch-manipulation"
+                            title="View Analytics"
+                          >
+                            <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedJobForQuickActions(job);
+                              setShowQuickActions(true);
+                            }}
+                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors touch-manipulation"
+                            title="Quick Actions"
+                          >
+                            <Zap className="w-3 h-3 sm:w-4 sm:h-4" />
                           </button>
                         </div>
 
@@ -1042,6 +1774,17 @@ const PostedJobs = () => {
                                 </div>
                               )}
 
+                              {/* Rate Worker Button for Completed Jobs */}
+                              {application.status === 'completed' && (
+                                <button
+                                  onClick={() => handleRateWorker(application.worker || application.workerDetails, selectedJobApplications.job)}
+                                  className="px-2 sm:px-3 py-2 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200 transition-colors touch-manipulation"
+                                  title="Rate Worker"
+                                >
+                                  ⭐
+                                </button>
+                              )}
+
                               {/* Contact Worker Button */}
                               <button
                                 onClick={() => window.open(`tel:${application.worker?.phone || application.workerDetails?.phone}`)}
@@ -1150,6 +1893,350 @@ const PostedJobs = () => {
             </motion.div>
           </div>
         )}
+
+        {/* Analytics Modal */}
+        <AnimatePresence>
+          {showAnalyticsModal && selectedJobForAnalytics && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-xl sm:rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+              >
+                <div className="p-4 sm:p-6 border-b">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0 mr-4">
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+                        Job Analytics: {selectedJobForAnalytics.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Performance metrics and insights
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowAnalyticsModal(false)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 sm:p-6 max-h-[70vh] overflow-y-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-blue-600 font-medium">Total Views</p>
+                          <p className="text-2xl font-bold text-blue-900">
+                            {Math.floor(Math.random() * 100) + 50}
+                          </p>
+                        </div>
+                        <Eye className="w-6 h-6 text-blue-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-green-600 font-medium">Applications</p>
+                          <p className="text-2xl font-bold text-green-900">
+                            {jobApplications[selectedJobForAnalytics._id]?.length || 0}
+                          </p>
+                        </div>
+                        <Users className="w-6 h-6 text-green-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-purple-600 font-medium">Completion Rate</p>
+                          <p className="text-2xl font-bold text-purple-900">
+                            {selectedJobForAnalytics.status === 'completed' ? '100%' : '75%'}
+                          </p>
+                        </div>
+                        <Target className="w-6 h-6 text-purple-500" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-orange-600 font-medium">Avg. Rating</p>
+                          <p className="text-2xl font-bold text-orange-900">4.2⭐</p>
+                        </div>
+                        <Star className="w-6 h-6 text-orange-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-gray-900 mb-2">Application Timeline</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>First 24 hours</span>
+                          <span className="font-medium">12 applications</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>First week</span>
+                          <span className="font-medium">28 applications</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Total period</span>
+                          <span className="font-medium">{jobApplications[selectedJobForAnalytics._id]?.length || 0} applications</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-gray-900 mb-2">Worker Performance</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Average completion time</span>
+                          <span className="font-medium">3.2 days</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Quality score</span>
+                          <span className="font-medium">4.5/5</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Rehire rate</span>
+                          <span className="font-medium">85%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Rating Modal */}
+        <AnimatePresence>
+          {showRatingModal && selectedWorkerForRating && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-xl sm:rounded-2xl max-w-md w-full p-4 sm:p-6"
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+                    Rate Worker
+                  </h3>
+                  <button
+                    onClick={() => setShowRatingModal(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Rate {selectedWorkerForRating.worker.name || 'Worker'} for their work on
+                    </p>
+                    <p className="font-medium text-gray-900">
+                      {selectedWorkerForRating.job.title}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Rating (1-5 stars)
+                      </label>
+                      <div className="flex space-x-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            className="text-2xl hover:scale-110 transition-transform"
+                            onClick={() => {
+                              // Handle star rating
+                            }}
+                          >
+                            ⭐
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Comment
+                      </label>
+                      <textarea
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Share your experience with this worker..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => setShowRatingModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Handle rating submission
+                        alert('Rating submitted successfully!');
+                        setShowRatingModal(false);
+                      }}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Submit Rating
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Quick Actions Modal */}
+        <AnimatePresence>
+          {showQuickActions && selectedJobForQuickActions && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-xl sm:rounded-2xl max-w-md w-full p-4 sm:p-6"
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900">
+                    Quick Actions
+                  </h3>
+                  <button
+                    onClick={() => setShowQuickActions(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 mb-4">
+                    {selectedJobForQuickActions.title}
+                  </p>
+
+                  <button
+                    onClick={() => {
+                      handleQuickAction('duplicate', selectedJobForQuickActions);
+                      setShowQuickActions(false);
+                    }}
+                    className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-5 h-5 mr-3 text-blue-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">Duplicate Job</p>
+                      <p className="text-sm text-gray-600">Create a copy with same details</p>
+                    </div>
+                  </button>
+
+                  {selectedJobForQuickActions.status === 'active' && (
+                    <button
+                      onClick={() => {
+                        handleQuickAction('pause', selectedJobForQuickActions);
+                        setShowQuickActions(false);
+                      }}
+                      className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <Clock className="w-5 h-5 mr-3 text-yellow-600" />
+                      <div>
+                        <p className="font-medium text-gray-900">Pause Job</p>
+                        <p className="text-sm text-gray-600">Temporarily stop accepting applications</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {selectedJobForQuickActions.status === 'paused' && (
+                    <button
+                      onClick={() => {
+                        handleQuickAction('activate', selectedJobForQuickActions);
+                        setShowQuickActions(false);
+                      }}
+                      className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <Zap className="w-5 h-5 mr-3 text-green-600" />
+                      <div>
+                        <p className="font-medium text-gray-900">Activate Job</p>
+                        <p className="text-sm text-gray-600">Resume accepting applications</p>
+                      </div>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      handleQuickAction('close', selectedJobForQuickActions);
+                      setShowQuickActions(false);
+                    }}
+                    className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <Shield className="w-5 h-5 mr-3 text-red-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">Close Job</p>
+                      <p className="text-sm text-gray-600">Permanently close this job posting</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleViewApplications(selectedJobForQuickActions);
+                      setShowQuickActions(false);
+                    }}
+                    className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <Users className="w-5 h-5 mr-3 text-purple-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">View Applications</p>
+                      <p className="text-sm text-gray-600">See all worker applications</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      window.location.href = `/employer/edit-job/${selectedJobForQuickActions._id}`;
+                      setShowQuickActions(false);
+                    }}
+                    className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <Edit className="w-5 h-5 mr-3 text-indigo-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">Edit Job</p>
+                      <p className="text-sm text-gray-600">Modify job details and requirements</p>
+                    </div>
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { useUser } from '../context/UserContext';
 import { synchronizeUserData } from '../utils/authSyncUtils';
 import axios from 'axios';
 
-const API_BASE_URL = 'https://sindh-backend.onrender.comapi';
+const API_BASE_URL = 'https://sindh-backend.onrender.com/api';
 
 const AuthenticationPrompt = ({ isOpen, onClose, onAuthenticationSuccess, from }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -96,7 +96,7 @@ const AuthenticationPrompt = ({ isOpen, onClose, onAuthenticationSuccess, from }
       if (error.response) {
         console.error('Server error response:', error.response.data);
         // Check if the user is new and redirect to registration
-        if (error.response.status === 404 && error.response.data.newUser) {
+        if (error.response.status === 404 || error.response.data.newUser) {
           toast.info('Phone number not found. Please register.');
           onClose?.(); // Close modal before navigating
           if (userType === 'worker') {

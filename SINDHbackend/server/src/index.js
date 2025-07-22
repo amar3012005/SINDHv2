@@ -96,6 +96,7 @@ const initializeServer = async () => {
         console.log(`📡 API available at https://sindh-backend.onrender.com/api`);
       } else {
         console.log(`📡 API available at http://localhost:${PORT}/api`);
+        console.log(`🔗 Local development URL: http://localhost:${PORT}/api`);
       }
       
       console.log('🎉 Your service is live!');

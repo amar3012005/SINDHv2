@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
-import { getApiUrl } from '../../utils/apiUtils';
+import { buildApiUrl } from '../../utils/apiUtils';
 import { 
   MapPin, 
   Briefcase, 
@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   CheckCircle
 } from 'lucide-react';
+import JobApplicationProgress from '../worker/JobApplicationProgress';
 
 const JobDetails = () => {
   const { id } = useParams();
@@ -22,6 +23,7 @@ const JobDetails = () => {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [application, setApplication] = useState(null);
 
   useEffect(() => {
     fetchJobDetails();
@@ -30,7 +32,7 @@ const JobDetails = () => {
   const fetchJobDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(getApiUrl(`/api/jobs/${id}`));
+      const response = await fetch(buildApiUrl(`/api/jobs/${id}`));
       
       if (!response.ok) {
         throw new Error('Job not found');
@@ -38,6 +40,22 @@ const JobDetails = () => {
       
       const data = await response.json();
       setJob(data);
+      
+      // If user is logged in and is a worker, check if they've applied
+      if (user?.id && user?.type === 'worker') {
+        try {
+          const applicationResponse = await fetch(buildApiUrl(`/api/job-applications/worker/${user.id}/current`));
+          if (applicationResponse.ok) {
+            const applications = await applicationResponse.json();
+            const userApplication = applications.find(app => app.job?._id === id);
+            if (userApplication) {
+              setApplication(userApplication);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user application:', error);
+        }
+      }
     } catch (error) {
       console.error('Error fetching job details:', error);
       toast.error('Failed to load job details');
@@ -57,7 +75,7 @@ const JobDetails = () => {
     setApplying(true);
 
     try {
-      const response = await fetch(getApiUrl('/api/job-applications'), {
+      const response = await fetch(buildApiUrl('/job-applications'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,15 +94,33 @@ const JobDetails = () => {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        setApplication(result);
         toast.success('Application submitted successfully!');
-        fetchJobDetails(); // Refresh to update application status
+        
+        // Trigger localStorage refresh for MyApplications page
+        localStorage.setItem('refreshApplications', 'true');
+        
+        // Dispatch custom event for immediate refresh
+        window.dispatchEvent(new CustomEvent('applicationSubmitted', {
+          detail: { jobId: job._id, workerId: user.id }
+        }));
       } else {
         const errorData = await response.json();
         toast.error(errorData.message || 'Failed to submit application');
       }
     } catch (error) {
+      let errorMsg = 'Failed to submit application';
+      if (error instanceof Response) {
+        try {
+          const errData = await error.json();
+          errorMsg = errData.message || errorMsg;
+        } catch {}
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
       console.error('Error applying for job:', error);
-      toast.error('Failed to submit application');
+      toast.error(errorMsg);
     } finally {
       setApplying(false);
     }
@@ -141,7 +177,7 @@ const JobDetails = () => {
                   <span className="text-lg">{job.companyName}</span>
                 </div>
                 
-                {job.hasApplied && (
+                {application && (
                   <div className="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full">
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Applied
@@ -155,6 +191,19 @@ const JobDetails = () => {
               </div>
             </div>
           </div>
+
+          {/* Application Progress - Show if user has applied */}
+          {application && (
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Application Progress</h3>
+              <JobApplicationProgress 
+                applicationId={application._id}
+                onStatusChange={(status) => {
+                  setApplication(prev => prev ? { ...prev, status } : null);
+                }}
+              />
+            </div>
+          )}
 
           {/* Job Details */}
           <div className="p-6">
@@ -215,8 +264,8 @@ const JobDetails = () => {
               </div>
             )}
 
-            {/* Apply Button */}
-            {user?.type === 'worker' && !job.hasApplied && (
+            {/* Apply Button - Only show if not applied */}
+            {user?.type === 'worker' && !application && (
               <div className="flex justify-center">
                 <button
                   onClick={handleApply}

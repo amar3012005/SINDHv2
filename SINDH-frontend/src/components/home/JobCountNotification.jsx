@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { getApiUrl } from '../../utils/apiUtils';
+import { buildApiUrl } from '../../utils/apiUtils';
 import { useUser } from '../../context/UserContext';
 
 const JobCountNotification = ({ 
@@ -19,7 +19,7 @@ const JobCountNotification = ({
   // Fetch job count from backend
   const fetchJobCount = async () => {
     try {
-      let url = getApiUrl('/api/jobs');
+              let url = buildApiUrl('/jobs');
       
       // Add location filter if user has location
       if (user?.location?.state) {

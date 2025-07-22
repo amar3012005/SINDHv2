@@ -4,13 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
 import { useTranslation } from 'react-i18next';
-import { getApiUrl } from '../../utils/apiUtils';
+import { buildApiUrl } from '../../utils/apiUtils';
 import { 
   MapPin, 
   Briefcase, 
   CheckCircle,
   Search
 } from 'lucide-react';
+import JobApplicationProgress from '../worker/JobApplicationProgress';
 
 const AvailableJobs = () => {
   const navigate = useNavigate();
@@ -41,9 +42,10 @@ const AvailableJobs = () => {
   const [locationBasedJobs, setLocationBasedJobs] = useState([]);
   const [otherLocationJobs, setOtherLocationJobs] = useState([]);
 
-  // Fetch jobs function
+  // Enhanced fetch jobs function with proper debugging
   const fetchJobs = useCallback(async () => {
     try {
+      console.log('🚀 Starting to fetch jobs...');
       setLoading(true);
       setError(null);
       
@@ -52,29 +54,94 @@ const AvailableJobs = () => {
       // Add user-specific parameter for application status
       if (user?.id && user?.type === 'worker') {
         queryParams.append('workerId', user.id);
+        console.log('👤 Adding workerId to query:', user.id);
       }
       
-      // Use the same filtering logic - only active and in-progress jobs
-      queryParams.append('status', 'active,in-progress');
+      // Only show active jobs, not in-progress ones
+      queryParams.append('status', 'active');
       
       // Add filters
       Object.entries(filters).forEach(([key, value]) => {
         if (value && value.trim() !== '') {
           queryParams.append(key, value.trim());
+          console.log(`🔍 Adding filter ${key}:`, value.trim());
         }
       });
       
-      const response = await fetch(getApiUrl(`/api/jobs?${queryParams.toString()}`));
+      // Use the correct API endpoint pattern
+      const apiUrl = buildApiUrl(`/jobs?${queryParams.toString()}`);
+      console.log('🌐 Fetching from API:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Type': user?.type || 'guest',
+          'User-ID': user?.id || ''
+        }
+      });
+      
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch jobs');
+        if (response.status === 404) {
+          throw new Error('Jobs not found');
+        } else if (response.status === 403) {
+          throw new Error('Access denied. Please log in again.');
+        } else {
+          const errorText = await response.text();
+          console.error('❌ API Error Response:', errorText);
+          throw new Error(`Failed to fetch jobs: ${response.status} ${response.statusText}`);
+        }
       }
       
       const jobsData = await response.json();
-      const jobsArray = Array.isArray(jobsData) ? jobsData : [];
+      console.log('📦 Raw jobs data:', jobsData);
+      
+      // Handle different response formats - same pattern as profile fetching
+      let jobsArray = [];
+      if (Array.isArray(jobsData)) {
+        jobsArray = jobsData;
+        console.log('📋 Jobs data is direct array');
+      } else if (jobsData.data && Array.isArray(jobsData.data)) {
+        jobsArray = jobsData.data;
+        console.log('📋 Jobs data found in response.data');
+      } else if (jobsData.jobs && Array.isArray(jobsData.jobs)) {
+        jobsArray = jobsData.jobs;
+        console.log('📋 Jobs data found in response.jobs');
+      } else if (jobsData.success && jobsData.data && Array.isArray(jobsData.data)) {
+        jobsArray = jobsData.data;
+        console.log('📋 Jobs data found in response.data (success format)');
+      } else {
+        console.warn('⚠️ Unexpected jobs data format:', jobsData);
+        jobsArray = [];
+      }
+      
+      console.log('📋 Processed jobs array length:', jobsArray.length);
+      
+      // Validate jobs data structure
+      if (jobsArray.length > 0) {
+        const sampleJob = jobsArray[0];
+        console.log('📋 Sample job structure:', {
+          id: sampleJob._id || sampleJob.id,
+          title: sampleJob.title,
+          companyName: sampleJob.companyName,
+          location: sampleJob.location,
+          salary: sampleJob.salary
+        });
+        
+        // Log all jobs for debugging
+        console.log('📋 All received jobs:');
+        jobsArray.forEach((job, index) => {
+          console.log(`   ${index + 1}. ${job.title} - ${job.companyName} - ${job.location?.city}, ${job.location?.state} - ₹${job.salary}`);
+        });
+      }
       
       // Deduplicate jobs by ID
       const uniqueJobs = deduplicateJobs(jobsArray);
+      console.log('✅ Final unique jobs count:', uniqueJobs.length);
       
       setJobs(uniqueJobs);
       setFilteredJobs(uniqueJobs);
@@ -82,51 +149,119 @@ const AvailableJobs = () => {
       // Group jobs by location if user has location preference
       if (user?.location?.state) {
         const userState = user.location.state.toLowerCase();
-        const locationBased = uniqueJobs.filter(job => 
-          job.location?.state?.toLowerCase() === userState
-        );
+        console.log(`📍 User location state: ${userState}`);
+        console.log(`📍 User location data:`, user.location);
+        
+        const locationBased = uniqueJobs.filter(job => {
+          const jobState = job.location?.state?.toLowerCase();
+          const matches = jobState === userState;
+          console.log(`📍 Job "${job.title}" state: ${jobState}, matches: ${matches}`);
+          return matches;
+        });
         const otherLocation = uniqueJobs.filter(job => 
           job.location?.state?.toLowerCase() !== userState
         );
         
+        console.log(`📍 Location-based jobs: ${locationBased.length} in ${userState}`);
+        console.log(`📍 Other location jobs: ${otherLocation.length}`);
+        
         setLocationBasedJobs(locationBased);
         setOtherLocationJobs(otherLocation);
       } else {
+        console.log('📍 No user location preference, showing all jobs');
         setLocationBasedJobs([]);
         setOtherLocationJobs(uniqueJobs);
       }
       
     } catch (error) {
-      console.error('Error fetching jobs:', error);
+      console.error('❌ Error fetching jobs:', error);
+      console.error('🔍 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Try fallback approach - same as profile components
+      try {
+        console.log('🔄 Trying fallback approach...');
+        
+        // Try without user headers
+        const fallbackResponse = await fetch(buildApiUrl('/jobs'), {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          console.log('✅ Fallback successful, found jobs:', fallbackData.length);
+          
+          let fallbackJobs = [];
+          if (Array.isArray(fallbackData)) {
+            fallbackJobs = fallbackData;
+          } else if (fallbackData.data && Array.isArray(fallbackData.data)) {
+            fallbackJobs = fallbackData.data;
+          } else if (fallbackData.jobs && Array.isArray(fallbackData.jobs)) {
+            fallbackJobs = fallbackData.jobs;
+          }
+          
+          const uniqueFallbackJobs = deduplicateJobs(fallbackJobs);
+          setJobs(uniqueFallbackJobs);
+          setFilteredJobs(uniqueFallbackJobs);
+          setLocationBasedJobs([]);
+          setOtherLocationJobs(uniqueFallbackJobs);
+          setError(null);
+          
+          console.log('✅ Fallback jobs loaded successfully');
+          return;
+        }
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+      }
+      
       setError(error.message);
       setJobs([]);
       setFilteredJobs([]);
       setLocationBasedJobs([]);
       setOtherLocationJobs([]);
+      
+      // Show user-friendly error message
+      toast.error('Failed to load jobs. Please try again.');
     } finally {
       setLoading(false);
+      console.log('🏁 Fetch jobs process finished');
     }
   }, [user, filters]);
 
-  // Enhanced deduplication function
+  // Enhanced deduplication function with better logging
   const deduplicateJobs = (jobs) => {
     const uniqueJobsMap = new Map();
     
-    jobs.forEach(job => {
+    jobs.forEach((job, index) => {
       const jobId = job._id || job.id;
       if (jobId && !uniqueJobsMap.has(jobId)) {
         uniqueJobsMap.set(jobId, job);
+      } else if (!jobId) {
+        console.warn(`⚠️ Job at index ${index} has no ID:`, job);
+      } else {
+        console.log(`🔄 Duplicate job found: ${jobId}`);
       }
     });
     
     const uniqueJobs = Array.from(uniqueJobsMap.values());
-    console.log(`Deduplicated ${jobs.length} jobs to ${uniqueJobs.length} unique jobs`);
+    console.log(`🔄 Deduplicated ${jobs.length} jobs to ${uniqueJobs.length} unique jobs`);
     
     return uniqueJobs;
   };
 
-  // Apply search and filters
+  // Apply search and filters with enhanced logic
   useEffect(() => {
+    console.log('🔍 Applying search and filters...');
+    console.log('🔍 Search term:', searchTerm);
+    console.log('🔍 Current jobs:', jobs.length);
+    
     let filtered = [...jobs];
 
     // Apply search term
@@ -136,14 +271,16 @@ const AvailableJobs = () => {
         job.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         job.companyName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
+      console.log('🔍 After search filter:', filtered.length);
     }
 
     // Deduplicate filtered results as well
     const uniqueFiltered = deduplicateJobs(filtered);
     setFilteredJobs(uniqueFiltered);
+    console.log('✅ Final filtered jobs:', uniqueFiltered.length);
   }, [searchTerm, jobs]);
 
-  // Job application handler
+  // Enhanced job application handler
   const handleApplyForJob = async (job) => {
     if (!user || user.type !== 'worker') {
       toast.error('Please login as a worker to apply for jobs');
@@ -159,22 +296,38 @@ const AvailableJobs = () => {
     setApplyingJobs(prev => new Set([...prev, job._id]));
 
     try {
+      console.log('📝 Applying for job:', job._id);
+      
       // First fetch the job details to get the employer ID
-      const jobResponse = await fetch(getApiUrl(`/api/jobs/${job._id}`));
+      const jobResponse = await fetch(buildApiUrl(`/jobs/${job._id}`), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Type': user?.type || 'guest',
+          'User-ID': user?.id || ''
+        }
+      });
+      
       if (!jobResponse.ok) {
-        throw new Error('Failed to fetch job details');
+        if (jobResponse.status === 404) {
+          throw new Error('Job not found');
+        } else {
+          const errorText = await jobResponse.text();
+          throw new Error(`Failed to fetch job details: ${jobResponse.status} ${errorText}`);
+        }
       }
       const jobData = await jobResponse.json();
 
-      const response = await fetch(getApiUrl('/api/job-applications'), {
+      const response = await fetch(buildApiUrl('/job-applications/apply'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'User-Type': user?.type || 'guest',
+          'User-ID': user?.id || ''
         },
         body: JSON.stringify({
-          job: job._id,
-          worker: user.id,
-          employer: jobData.employer._id || jobData.employer,
+          jobId: job._id,
+          workerId: user.id,
           workerDetails: {
             name: user.name,
             phone: user.phone,
@@ -185,10 +338,48 @@ const AvailableJobs = () => {
       });
 
       if (response.ok) {
-        toast.success('Application submitted successfully!');
+        const result = await response.json();
+        const successMessage = result.jobStatusUpdated 
+          ? 'Application submitted successfully! Job status updated to in-progress.'
+          : 'Application submitted successfully!';
+        
+        toast.success(successMessage);
         setShowSuccessAnimation(true);
         setTimeout(() => setShowSuccessAnimation(false), 3000);
         fetchJobs(); // Refresh jobs to update application status
+        
+        // Save application ID to localStorage for MyApplications tracking
+        if (result.data && result.data._id) {
+          let applicationIds = JSON.parse(localStorage.getItem('myApplicationIds') || '[]');
+          if (!applicationIds.includes(result.data._id)) {
+            applicationIds.push(result.data._id);
+            localStorage.setItem('myApplicationIds', JSON.stringify(applicationIds));
+            console.log('💾 Saved application ID to localStorage:', result.data._id);
+            console.log('📋 All application IDs:', applicationIds);
+          }
+        }
+        
+        // Trigger refresh of MyApplications page using localStorage
+        localStorage.setItem('refreshApplications', 'true');
+        
+        // Also dispatch a custom event for immediate refresh if on same page
+        window.dispatchEvent(new CustomEvent('applicationSubmitted', {
+          detail: { jobId: job._id, workerId: user.id, applicationId: result.data?._id }
+        }));
+        
+        // Show success message with option to view applications
+        toast.success(
+          <div>
+            <div>{successMessage}</div>
+            <button 
+              onClick={() => navigate('/my-applications')}
+              className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            >
+              View My Applications
+            </button>
+          </div>,
+          { autoClose: 5000 }
+        );
       } else {
         const errorData = await response.json();
         toast.error(errorData.message || 'Failed to submit application');
@@ -205,20 +396,28 @@ const AvailableJobs = () => {
     }
   };
 
-  // Filter change handlers
+  // Enhanced filter change handlers
   const handleFilterChange = (filterType, value) => {
+    console.log(`🔧 Filter change: ${filterType} = ${value}`);
     const newFilters = { ...filters, [filterType]: value };
     setFilters(newFilters);
   };
 
   const handleApplyFilter = () => {
+    console.log('🔧 Applying filters:', filters);
     fetchJobs();
   };
 
-  // Render job card
+  // Enhanced render job card with better error handling
   const renderJobCard = (job) => {
     const applicationStatus = job.applicationStatus;
     const hasApplied = job.hasApplied;
+    const userApplication = applications.find(app => app.job?._id === job._id);
+    
+    // Don't show in-progress or completed jobs
+    if (job.status === 'in-progress' || job.status === 'completed') {
+      return null;
+    }
 
     return (
       <motion.div
@@ -235,10 +434,10 @@ const AvailableJobs = () => {
           <div className="flex justify-between items-start mb-4">
             <div className="flex-1">
               <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
-                {job.title}
+                {job.title || 'Untitled Job'}
               </h3>
               <p className="text-gray-600 font-medium">
-                {job.companyName}
+                {job.companyName || 'Unknown Company'}
               </p>
             </div>
             
@@ -260,64 +459,111 @@ const AvailableJobs = () => {
             )}
           </div>
 
+          {/* Application Progress - Show if user has applied */}
+          {userApplication && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-gray-900">Application Status</h4>
+                <span className="text-xs text-gray-500">
+                  Last updated: {new Date(userApplication.updatedAt || Date.now()).toLocaleString()}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                <div 
+                  className={`h-2 rounded-full ${
+                    userApplication.status === 'accepted' ? 'bg-green-500' :
+                    userApplication.status === 'in-progress' ? 'bg-blue-500' :
+                    userApplication.status === 'completed' ? 'bg-purple-500' :
+                    'bg-yellow-500'
+                  }`}
+                  style={{
+                    width: 
+                      userApplication.status === 'pending' ? '25%' :
+                      userApplication.status === 'accepted' ? '50%' :
+                      userApplication.status === 'in-progress' ? '75%' :
+                      '100%'
+                  }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500">
+                <span className={userApplication.status === 'pending' ? 'font-bold text-blue-600' : ''}>Applied</span>
+                <span className={userApplication.status === 'accepted' ? 'font-bold text-green-600' : ''}>Accepted</span>
+                <span className={userApplication.status === 'in-progress' ? 'font-bold text-blue-600' : ''}>In Progress</span>
+                <span className={userApplication.status === 'completed' ? 'font-bold text-purple-600' : ''}>Completed</span>
+              </div>
+            </div>
+          )}
+
           {/* Job Details */}
           <div className="space-y-3 mb-4">
             <div className="flex items-center text-gray-600">
               <MapPin className="w-4 h-4 mr-2 text-blue-500" />
               <span className="text-sm">
-                {job.location?.city}, {job.location?.state}
+                {job.location?.city || 'Location not specified'}, {job.location?.state || 'State not specified'}
               </span>
             </div>
             
             <div className="flex items-center text-gray-600">
               <span className="text-green-600 font-semibold">₹</span>
               <span className="text-sm font-medium ml-1">
-                {job.salary?.toLocaleString()} {job.employmentType === 'Full-time' ? '/month' : '/day'}
+                {job.salary?.toLocaleString() || '0'} {job.employmentType === 'Full-time' ? '/month' : '/day'}
               </span>
             </div>
             
             <div className="flex items-center text-gray-600">
               <Briefcase className="w-4 h-4 mr-2 text-purple-500" />
-              <span className="text-sm">{job.category}</span>
+              <span className="text-sm">{job.category || 'General Work'}</span>
             </div>
           </div>
 
           {/* Job Description */}
           <p className="text-gray-700 text-sm mb-4 line-clamp-3">
-            {job.description}
+            {job.description || 'No description available'}
           </p>
 
-          {/* Action Button */}
-          <div className="flex gap-2">
+          {/* Action Buttons - Always visible */}
+          <div className="flex gap-2 mt-4">
             {!hasApplied ? (
-              <button
-                onClick={() => handleApplyForJob(job)}
-                disabled={applyingJobs.has(job._id)}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {applyingJobs.has(job._id) ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Applying...
-                  </>
-                ) : (
-                  'Apply Now'
-                )}
-              </button>
+              <>
+                <button
+                  onClick={() => handleApplyForJob(job)}
+                  disabled={applyingJobs.has(job._id)}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {applyingJobs.has(job._id) ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Applying...
+                    </>
+                  ) : (
+                    'Apply Now'
+                  )}
+                </button>
+                <button
+                  onClick={() => navigate(`/jobs/${job._id}`)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  View Details
+                </button>
+              </>
             ) : (
-              <div className="flex-1 text-center py-2">
-                <span className="text-sm text-gray-600">
-                  Applied on {new Date(job.application?.createdAt).toLocaleDateString()}
-                </span>
+              <div className="w-full space-y-2">
+                <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg">
+                  <span className="text-sm font-medium text-blue-700">
+                    Applied on {new Date(job.application?.createdAt || Date.now()).toLocaleDateString()}
+                  </span>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                    {applicationStatus === 'pending' ? '⏳ Pending' : '✅ ' + applicationStatus}
+                  </span>
+                </div>
+                <button
+                  onClick={() => navigate(`/jobs/${job._id}`)}
+                  className="w-full mt-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Track Application
+                </button>
               </div>
             )}
-            
-            <button
-              onClick={() => navigate(`/jobs/${job._id}`)}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              View Details
-            </button>
           </div>
 
           {/* Requirements */}
@@ -348,7 +594,16 @@ const AvailableJobs = () => {
 
   // Effects
   useEffect(() => {
-    fetchJobs();
+    console.log('🔄 AvailableJobs component mounted, fetching jobs...');
+    console.log('👤 Current user:', user);
+    console.log('🔧 Current filters:', filters);
+    
+    // Add a small delay to ensure user context is loaded
+    const timer = setTimeout(() => {
+      fetchJobs();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [fetchJobs]);
 
   return (
@@ -361,6 +616,26 @@ const AvailableJobs = () => {
               <h1 className="text-3xl font-bold text-gray-900">
                 Available Jobs
               </h1>
+              {loading && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Loading jobs...
+                </p>
+              )}
+              {error && (
+                <p className="text-sm text-red-600 mt-1">
+                  Error: {error}
+                </p>
+              )}
+              {!loading && !error && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Found {filteredJobs.length} jobs
+                  {user?.location?.state && (
+                    <span className="ml-2">
+                      ({locationBasedJobs.length} in {user.location.state}, {otherLocationJobs.length} other)
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
           </div>
 
@@ -438,8 +713,18 @@ const AvailableJobs = () => {
           </div>
         )}
 
-        {/* Main Jobs Grid - only show if no location preference or as fallback */}
-        {(!user?.location?.state || (locationBasedJobs.length === 0 && otherLocationJobs.length === 0)) && (
+        {/* Debug: Show all jobs for troubleshooting */}
+        {process.env.NODE_ENV === 'development' && filteredJobs.length > 0 && (
+          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔍 Debug: All Jobs ({filteredJobs.length})</h3>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredJobs.map(renderJobCard)}
+            </div>
+          </div>
+        )}
+
+        {/* Main Jobs Grid - always show all jobs */}
+        {filteredJobs.length > 0 && (
           <AnimatePresence mode="wait">
             {loading ? (
               <motion.div

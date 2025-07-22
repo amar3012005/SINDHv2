@@ -61,7 +61,7 @@ const ProfilePage = () => {
       <div className="relative z-10 max-w-5xl mx-auto pt-20 px-4 pb-10">
         <div className="flex items-center justify-between mb-8">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="px-4 py-2 border border-white/20 font-mono text-xs"
           >
             &lt; Back to Home

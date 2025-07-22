@@ -36,7 +36,7 @@ const ProductPage = () => {
     <div className="min-h-screen bg-black text-white">
       {/* Navigation breadcrumbs */}
       <div className="flex items-center space-x-2 px-4 py-3 text-xs font-mono text-white/60">
-        <div className="cursor-pointer hover:text-white" onClick={() => navigate('/')}>HOME</div>
+        <div className="cursor-pointer hover:text-white" onClick={() => navigate('/home')}>HOME</div>
         <div className="text-white/40">/</div>
         <div className="cursor-pointer hover:text-white" onClick={() => navigate('/products')}>COLLECTIBLE</div>
         <div className="text-white/40">/</div>

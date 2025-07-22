@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { getApiUrl } from '../../utils/apiUtils';
+import { buildApiUrl } from '../../utils/apiUtils';
 
 const GrameenLinkProfile = () => {
   const { user } = useUser();
@@ -15,7 +15,7 @@ const GrameenLinkProfile = () => {
   // Fetch job count from backend
   const fetchJobCount = async () => {
     try {
-      const response = await fetch(getApiUrl('/api/jobs'), {
+              const response = await fetch(buildApiUrl('/jobs'), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

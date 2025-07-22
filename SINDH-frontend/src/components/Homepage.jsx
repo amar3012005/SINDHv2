@@ -4,304 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
-import { getCurrentUser } from '../utils/authUtils';
-import { Phone, Star, Users, Briefcase, TrendingUp, Wallet, MessageCircle, ArrowRight, Calendar, MapPin } from 'lucide-react';
-import { getApiUrl } from '../utils/apiUtils';
+import { getCurrentUser, logout } from '../utils/authUtils';
+import { Phone, Star, Users, Briefcase, TrendingUp, Wallet, MessageCircle, ArrowRight, Calendar, MapPin, LogOut } from 'lucide-react';
+import { buildApiUrl } from '../utils/apiUtils';
 
-// Animated Pattern Components
-const FloatingGeometry = ({ delay = 0 }) => {
-  const shapes = ['square', 'circle', 'triangle'];
-  const shape = shapes[Math.floor(Math.random() * shapes.length)];
-  const size = Math.random() * 20 + 10;
-  const duration = Math.random() * 10 + 15;
-  
-  const initialX = Math.random() * window.innerWidth;
-  const initialY = Math.random() * window.innerHeight;
-  
-  return (
-    <motion.div
-      className="absolute pointer-events-none opacity-5"
-      style={{
-        width: size,
-        height: size,
-        left: initialX,
-        top: initialY,
-      }}
-      animate={{
-        x: [0, Math.random() * 200 - 100, Math.random() * 200 - 100, 0],
-        y: [0, Math.random() * 200 - 100, Math.random() * 200 - 100, 0],
-        rotate: [0, 180, 360],
-        scale: [1, 1.2, 0.8, 1]
-      }}
-      transition={{
-        duration: duration,
-        repeat: Infinity,
-        delay: delay,
-        ease: "linear"
-      }}
-    >
-      {shape === 'square' && <div className="w-full h-full bg-black" />}
-      {shape === 'circle' && <div className="w-full h-full bg-black rounded-full" />}
-      {shape === 'triangle' && (
-        <div 
-          className="w-0 h-0 border-l-[10px] border-r-[10px] border-b-[17px] border-l-transparent border-r-transparent border-b-black"
-          style={{ borderBottomWidth: size * 0.866 }}
-        />
-      )}
-    </motion.div>
-  );
-};
 
-const AnimatedGrid = ({ opacity = 0.05 }) => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ opacity }}>
-      <motion.div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `
-            linear-gradient(90deg, black 1px, transparent 1px),
-            linear-gradient(black 1px, transparent 1px)
-          `,
-          backgroundSize: '50px 50px'
-        }}
-        animate={{
-          x: [0, 50, 0],
-          y: [0, 50, 0]
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: "linear"
-        }}
-      />
-    </div>
-  );
-};
-
-const ParticleField = ({ count = 30 }) => {
-  const particles = Array.from({ length: count }, (_, i) => (
-    <motion.div
-      key={i}
-      className="absolute w-1 h-1 bg-black rounded-full opacity-20"
-      style={{
-        left: `${Math.random() * 100}%`,
-        top: `${Math.random() * 100}%`,
-      }}
-      animate={{
-        y: [0, -20, 0],
-        opacity: [0.2, 0.5, 0.2],
-        scale: [1, 1.5, 1]
-      }}
-      transition={{
-        duration: Math.random() * 3 + 2,
-        repeat: Infinity,
-        delay: Math.random() * 2,
-        ease: "easeInOut"
-      }}
-    />
-  ));
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {particles}
-    </div>
-  );
-};
-
-const WavePattern = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
-      <motion.svg
-        className="absolute w-full h-full"
-        viewBox="0 0 1000 1000"
-        preserveAspectRatio="none"
-        animate={{
-          rotate: [0, 360]
-        }}
-        transition={{
-          duration: 60,
-          repeat: Infinity,
-          ease: "linear"
-        }}
-      >
-        <defs>
-          <pattern id="wave" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-            <path d="M0,50 Q25,25 50,50 T100,50" stroke="black" strokeWidth="1" fill="none" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#wave)" />
-      </motion.svg>
-    </div>
-  );
-};
-
-const GeometricOverlay = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Animated triangles */}
-      <motion.div
-        className="absolute top-10 right-10 w-16 h-16 opacity-10"
-        animate={{
-          rotate: [0, 360],
-          scale: [1, 1.2, 1]
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: "linear"
-        }}
-      >
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          <polygon points="50,10 90,80 10,80" fill="black" />
-        </svg>
-      </motion.div>
-
-      {/* Animated squares */}
-      <motion.div
-        className="absolute top-1/4 left-10 w-12 h-12 opacity-10"
-        animate={{
-          rotate: [0, 45, 0],
-          x: [0, 20, 0]
-        }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      >
-        <div className="w-full h-full bg-black transform rotate-45" />
-      </motion.div>
-
-      {/* Animated circles */}
-      <motion.div
-        className="absolute bottom-1/4 right-20 opacity-10"
-        animate={{
-          scale: [1, 1.5, 1],
-          opacity: [0.1, 0.2, 0.1]
-        }}
-        transition={{
-          duration: 4,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      >
-        <div className="w-8 h-8 border-2 border-black rounded-full" />
-      </motion.div>
-
-      {/* Animated lines */}
-      <motion.div
-        className="absolute top-1/2 left-1/4 opacity-10"
-        animate={{
-          scaleX: [1, 1.5, 1],
-          rotate: [0, 10, 0]
-        }}
-        transition={{
-          duration: 5,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      >
-        <div className="w-24 h-px bg-black" />
-      </motion.div>
-    </div>
-  );
-};
-
-const NetworkLines = () => {
-  const nodes = Array.from({ length: 8 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100
-  }));
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
-      <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-        {nodes.map((node, i) => (
-          <g key={node.id}>
-            {/* Node */}
-            <motion.circle
-              cx={node.x}
-              cy={node.y}
-              r="0.5"
-              fill="black"
-              animate={{
-                r: [0.3, 0.7, 0.3],
-                opacity: [0.3, 0.8, 0.3]
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                delay: i * 0.5,
-                ease: "easeInOut"
-              }}
-            />
-            
-            {/* Connection lines */}
-            {nodes.slice(i + 1).map((nextNode, j) => (
-              <motion.line
-                key={`${i}-${j}`}
-                x1={node.x}
-                y1={node.y}
-                x2={nextNode.x}
-                y2={nextNode.y}
-                stroke="black"
-                strokeWidth="0.1"
-                animate={{
-                  opacity: [0.1, 0.3, 0.1]
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  delay: (i + j) * 0.3,
-                  ease: "easeInOut"
-                }}
-              />
-            ))}
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-};
-
-const MorphingPattern = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-5">
-      <motion.svg
-        className="absolute top-1/3 left-1/3 w-32 h-32"
-        viewBox="0 0 100 100"
-        animate={{
-          rotate: [0, 180, 360],
-          scale: [1, 1.2, 1]
-        }}
-        transition={{
-          duration: 12,
-          repeat: Infinity,
-          ease: "linear"
-        }}
-      >
-        <motion.path
-          d="M50,10 L90,35 L75,85 L25,85 L10,35 Z"
-          fill="black"
-          animate={{
-            d: [
-              "M50,10 L90,35 L75,85 L25,85 L10,35 Z",
-              "M50,5 L95,30 L80,90 L20,90 L5,30 Z",
-              "M50,15 L85,40 L70,80 L30,80 L15,40 Z",
-              "M50,10 L90,35 L75,85 L25,85 L10,35 Z"
-            ]
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-      </motion.svg>
-    </div>
-  );
-};
 
 function Homepage() {
   const { t } = useTranslation();
@@ -319,6 +26,7 @@ function Homepage() {
 
   // Job notification states
   const [jobCount, setJobCount] = useState(0);
+  const [jobCountLoading, setJobCountLoading] = useState(false);
   const [showJobNotification, setShowJobNotification] = useState(false);
   const [hasShownNotification, setHasShownNotification] = useState(false);
 
@@ -327,11 +35,38 @@ function Homepage() {
   const [recentEarnings, setRecentEarnings] = useState([]);
 
   // Get user from context and fallback to localStorage if needed
-  const { user: contextUser, isLoadingUser } = useUser();
+  const { user: contextUser, isLoadingUser, logoutUser } = useUser();
   const user = contextUser || getCurrentUser();
+
+  // Logout function
+  const handleLogout = () => {
+    // Use the authUtils logout function
+    logout();
+    
+    // Use the context logout function to update state
+    logoutUser();
+    
+    // Clear any other auth-related data
+    sessionStorage.clear();
+    
+    // Show logout message
+    toast.success('Successfully logged out!', {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+    
+    // Navigate to homepage and refresh
+    navigate('/', { replace: true });
+    window.location.reload();
+  };
 
   // Fetch job count for notifications - wrapped in useCallback
   const fetchJobCount = useCallback(async () => {
+    setJobCountLoading(true);
     try {
       console.log('Fetching job count for user:', user);
       
@@ -351,7 +86,7 @@ function Homepage() {
         console.log('Adding location filter:', user.location.state);
       }
 
-      const url = getApiUrl(`/api/jobs/count?${queryParams.toString()}`);
+              const url = buildApiUrl(`/jobs/count?${queryParams.toString()}`);
       console.log('Fetching from URL:', url);
 
       const response = await fetch(url, {
@@ -369,34 +104,30 @@ function Homepage() {
         console.log('Job count response:', data);
         
         const count = data.count || 0;
+        console.log('🎯 Setting job count to:', count);
         setJobCount(count);
         setStats(prev => ({ ...prev, totalJobs: count }));
         
+        // Show job notification popup only (remove duplicate toast notification)
         if (user?.type === 'worker' && count > 0 && !hasShownNotification) {
-          console.log('Showing notifications for worker with', count, 'jobs');
+          console.log('Showing job notification popup for worker with', count, 'jobs');
           
-          const locationText = user.location?.state ? ` in ${user.location.state}` : '';
-          
-          toast.success(`🎯 ${count} job${count !== 1 ? 's' : ''} available${locationText}!`, {
-            position: "top-right",
-            autoClose: 6000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-          
+          // Show the job notification popup directly without duplicate toast
           setTimeout(() => {
             setShowJobNotification(true);
             setHasShownNotification(true);
-          }, 3000);
+          }, 1500); // Reduced delay for better UX
         }
         
         return count;
       }
     } catch (error) {
       console.error('Error fetching job count:', error);
+      console.log('⚠️ Setting job count to 0 due to error');
+      setJobCount(0);
       return 0;
+    } finally {
+      setJobCountLoading(false);
     }
   }, [user, hasShownNotification]);
 
@@ -404,7 +135,7 @@ function Homepage() {
   const fetchWorkerFinancials = useCallback(async () => {
     if (user?.type === 'worker' && user?.id) {
       try {
-        const response = await fetch(getApiUrl(`/api/workers/${user.id}/balance`));
+        const response = await fetch(buildApiUrl(`/workers/${user.id}/balance`));
         if (response.ok) {
           const data = await response.json();
           setWorkerBalance(data.balance || 0);
@@ -432,11 +163,12 @@ function Homepage() {
       
       console.log('Fetching job count with params:', queryParams.toString());
       
-      const response = await fetch(getApiUrl(`/api/jobs/count?${queryParams.toString()}`));
+              const response = await fetch(buildApiUrl(`/jobs/count?${queryParams.toString()}`));
       
       if (response.ok) {
         const data = await response.json();
         console.log('Job count response:', data);
+        console.log('📊 Setting stats totalJobs to:', data.count || 0);
         setStats(prev => ({
           ...prev,
           totalJobs: data.count || 0
@@ -464,7 +196,7 @@ function Homepage() {
           queryParams.append('workerId', user.id);
         }
         
-        const response = await fetch(getApiUrl(`/api/jobs/count?${queryParams.toString()}`));
+        const response = await fetch(buildApiUrl(`/jobs/count?${queryParams.toString()}`));
         if (response.ok) {
           const data = await response.json();
           return { category, count: data.count || 0 };
@@ -501,7 +233,7 @@ function Homepage() {
       // Only show active and in-progress jobs (same as AvailableJobs)
       queryParams.append('status', 'active,in-progress');
       
-      const response = await fetch(getApiUrl(`/api/jobs?${queryParams.toString()}`));
+      const response = await fetch(buildApiUrl(`/api/jobs?${queryParams.toString()}`));
       
       if (response.ok) {
         const jobsData = await response.json();
@@ -548,7 +280,7 @@ function Homepage() {
 
   const fetchShaktiScore = async (workerId) => {
     try {
-      const response = await fetch(getApiUrl(`/api/workers/${workerId}/shakti-score`));
+      const response = await fetch(buildApiUrl(`/api/workers/${workerId}/shakti-score`));
       if (!response.ok) {
         throw new Error('Failed to fetch Shakti score');
       }
@@ -562,7 +294,7 @@ function Homepage() {
 
   const fetchRecentJobs = async () => {
     try {
-      const response = await fetch(getApiUrl('/api/jobs/recent'));
+              const response = await fetch(buildApiUrl('/jobs/recent'));
       if (!response.ok) {
         throw new Error('Failed to fetch recent jobs');
       }
@@ -589,7 +321,7 @@ function Homepage() {
   const handleFindWork = () => {
     if (!isAuthenticated) {
       toast.info(t('home.loginFirst'));
-      navigate('/login');
+      navigate('/login?type=worker');
       return;
     }
     navigate('/jobs');
@@ -598,7 +330,7 @@ function Homepage() {
   const handlePostJob = () => {
     if (!isAuthenticated) {
       toast.info(t('home.loginAsEmployer'));
-      navigate('/login');
+      navigate('/login?type=employer');
       return;
     }
 
@@ -628,10 +360,10 @@ function Homepage() {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-2xl md:max-w-5xl mx-auto my-12 md:my-16 px-3 md:px-4"
       >
-        <div className="bg-white rounded-2xl md:rounded-3xl shadow-xl md:shadow-2xl overflow-hidden border border-gray-100">
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl md:rounded-3xl shadow-md overflow-hidden border border-gray-200/50">
           <div className="relative p-4 md:p-8">
-            {/* Geometric Background Pattern - Hidden on Mobile */}
-            <div className="absolute top-0 right-0 w-32 h-32 md:w-64 md:h-64 opacity-5 hidden md:block">
+            {/* Geometric Background Pattern - Enhanced for Mobile */}
+            <div className="absolute top-0 right-0 w-24 h-24 md:w-64 md:h-64 opacity-5">
               <svg viewBox="0 0 100 100" className="w-full h-full">
                 <polygon points="50,0 100,50 50,100 0,50" fill="currentColor"/>
               </svg>
@@ -640,12 +372,12 @@ function Homepage() {
             <div className="relative flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
               <div className="flex items-center space-x-4 md:space-x-6">
                 <div className="relative">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-black rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-black to-gray-800 rounded-full flex items-center justify-center shadow-lg">
                     <span className="text-xl md:text-2xl font-bold text-white">
                     {user?.name?.charAt(0)}
                   </span>
                 </div>
-                  <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-gray-900 rounded-full border-2 border-white"></div>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
                 </div>
                 
                 <div className="flex-1">
@@ -653,19 +385,29 @@ function Homepage() {
                   <p className="text-xs md:text-sm text-gray-500 uppercase tracking-wide md:tracking-widest font-medium">{user?.type}</p>
                   
                   {user?.type === 'worker' && (
-                    <div className="mt-3 md:mt-4 flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-6">
+                    <div className="mt-3 md:mt-4 flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 md:space-x-6">
                       <div className="flex items-center">
                         <Wallet className="w-4 h-4 mr-2 text-gray-400" />
                         <span className="text-sm text-gray-700 font-medium">₹{workerBalance.toLocaleString()}</span>
                       </div>
                       
-                      {jobCount > 0 && (
+                      {jobCountLoading ? (
                         <div className="flex items-center">
-                          <div className="w-2 h-2 bg-black rounded-full mr-2"></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full mr-2 animate-pulse"></div>
+                          <span className="text-sm text-gray-500">Loading jobs...</span>
+                        </div>
+                      ) : jobCount > 0 ? (
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
                           <span className="text-sm text-gray-700">
                             {jobCount} jobs
                           {user.location?.state && ` in ${user.location.state}`}
                           </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 bg-gray-300 rounded-full mr-2"></div>
+                          <span className="text-sm text-gray-500">No jobs available</span>
                         </div>
                       )}
                     </div>
@@ -680,26 +422,37 @@ function Homepage() {
                 </div>
               </div>
               
-              <div className="flex flex-row md:flex-col gap-2 md:gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                 <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
+                  whileHover={{ scale: 1.02, y: -1 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => navigate(`/${user.type}/profile`)}
-                  className="flex-1 md:flex-none px-4 py-3 md:px-6 bg-black text-white text-xs md:text-sm font-medium tracking-wide hover:bg-gray-800 transition-colors duration-200 touch-manipulation"
+                  className="flex-1 px-4 py-3 md:px-6 bg-black text-white text-xs md:text-sm font-medium tracking-wide hover:bg-gray-800 transition-all duration-300 touch-manipulation rounded-2xl shadow-sm hover:shadow-md"
                 >
                   PROFILE
                 </motion.button>
                 
-                {user.type === 'worker' && jobCount > 0 && (
+                {user.type === 'worker' && (jobCount > 0 || jobCountLoading) && (
                   <motion.button
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
+                    whileHover={{ scale: 1.02, y: -1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handleViewJobs}
-                    className="flex-1 md:flex-none px-4 py-3 md:px-6 border border-black text-black text-xs md:text-sm font-medium tracking-wide hover:bg-black hover:text-white transition-all duration-200 touch-manipulation"
+                    disabled={jobCountLoading}
+                    className="flex-1 px-4 py-3 md:px-6 border border-black text-black text-xs md:text-sm font-medium tracking-wide hover:bg-black hover:text-white transition-all duration-300 touch-manipulation rounded-2xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    JOBS ({jobCount})
+                    {jobCountLoading ? 'LOADING...' : `JOBS (${jobCount})`}
                   </motion.button>
                 )}
+                
+                <motion.button
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleLogout}
+                  className="flex-1 px-4 py-3 md:px-6 bg-gradient-to-r from-red-500/5 to-red-600/5 border border-red-400/40 text-red-600 text-xs md:text-sm font-medium tracking-wide hover:from-red-500/15 hover:to-red-600/15 hover:border-red-500/60 hover:text-red-700 transition-all duration-300 touch-manipulation rounded-2xl backdrop-blur-sm shadow-sm hover:shadow-lg group"
+                >
+                  <LogOut className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform duration-300" />
+                  LOGOUT
+                </motion.button>
               </div>
             </div>
           </div>
@@ -723,62 +476,249 @@ function Homepage() {
   };
 
   return (
-    <div className="min-h-screen relative">
-      {/* Multi-layer Background with sophisticated glass-morphism */}
-      <div className="fixed inset-0 bg-gradient-to-br from-gray-50 via-white to-gray-100 -z-10"></div>
-      
-      {/* Animated Pattern Overlay */}
-      <div className="fixed inset-0 -z-5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(0,0,0,0.02)_0%,transparent_50%)]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(0,0,0,0.01)_0%,transparent_50%)]"></div>
-        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_48%,rgba(0,0,0,0.01)_49%,rgba(0,0,0,0.01)_51%,transparent_52%)]"></div>
-        <AnimatedGrid opacity={0.02} />
-        <ParticleField count={25} />
-        <NetworkLines />
-        <GeometricOverlay />
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 relative overflow-hidden" style={{
+      background: `
+        linear-gradient(135deg, 
+          rgba(99, 102, 241, 0.1) 0%, 
+          rgba(59, 130, 246, 0.1) 25%, 
+          rgba(147, 51, 234, 0.1) 50%, 
+          rgba(236, 72, 153, 0.1) 75%, 
+          rgba(99, 102, 241, 0.1) 100%
+        ),
+        linear-gradient(45deg, 
+          rgba(99, 102, 241, 0.05) 0%, 
+          rgba(147, 51, 234, 0.05) 50%, 
+          rgba(59, 130, 246, 0.05) 100%
+        )
+      `
+    }}>
+      {/* Enhanced Background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Primary animated blobs */}
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-gradient-to-br from-indigo-200 to-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
+        <div className="absolute -bottom-20 left-0 w-96 h-96 bg-gradient-to-br from-blue-200 to-cyan-300 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 -left-20 w-72 h-72 bg-gradient-to-br from-purple-200 to-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-4000"></div>
+        
+        {/* Secondary floating elements */}
+        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-yellow-200 to-orange-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-1000"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-40 h-40 bg-gradient-to-br from-green-200 to-teal-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000"></div>
+        
+        {/* Additional floating orbs */}
+        <div className="absolute top-1/6 right-1/6 w-16 h-16 bg-gradient-to-br from-pink-200 to-rose-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-float animation-delay-1500"></div>
+        <div className="absolute bottom-1/6 left-1/6 w-20 h-20 bg-gradient-to-br from-emerald-200 to-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-35 animate-float animation-delay-2500"></div>
+        
+        {/* Geometric shapes with enhanced animations */}
+        <div className="absolute top-1/3 right-1/3 w-24 h-24 bg-gradient-to-br from-red-200 to-pink-300 transform rotate-45 mix-blend-multiply filter blur-xl opacity-30 animate-pulse-glow"></div>
+        <div className="absolute bottom-1/3 left-1/3 w-20 h-20 bg-gradient-to-br from-cyan-200 to-blue-300 transform -rotate-45 mix-blend-multiply filter blur-xl opacity-30 animate-pulse-glow animation-delay-2000"></div>
+        
+        {/* Floating particles with enhanced effects */}
+        <div className="absolute top-1/6 left-1/6 w-2 h-2 bg-white rounded-full opacity-20 animate-bounce shadow-lg"></div>
+        <div className="absolute top-1/3 right-1/6 w-1 h-1 bg-white rounded-full opacity-30 animate-bounce animation-delay-1000 shadow-lg"></div>
+        <div className="absolute bottom-1/3 left-1/6 w-1.5 h-1.5 bg-white rounded-full opacity-25 animate-bounce animation-delay-2000 shadow-lg"></div>
+        <div className="absolute bottom-1/6 right-1/3 w-1 h-1 bg-white rounded-full opacity-20 animate-bounce animation-delay-3000 shadow-lg"></div>
+        <div className="absolute top-1/2 left-1/2 w-0.5 h-0.5 bg-white rounded-full opacity-40 animate-bounce animation-delay-1500 shadow-lg"></div>
+        <div className="absolute top-2/3 right-1/4 w-1.5 h-1.5 bg-white rounded-full opacity-25 animate-bounce animation-delay-3500 shadow-lg"></div>
+        
+        {/* Animated grid overlay */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0 animate-grid" style={{
+            backgroundImage: `
+              linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+              linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px'
+          }}></div>
+        </div>
+        
+        {/* Radial gradient overlay */}
+        <div className="absolute inset-0 bg-radial-gradient opacity-20"></div>
+        
+        {/* Light rays effect */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-indigo-300 to-transparent animate-pulse"></div>
+          <div className="absolute top-0 right-1/3 w-px h-full bg-gradient-to-b from-transparent via-purple-300 to-transparent animate-pulse animation-delay-2000"></div>
+          <div className="absolute top-0 left-2/3 w-px h-full bg-gradient-to-b from-transparent via-blue-300 to-transparent animate-pulse animation-delay-4000"></div>
+        </div>
+        
+        {/* Floating geometric patterns */}
+        <div className="absolute top-1/4 right-1/4 w-12 h-12 border-2 border-indigo-300/30 rounded-full animate-spin"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-8 h-8 border-2 border-purple-300/30 rounded-full animate-spin animation-delay-2000"></div>
+        <div className="absolute top-3/4 right-1/6 w-6 h-6 border-2 border-blue-300/30 rounded-full animate-spin animation-delay-4000"></div>
       </div>
 
-      {/* Glass-morphism overlay sections */}
-      <div className="relative z-10 backdrop-blur-sm">
+      <div className="relative z-10">
         {/* Mobile-Optimized Job Notification */}
-        <AnimatePresence>
-          {showJobNotification && user?.type === 'worker' && jobCount > 0 && (
-            <motion.div
+      <AnimatePresence>
+          {showJobNotification && user?.type === 'worker' && jobCount > 0 && !jobCountLoading && (
+          <motion.div
               initial={{ opacity: 0, x: 100 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 100 }}
               className="fixed top-20 right-2 md:right-6 z-50 max-w-xs md:max-w-sm touch-manipulation"
             >
               <div className="bg-black/95 backdrop-blur-md text-white p-4 md:p-6 shadow-2xl relative mx-2 md:mx-0 rounded-2xl border border-white/10">
-                <button
-                  onClick={handleCloseJobNotification}
+                  <button
+                    onClick={handleCloseJobNotification}
                   className="absolute top-2 right-2 md:top-4 md:right-4 text-gray-400 hover:text-white transition-colors p-2 touch-manipulation"
-                >
+                  >
                   <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
               
                 <div className="pr-8 md:pr-8">
                   <h4 className="font-medium text-base md:text-lg mb-2">New Jobs</h4>
                   <p className="text-sm text-gray-300 mb-4">
-                    {stats.totalJobs} available
+                    {jobCount} available
                     {user.location?.state && ` in ${user.location.state}`}
                   </p>
                   
                   <div className="flex gap-2 md:gap-3">
-                    <button
-                      onClick={handleViewJobs}
+                  <button
+                    onClick={handleViewJobs}
                       className="flex-1 bg-white text-black px-3 py-3 md:px-4 md:py-2 text-sm font-medium hover:bg-gray-100 transition-colors touch-manipulation rounded-xl"
-                    >
+                  >
                       VIEW ALL
-                    </button>
-                    <button
-                      onClick={handleCloseJobNotification}
+                  </button>
+                  <button
+                    onClick={handleCloseJobNotification}
                       className="px-3 py-3 md:px-4 md:py-2 border border-gray-600 text-gray-300 text-sm font-medium hover:border-gray-400 transition-colors touch-manipulation rounded-xl"
-                    >
+                  >
                       LATER
-                    </button>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+                {/* Hero Section */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50/50 via-blue-50/50 to-purple-50/50 backdrop-blur-sm">
+          {/* Hero Background Elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            {/* Hero-specific animated elements */}
+            <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-gradient-to-br from-indigo-200/40 to-purple-300/40 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob"></div>
+            <div className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-gradient-to-br from-blue-200/40 to-cyan-300/40 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-purple-200/30 to-pink-300/30 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-float"></div>
+            
+            {/* Floating particles for hero */}
+            <div className="absolute top-1/3 left-1/3 w-2 h-2 bg-white rounded-full opacity-30 animate-bounce shadow-lg"></div>
+            <div className="absolute top-2/3 right-1/3 w-1 h-1 bg-white rounded-full opacity-25 animate-bounce animation-delay-1000 shadow-lg"></div>
+            <div className="absolute bottom-1/3 left-2/3 w-1.5 h-1.5 bg-white rounded-full opacity-20 animate-bounce animation-delay-2000 shadow-lg"></div>
+            
+            {/* Light rays for hero */}
+            <div className="absolute top-0 left-1/3 w-px h-full bg-gradient-to-b from-transparent via-indigo-300/30 to-transparent animate-pulse"></div>
+            <div className="absolute top-0 right-1/3 w-px h-full bg-gradient-to-b from-transparent via-purple-300/30 to-transparent animate-pulse animation-delay-2000"></div>
+            
+            {/* Geometric patterns for hero */}
+            <div className="absolute top-1/4 right-1/6 w-16 h-16 border-2 border-indigo-300/20 rounded-full animate-spin"></div>
+            <div className="absolute bottom-1/4 left-1/6 w-12 h-12 border-2 border-purple-300/20 rounded-full animate-spin animation-delay-2000"></div>
+          </div>
+          
+            <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            <div className="pt-16 pb-16 md:pt-24 md:pb-24">
+
+                      {/* Compact Mobile-Friendly Welcome Header */}
+        <AnimatePresence>
+          {isAuthenticated ? (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center mb-6 md:mb-8"
+            >
+              <div className="relative mx-2 sm:mx-0">
+                <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
+                  <div className="px-4 py-3 md:px-6 md:py-4">
+                    <div className="flex items-center justify-between">
+                      {/* Compact User Info */}
+                      <div className="flex items-center">
+                        <div className="relative">
+                          <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold text-sm md:text-base shadow-md">
+                            {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                          </div>
+                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 md:w-3 md:h-3 bg-green-500 rounded-full border border-white animate-pulse"></div>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm md:text-base font-medium text-gray-900 leading-tight">
+                            Welcome back, {user.name?.split(' ')[0] || user.company?.name}
+                          </h3>
+                          <p className="text-xs md:text-sm text-gray-500 capitalize">
+                            {user.type} • Online
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Compact Actions */}
+                      <div className="flex items-center space-x-2 md:space-x-3">
+                        {user?.type === 'worker' && jobCount > 0 && !jobCountLoading && (
+                          <motion.div
+                            initial={{ scale: 0.8 }}
+                            animate={{ scale: 1 }}
+                            className="relative"
+                          >
+                            <div className="px-2 py-1 md:px-3 md:py-1.5 bg-green-500 text-white text-xs md:text-sm font-medium rounded-lg shadow-sm">
+                              <div className="flex items-center">
+                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full mr-1.5 animate-pulse"></div>
+                                {jobCount} jobs
+                                {user.location?.state && (
+                                  <span className="hidden sm:inline"> in {user.location.state}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                          </motion.div>
+                        )}
+                        
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleLogout}
+                          className="px-3 py-1.5 md:px-4 md:py-2 bg-gray-100 text-gray-700 text-xs md:text-sm font-medium rounded-lg hover:bg-gray-200 transition-all duration-200 flex items-center shadow-sm"
+                        >
+                          <LogOut className="w-3 h-3 md:w-4 md:h-4 mr-1.5" />
+                          <span className="hidden sm:inline">Logout</span>
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center mb-6 md:mb-8"
+            >
+              <div className="relative mx-2 sm:mx-0">
+                <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
+                  <div className="px-4 py-3 md:px-6 md:py-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-semibold text-sm md:text-base shadow-md">
+                          <span className="text-lg md:text-xl">🚀</span>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm md:text-base font-medium text-gray-900">
+                            Welcome to INDUS
+                          </h3>
+                          <p className="text-xs md:text-sm text-gray-500">
+                            Your digital employment platform
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => navigate('/login')}
+                        className="px-4 py-2 md:px-6 md:py-2.5 bg-black text-white text-xs md:text-sm font-medium rounded-lg hover:bg-gray-800 transition-all duration-200 flex items-center shadow-sm"
+                      >
+                        <span className="mr-1.5">Get Started</span>
+                        <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
+                      </motion.button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -786,95 +726,26 @@ function Homepage() {
           )}
         </AnimatePresence>
 
-        {/* Hero Section with Glass-morphism */}
-        <div className="relative overflow-hidden bg-white/30 backdrop-blur-sm">
-          {/* Floating geometric shapes */}
-          {Array.from({ length: 12 }, (_, i) => (
-            <FloatingGeometry key={i} delay={i * 0.5} />
-          ))}
-          
-          {/* Enhanced geometric background with glass effect */}
-          <div className="absolute inset-0 opacity-5">
-            <svg className="w-full h-full" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice">
-              <defs>
-                <pattern id="stairs" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-                  <path d="M0,0 L20,0 L20,20 L40,20 L40,40 L60,40 L60,60 L80,60 L80,80 L100,80 L100,100 L0,100 Z" fill="black" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#stairs)" />
-            </svg>
-          </div>
-          
-          <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-            <div className="pt-16 pb-16 md:pt-24 md:pb-24">
-              
-              {/* Mobile-Optimized Welcome Badge with Glass Effect */}
-              <AnimatePresence>
-                {isAuthenticated ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-8 md:mb-12"
-                  >
-                    <div className="flex flex-col sm:inline-flex sm:flex-row items-center px-4 py-3 md:px-6 bg-black/90 backdrop-blur-md text-white mx-2 sm:mx-0 rounded-2xl border border-white/10">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-white rounded-full mr-2 md:mr-3"></div>
-                        <span className="text-xs md:text-sm font-medium tracking-wide uppercase">
-                          Welcome, {user.name?.split(' ')[0] || user.company?.name}
-                        </span>
-                      </div>
-                      {user?.type === 'worker' && stats.totalJobs > 0 && (
-                        <div className="mt-2 sm:mt-0 sm:ml-4 px-3 py-1 bg-white/90 backdrop-blur-sm text-black text-xs font-medium tracking-wide rounded-xl">
-                          {stats.totalJobs} JOBS
-                          {user.location?.state && ` IN ${user.location.state.toUpperCase()}`}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-8 md:mb-12"
-                  >
-                    <div className="flex flex-col sm:inline-flex sm:flex-row items-center px-4 py-3 md:px-6 border border-gray-300/50 mx-2 sm:mx-0 rounded-2xl bg-white/40 backdrop-blur-sm">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-2 md:mr-3"></div>
-                        <span className="text-xs md:text-sm font-medium tracking-wide uppercase text-gray-700">
-                          Welcome to INDUS
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => navigate('/login')}
-                        className="mt-2 sm:mt-0 sm:ml-4 px-4 py-2 md:px-3 md:py-1 bg-black/90 backdrop-blur-sm text-white text-xs font-medium tracking-wide hover:bg-gray-800 transition-colors touch-manipulation rounded-xl"
-                      >
-                        GET STARTED
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Mobile-Optimized Main Title */}
+              {/* Clean Main Title */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="text-center mb-12 md:mb-16"
               >
-                              <div className="relative mb-6 md:mb-8">
-                <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-bold text-gray-900 tracking-wide md:tracking-wider">
-                  INDUS
-                </h1>
-                <div className="absolute -bottom-1 md:-bottom-2 left-1/2 transform -translate-x-1/2 w-16 md:w-24 h-px bg-black"></div>
-              </div>
+                <div className="relative mb-8 md:mb-10">
+                  <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-gray-900 tracking-tight">
+                    INDUS
+                  </h1>
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent"></div>
+                </div>
 
-                <h2 className="text-lg md:text-xl lg:text-2xl font-light text-gray-600 tracking-wide mb-6 md:mb-8 px-4 md:px-0">
+                <h2 className="text-xl md:text-2xl lg:text-3xl font-light text-gray-600 tracking-wide mb-8 md:mb-10 px-4 md:px-0">
                   Digital Employment Platform
                 </h2>
               </motion.div>
 
-              {/* Mobile-Optimized Action Buttons with Glass Effect */}
+              {/* Clean Action Buttons */}
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -882,54 +753,40 @@ function Homepage() {
                 className="flex flex-col gap-4 md:gap-6 justify-center items-center max-w-lg md:max-w-4xl mx-auto mb-12 md:mb-16 px-4 md:px-0"
               >
                 <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={handleFindWork}
-                  className="group relative w-full md:w-auto px-8 py-4 md:px-12 bg-black/90 backdrop-blur-md text-white font-medium tracking-wide md:tracking-widest overflow-hidden touch-manipulation rounded-2xl border border-white/10"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={!user ? () => navigate('/login?type=worker') : (user?.type === 'employer' ? () => navigate('/employer/posted-jobs') : handleFindWork)}
+                  className="w-full md:w-auto px-8 py-4 bg-black text-white font-medium rounded-2xl hover:bg-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                 >
-                  <div className="absolute inset-0 bg-gray-800 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                  <div className="relative flex items-center justify-center space-x-2 md:space-x-3">
-                    <span className="text-sm md:text-base">
-                      {user?.type === 'worker' ? 'FIND WORK' : 'FIND WORKERS'}
-                    </span>
-                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
-                    {user?.type === 'worker' && stats.totalJobs > 0 && (
-                      <span className="ml-1 md:ml-2 px-2 py-1 bg-white/90 backdrop-blur-sm text-black text-xs font-medium rounded-lg">
-                        {stats.totalJobs}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-base">
+                    {!user ? 'Find Job' : (user?.type === 'employer' ? 'Posted Jobs' : (user?.type === 'worker' ? 'Find Work' : 'Find Workers'))}
+                  </span>
+                  <ArrowRight className="w-5 h-5 ml-3" />
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={handlePostJob}
-                  className="group relative w-full md:w-auto px-8 py-4 md:px-12 border border-black/30 text-black font-medium tracking-wide md:tracking-widest overflow-hidden touch-manipulation rounded-2xl bg-white/40 backdrop-blur-sm"
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={!user ? () => navigate('/login?type=employer') : handlePostJob}
+                  className="w-full md:w-auto px-8 py-4 border-2 border-black text-black font-medium rounded-2xl hover:bg-black hover:text-white transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                 >
-                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                  <div className="relative flex items-center justify-center space-x-2 md:space-x-3 group-hover:text-white transition-colors duration-300">
-                    <span className="text-sm md:text-base">
-                      {user?.type === 'employer' ? 'POST JOB' : 'HIRE WORKERS'}
-                    </span>
-                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
-                  </div>
+                  <span className="text-base">
+                    {!user ? 'Post Job' : (user?.type === 'employer' ? 'Post New Job' : 'Hire Workers')}
+                  </span>
+                  <ArrowRight className="w-5 h-5 ml-3" />
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => navigate('/chat-mode')}
-                  className="group relative w-full md:w-auto px-8 py-4 md:px-12 bg-gray-900/90 backdrop-blur-md text-white font-medium tracking-wide md:tracking-widest overflow-hidden touch-manipulation rounded-2xl border border-white/10"
+                  className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-2xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
                 >
-                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                  <div className="relative flex items-center justify-center space-x-2 md:space-x-3">
-                    <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
-                    <span className="text-sm md:text-base">AI ASSISTANT</span>
-                    <span className="ml-1 md:ml-2 px-2 py-1 bg-white/90 backdrop-blur-sm text-black text-xs font-medium tracking-normal rounded-lg">
-                      NEW
-                    </span>
-                  </div>
+                  <MessageCircle className="w-5 h-5 mr-3" />
+                  <span className="text-base">AI Assistant</span>
+                  <span className="ml-3 px-3 py-1 bg-white/20 text-white text-xs font-medium rounded-full">
+                    New
+                  </span>
                 </motion.button>
               </motion.div>
             </div>
@@ -940,74 +797,12 @@ function Homepage() {
         {renderUserProfile()}
 
         {/* Mobile-Optimized AI Assistant Highlight with Glass Effect */}
-        <div className="py-8 md:py-12 bg-white/20 backdrop-blur-sm relative overflow-hidden">
-          {/* AI Assistant Background Patterns */}
-          <div className="absolute inset-0 opacity-5">
-            <motion.div
-              className="absolute top-1/4 right-1/4 w-24 h-24"
-              animate={{
-                rotate: [0, 360],
-                scale: [1, 1.2, 1]
-              }}
-              transition={{
-                duration: 20,
-                repeat: Infinity,
-                ease: "linear"
-              }}
-            >
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                <circle cx="50" cy="50" r="30" fill="none" stroke="black" strokeWidth="1" />
-                <circle cx="50" cy="50" r="15" fill="none" stroke="black" strokeWidth="0.5" />
-                <circle cx="50" cy="50" r="5" fill="black" />
-              </svg>
-            </motion.div>
+        <div className="py-8 md:py-12 bg-gradient-to-br from-indigo-50/30 via-blue-50/30 to-purple-50/30 backdrop-blur-sm relative overflow-hidden">
 
-            <motion.div
-              className="absolute bottom-1/4 left-1/4 w-20 h-20"
-              animate={{
-                rotate: [360, 0],
-                x: [0, 15, 0]
-              }}
-              transition={{
-                duration: 15,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            >
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                <rect x="25" y="25" width="50" height="50" fill="none" stroke="black" strokeWidth="1" transform="rotate(45 50 50)" />
-                <rect x="35" y="35" width="30" height="30" fill="none" stroke="black" strokeWidth="0.5" transform="rotate(45 50 50)" />
-              </svg>
-            </motion.div>
-            
-            {/* Floating AI particles */}
-            {Array.from({ length: 8 }, (_, i) => (
               <motion.div
-                key={i}
-                className="absolute w-1 h-1 bg-black rounded-full"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                }}
-                animate={{
-                  y: [0, -20, 0],
-                  opacity: [0.2, 0.6, 0.2],
-                  scale: [1, 1.5, 1]
-                }}
-                transition={{
-                  duration: Math.random() * 5 + 4,
-                  repeat: Infinity,
-                  delay: Math.random() * 3,
-                  ease: "easeInOut"
-                }}
-              />
-            ))}
-          </div>
-          
-          <motion.div
             initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
             className="max-w-md md:max-w-2xl mx-auto text-center px-4 md:px-0 relative z-10"
           >
             <div className="p-6 md:p-8 border border-gray-200/30 bg-white/30 backdrop-blur-md relative overflow-hidden rounded-2xl">
@@ -1029,7 +824,7 @@ function Homepage() {
                     <polygon points="50,10 90,50 50,90 10,50" fill="black" />
                   </svg>
                 </motion.div>
-              </div>
+                  </div>
 
               <div className="relative z-10">
                 <motion.div
@@ -1044,67 +839,80 @@ function Homepage() {
                   }}
                 >
                   <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </motion.div>
+              </motion.div>
                 <h3 className="text-lg md:text-xl font-light text-gray-900 mb-3 md:mb-4 tracking-wide">AI ASSISTANT</h3>
                 <p className="text-sm md:text-base text-gray-600 font-light leading-relaxed mb-4 md:mb-6">
                   Instant help with jobs and platform guidance.
-                </p>
-                <button
-                  onClick={() => navigate('/chat-mode')}
+                  </p>
+                  <button
+                    onClick={() => navigate('/chat-mode')}
                   className="inline-flex items-center px-4 py-3 md:px-6 bg-black/90 backdrop-blur-md text-white text-sm font-medium tracking-wide md:tracking-widest hover:bg-gray-800 transition-colors touch-manipulation rounded-2xl"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
                   TRY AI ASSISTANT
-                </button>
+                  </button>
               </div>
-            </div>
-          </motion.div>
+                </div>
+              </motion.div>
         </div>
 
-        {/* Mobile-Optimized Stats Grid with Glass Effect */}
-        <div className="py-8 md:py-12 bg-white/10 backdrop-blur-sm relative overflow-hidden">
-          {/* Stats Section Background Patterns */}
-          <div className="absolute inset-0 opacity-5">
-            <AnimatedGrid opacity={0.03} />
-            
-            <motion.div
-              className="absolute top-1/4 left-1/4 w-16 h-16"
-              animate={{
-                rotate: [0, 90, 180, 270, 360],
-                scale: [1, 1.1, 1]
-              }}
-              transition={{
-                duration: 25,
-                repeat: Infinity,
-                ease: "linear"
-              }}
-            >
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                <rect x="10" y="10" width="80" height="80" fill="none" stroke="black" strokeWidth="1" />
-                <rect x="25" y="25" width="50" height="50" fill="none" stroke="black" strokeWidth="0.5" />
-                <rect x="40" y="40" width="20" height="20" fill="black" />
-              </svg>
-            </motion.div>
+        {/* Motivational Quote Section */}
+        <div className="py-8 md:py-12 bg-gradient-to-br from-indigo-50/20 via-blue-50/20 to-purple-50/20 backdrop-blur-sm relative overflow-hidden">
+          
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+            className="max-w-2xl md:max-w-4xl mx-auto text-center px-4 md:px-0 relative z-10"
+          >
+            <div className="p-6 md:p-8 border border-gray-200/30 bg-white/40 backdrop-blur-md relative overflow-hidden rounded-2xl shadow-lg">
+              {/* Inner pattern overlay */}
+              <div className="absolute inset-0 opacity-5">
+                <motion.div
+                  className="absolute top-2 right-2 w-8 h-8"
+                  animate={{
+                    rotate: [0, 180, 360],
+                    scale: [1, 1.1, 1]
+                  }}
+                  transition={{
+                    duration: 10,
+                    repeat: Infinity,
+                    ease: "linear"
+                  }}
+                >
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <polygon points="50,10 90,50 50,90 10,50" fill="black" />
+                  </svg>
+                </motion.div>
+                  </div>
 
-            <motion.div
-              className="absolute bottom-1/4 right-1/4 w-20 h-20"
-              animate={{
-                rotate: [360, 0],
-                y: [0, -10, 0]
-              }}
-              transition={{
-                duration: 18,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            >
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="black" strokeWidth="1" />
-                <circle cx="50" cy="50" r="25" fill="none" stroke="black" strokeWidth="0.5" />
-                <circle cx="50" cy="50" r="10" fill="black" />
-              </svg>
-            </motion.div>
+              <div className="relative z-10">
+                <motion.div
+                  className="w-12 h-12 md:w-16 md:h-16 bg-black/90 backdrop-blur-sm mx-auto mb-4 md:mb-6 flex items-center justify-center rounded-2xl"
+                  animate={{
+                    scale: [1, 1.05, 1]
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <span className="text-white text-lg md:text-2xl font-bold">💪</span>
+                </motion.div>
+                <blockquote className="text-lg md:text-2xl lg:text-3xl font-bold text-gray-900 mb-3 md:mb-4 leading-tight">
+                  "Work! As if you were chased by a dawgg!!"
+                </blockquote>
+                <cite className="text-sm md:text-base text-gray-600 font-medium">
+                  — Amar
+                </cite>
+            </div>
           </div>
+          </motion.div>
+      </div>
+
+        {/* Mobile-Optimized Stats Grid with Glass Effect */}
+        <div className="py-8 md:py-12 bg-gradient-to-br from-indigo-50/25 via-blue-50/25 to-purple-50/25 backdrop-blur-sm relative overflow-hidden">
 
           <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 relative z-10">
             <motion.div
@@ -1115,7 +923,7 @@ function Homepage() {
             >
               <h2 className="text-2xl md:text-4xl font-light text-gray-900 tracking-wide mb-3 md:mb-4">
                 Platform Stats
-              </h2>
+            </h2>
               <div className="w-12 md:w-16 h-px bg-black mx-auto mb-4 md:mb-8"></div>
               <p className="text-base md:text-xl text-gray-600 max-w-2xl mx-auto font-light px-4 md:px-0">
                 Connecting communities across India
@@ -1123,91 +931,56 @@ function Homepage() {
             </motion.div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-              <motion.div
+            <motion.div
                 whileHover={{ y: -2 }}
-                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
               >
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                   <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
                 <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.totalJobs}</h3>
                 <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Active Jobs</p>
-              </motion.div>
+            </motion.div>
 
-              <motion.div
+            <motion.div
                 whileHover={{ y: -2 }}
-                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
               >
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                   <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
                 <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.activeWorkers}</h3>
                 <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Active Workers</p>
-              </motion.div>
+            </motion.div>
 
-              <motion.div
+            <motion.div
                 whileHover={{ y: -2 }}
-                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
               >
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                   <Briefcase className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
                 <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.successfulMatches}</h3>
                 <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Successful Matches</p>
-              </motion.div>
+            </motion.div>
 
-              <motion.div
+            <motion.div
                 whileHover={{ y: -2 }}
-                className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
               >
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                   <Star className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
                 <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.averageRating}</h3>
                 <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Average Rating</p>
-              </motion.div>
-            </div>
+            </motion.div>
           </div>
+        </div>
         </div>
       </div>
 
       {/* Local Matching Section with Glass Effect */}
-      <section className="py-12 md:py-20 bg-white/15 backdrop-blur-sm relative overflow-hidden">
-        {/* Local Matching Background Patterns */}
-        <div className="absolute inset-0 opacity-5">
-          <MorphingPattern />
-          
-          <motion.svg
-            className="absolute top-1/4 left-1/4 w-32 h-32"
-            viewBox="0 0 100 100"
-            animate={{
-              rotate: [0, 360],
-              scale: [1, 1.1, 1]
-            }}
-            transition={{
-              duration: 30,
-              repeat: Infinity,
-              ease: "linear"
-            }}
-          >
-            <motion.path
-              d="M50,10 L90,30 L80,70 L50,90 L20,70 L10,30 Z"
-              fill="none"
-              stroke="black"
-              strokeWidth="1"
-              animate={{
-                strokeDasharray: ["0,200", "100,200", "200,200"],
-                strokeDashoffset: [0, -50, -100]
-              }}
-              transition={{
-                duration: 8,
-                repeat: Infinity,
-                delay: 1.5,
-                ease: "easeInOut"
-              }}
-            />
-          </motion.svg>
-        </div>
+      <section className="py-12 md:py-20 bg-gradient-to-br from-indigo-50/35 via-blue-50/35 to-purple-50/35 backdrop-blur-sm relative overflow-hidden">
         
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-10 md:mb-16">
@@ -1223,7 +996,7 @@ function Homepage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
             <motion.div
               whileHover={{ y: -2 }}
-              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
             >
               <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                 <div className="text-white text-lg md:text-xl">🏘️</div>
@@ -1234,7 +1007,7 @@ function Homepage() {
 
             <motion.div
               whileHover={{ y: -2 }}
-              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
             >
               <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                 <div className="text-white text-lg md:text-xl">🤝</div>
@@ -1245,7 +1018,7 @@ function Homepage() {
 
             <motion.div
               whileHover={{ y: -2 }}
-              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
             >
               <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                 <div className="text-white text-lg md:text-xl">💼</div>
@@ -1256,7 +1029,7 @@ function Homepage() {
 
             <motion.div
               whileHover={{ y: -2 }}
-              className="bg-white/30 backdrop-blur-sm p-4 md:p-8 border border-gray-100/30 group touch-manipulation rounded-2xl"
+              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
             >
               <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
                 <div className="text-white text-lg md:text-xl">🌱</div>
@@ -1269,78 +1042,7 @@ function Homepage() {
       </section>
 
       {/* Mobile-Optimized Recent Jobs Section with Glass Effect */}
-      <div className="py-12 md:py-20 bg-white/10 backdrop-blur-sm relative overflow-hidden">
-        {/* Recent Jobs Background Patterns */}
-        <div className="absolute inset-0 opacity-5">
-          <WavePattern />
-          
-          <motion.div
-            className="absolute top-1/4 right-1/4 w-28 h-28"
-            animate={{
-              rotate: [0, 360],
-              scale: [1, 1.1, 1],
-              x: [0, 10, 0]
-            }}
-            transition={{
-              duration: 25,
-              repeat: Infinity,
-              ease: "linear"
-            }}
-          >
-            <svg viewBox="0 0 100 100" className="w-full h-full">
-              <rect x="15" y="15" width="70" height="70" fill="none" stroke="black" strokeWidth="1" />
-              <rect x="25" y="25" width="50" height="50" fill="none" stroke="black" strokeWidth="0.5" />
-              <rect x="35" y="35" width="30" height="30" fill="none" stroke="black" strokeWidth="0.5" />
-              <rect x="42" y="42" width="16" height="16" fill="black" />
-            </svg>
-          </motion.div>
-          
-          <motion.div
-            className="absolute bottom-1/4 left-1/4 w-24 h-24"
-            animate={{
-              rotate: [360, 0],
-              y: [0, -15, 0],
-              scale: [1, 1.15, 1]
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
-            <svg viewBox="0 0 100 100" className="w-full h-full">
-              <circle cx="50" cy="50" r="45" fill="none" stroke="black" strokeWidth="0.5" />
-              <circle cx="50" cy="50" r="30" fill="none" stroke="black" strokeWidth="1" />
-              <circle cx="50" cy="50" r="15" fill="none" stroke="black" strokeWidth="0.5" />
-              <circle cx="50" cy="50" r="5" fill="black" />
-              <rect x="47" y="5" width="6" height="90" fill="none" stroke="black" strokeWidth="0.5" />
-              <rect x="5" y="47" width="90" height="6" fill="none" stroke="black" strokeWidth="0.5" />
-            </svg>
-          </motion.div>
-          
-          {/* Job cards floating pattern */}
-          {Array.from({ length: 6 }, (_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-4 h-3 bg-black opacity-20"
-              style={{
-                left: `${20 + (i * 12)}%`,
-                top: `${30 + Math.sin(i) * 20}%`,
-              }}
-              animate={{
-                y: [0, -10, 0],
-                x: [0, 5, 0],
-                opacity: [0.1, 0.3, 0.1]
-              }}
-              transition={{
-                duration: Math.random() * 4 + 3,
-                repeat: Infinity,
-                delay: i * 0.5,
-                ease: "easeInOut"
-              }}
-            />
-          ))}
-        </div>
+      <div className="py-12 md:py-20 bg-gradient-to-br from-indigo-50/30 via-blue-50/30 to-purple-50/30 backdrop-blur-sm relative overflow-hidden">
         
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-10 md:mb-16">
@@ -1363,7 +1065,7 @@ function Homepage() {
                 <motion.div
                   key={job._id}
                   whileHover={{ y: -2 }}
-                  className="bg-white/40 backdrop-blur-sm border border-gray-100/30 shadow-sm group touch-manipulation rounded-2xl"
+                  className="bg-white/70 backdrop-blur-md border border-gray-100/50 shadow-sm hover:shadow-lg group touch-manipulation rounded-2xl transition-all duration-300"
                 >
                   <div className="p-4 md:p-8">
                     <h3 className="text-lg md:text-xl font-medium text-gray-900 mb-1 md:mb-2 tracking-wide line-clamp-2">{job.title}</h3>
@@ -1373,19 +1075,19 @@ function Homepage() {
                       <div className="flex items-center text-xs md:text-sm text-gray-600">
                         <MapPin className="w-3 h-3 md:w-4 md:h-4 mr-2 flex-shrink-0" />
                         <span className="truncate">{job.location?.city ? `${job.location.city}, ${job.location.state}` : 'Remote'}</span>
-                      </div>
+                    </div>
                       <div className="flex items-center text-xs md:text-sm text-gray-600">
                         <Wallet className="w-3 h-3 md:w-4 md:h-4 mr-2 flex-shrink-0" />
                         <span>₹{job.salary?.toLocaleString() || 'Negotiable'}</span>
                       </div>
                     </div>
                     
-                    <button
+                      <button
                       onClick={() => navigate(`/jobs/${job._id}`)}
                       className="w-full bg-black/90 backdrop-blur-sm text-white py-3 md:py-3 text-xs md:text-sm font-medium tracking-wide md:tracking-widest hover:bg-gray-800 transition-colors group-hover:bg-gray-800 touch-manipulation rounded-2xl"
                     >
                       VIEW DETAILS
-                    </button>
+                      </button>
                   </div>
                 </motion.div>
               ))}
@@ -1397,6 +1099,107 @@ function Homepage() {
           )}
         </div>
       </div>
+
+      {/* Add global styles for animations */}
+      <style jsx global>{`
+        @keyframes blob {
+          0% { 
+            transform: translate(0px, 0px) scale(1) rotate(0deg); 
+            opacity: 0.6;
+          }
+          25% { 
+            transform: translate(40px, -60px) scale(1.2) rotate(90deg); 
+            opacity: 0.8;
+          }
+          50% { 
+            transform: translate(-30px, 40px) scale(0.8) rotate(180deg); 
+            opacity: 0.4;
+          }
+          75% { 
+            transform: translate(60px, 20px) scale(1.1) rotate(270deg); 
+            opacity: 0.7;
+          }
+          100% { 
+            transform: translate(0px, 0px) scale(1) rotate(360deg); 
+            opacity: 0.6;
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          25% { transform: translateY(-20px) rotate(5deg); }
+          50% { transform: translateY(-10px) rotate(-5deg); }
+          75% { transform: translateY(-15px) rotate(3deg); }
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% { 
+            opacity: 0.3;
+            filter: blur(1rem);
+          }
+          50% { 
+            opacity: 0.6;
+            filter: blur(1.5rem);
+          }
+        }
+        
+        @keyframes grid-move {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(50px, 50px); }
+        }
+        
+        .animate-blob {
+          animation: blob 8s infinite ease-in-out;
+        }
+        
+        .animate-float {
+          animation: float 6s infinite ease-in-out;
+        }
+        
+        .animate-pulse-glow {
+          animation: pulse-glow 4s infinite ease-in-out;
+        }
+        
+        .animate-grid {
+          animation: grid-move 20s infinite linear;
+        }
+        
+        .animation-delay-1000 {
+          animation-delay: 1s;
+        }
+        
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        
+        .animation-delay-3000 {
+          animation-delay: 3s;
+        }
+        
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        
+        .bg-radial-gradient {
+          background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+        }
+        
+        /* Enhanced blur effects */
+        .blur-3xl {
+          filter: blur(3rem);
+        }
+        
+        .blur-2xl {
+          filter: blur(2rem);
+        }
+        
+        /* Glass morphism effect */
+        .glass-effect {
+          backdrop-filter: blur(10px);
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+      `}</style>
     </div>
   );
 }

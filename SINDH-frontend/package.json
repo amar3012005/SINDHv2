@@ -72,6 +72,8 @@
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.14.5",
     "@capacitor/cli": "^7.4.2",
-    "@capacitor/core": "^7.4.2"
+    "@capacitor/core": "^7.4.2",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/typography": "^0.5.16"
   }
 }

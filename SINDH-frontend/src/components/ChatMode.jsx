@@ -1283,7 +1283,7 @@ const ChatMode = () => {
                   backgroundColor: 'rgba(0,0,0,0.04)' 
                 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/home')}
                 className="p-1.5 hover:bg-gray-50 rounded-sm transition-all duration-200"
                 title="Home"
               >

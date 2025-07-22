@@ -23,16 +23,13 @@ const getApiUrl = () => {
   // Check if we're in a mobile app environment (Capacitor)
   const isMobileApp = window.Capacitor || window.cordova;
   
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://sindh-backend.onrender.com/api';
-  }
+  // Always use localhost for development and testing
+  // Comment out the production check to force localhost usage
+  // if (process.env.NODE_ENV === 'production') {
+  //   return 'https://sindh-backend.onrender.com/api';
+  // }
   
-  // For mobile app development, use the backend URL
-  if (isMobileApp) {
-    return 'https://sindh-backend.onrender.com/api';
-  }
-  
-  // For local development
+  // For local development (including mobile app development), use localhost
   return 'http://localhost:10000/api';
 };
 
@@ -44,7 +41,8 @@ console.log('🌐 API Configuration:', {
   mode: process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT',
   host: window.location.host,
   isMobileApp: !!(window.Capacitor || window.cordova),
-  userAgent: navigator.userAgent
+  userAgent: navigator.userAgent,
+  platform: window.Capacitor?.getPlatform?.() || 'web'
 });
 
 const api = axios.create({

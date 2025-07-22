@@ -6,8 +6,9 @@ import { toast } from 'react-toastify';
 import { 
   CheckCircle, Calendar, MapPin, DollarSign, Building, Clock, 
   Briefcase, Eye, Phone, Mail, RefreshCw,
-  AlertCircle, Award, Star
+  AlertCircle, Award, Star, TrendingUp
 } from 'lucide-react';
+import JobApplicationProgress from './JobApplicationProgress';
 
 const MyApplications = () => {
   const { user } = useUser();
@@ -522,8 +523,23 @@ const MyApplications = () => {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {currentApplications.map(renderCurrentApplicationCard)}
+                <div className="space-y-6">
+                  {currentApplications.map((application) => (
+                    <div key={application._id} className="space-y-4">
+                      <JobApplicationProgress 
+                        applicationId={application._id} 
+                        onStatusChange={(status) => {
+                          setCurrentApplications(prev => 
+                            prev.map(app => 
+                              app._id === application._id 
+                                ? { ...app, status } 
+                                : app
+                            )
+                          );
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
             </motion.div>

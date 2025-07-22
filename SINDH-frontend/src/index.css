@@ -19,15 +19,12 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* background-image: url('./assets/background.jpeg'); */
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background: transparent !important; /* Ensure no background overrides */
   color: var(--color-text-primary);
   position: relative;
   z-index: 0;
-  height: 100%; /* Ensure body takes full height */
+  min-height: 100vh;
+  width: 100%;
 
   /* Mobile optimizations */
   -webkit-text-size-adjust: 100%;
@@ -199,4 +196,36 @@ input, select, textarea {
 img {
   max-width: 100%;
   height: auto;
+}
+
+/* Blob animations for gradient backgrounds */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+.animation-delay-6000 {
+  animation-delay: 6s;
 }

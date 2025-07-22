@@ -18,7 +18,7 @@ const jobApplicationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'completed', 'cancelled'],
+    enum: ['pending', 'accepted', 'rejected', 'in-progress', 'completed', 'cancelled'],
     default: 'pending'
   },
   updatedAt: {
@@ -104,6 +104,9 @@ jobApplicationSchema.pre('save', function(next) {
     switch (this.status) {
       case 'accepted':
         this.acceptedAt = Date.now();
+        break;
+      case 'in-progress':
+        this.startedAt = Date.now();
         break;
       case 'completed':
         this.completedAt = Date.now();

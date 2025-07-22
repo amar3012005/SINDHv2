@@ -186,7 +186,7 @@ const Navbar = () => {
 
   useEffect(() => {
     const path = location.pathname;
-    if (path === '/') setActiveSection('home');
+    if (path === '/home') setActiveSection('home');
     else if (path === '/about') setActiveSection('about');
     else if (path === '/news') setActiveSection('news');
     else if (path.includes('/profile')) setActiveSection('profile');
@@ -229,13 +229,13 @@ const Navbar = () => {
   const handleLogoutComplete = () => {
     setShowProfileMenu(false);
     setIsSideMenuOpen(false);
-    navigate('/', { replace: true });
+    navigate('/home', { replace: true });
   };
 
   const handleLogout = () => {
     logoutUser();
     setShowProfileMenu(false);
-    navigate('/');
+    navigate('/home');
   };
 
   const handleProfileClick = () => {
@@ -300,7 +300,7 @@ const Navbar = () => {
   const renderDesktopNav = () => (
     <div className="hidden md:flex items-center space-x-8">
       <Link 
-        to="/" 
+        to="/home" 
         className="nav-link group relative px-3 py-2 text-sm font-light tracking-wide text-gray-800 hover:text-black transition-all duration-300"
         onClick={() => handleNavigation('home')}
       >
@@ -406,7 +406,7 @@ const Navbar = () => {
           </motion.button>
 
           <AnimatePresence>
-            {showProfileMenu && (
+          {showProfileMenu && (
               <motion.div
                 initial={{ opacity: 0, y: -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -414,22 +414,22 @@ const Navbar = () => {
                 transition={{ duration: 0.2 }}
                 className="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200 py-2 z-50"
               >
-                <button
-                  onClick={() => {
-                    navigate(`/${userType}/profile`);
-                    setShowProfileMenu(false);
-                  }}
+              <button
+                onClick={() => {
+                  navigate(`/${userType}/profile`);
+                  setShowProfileMenu(false);
+                }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-black/5 transition-colors duration-200"
-                >
-                  {t('nav.profile')}
-                </button>
-                <LogoutButton
-                  variant="text"
+              >
+                {t('nav.profile')}
+              </button>
+              <LogoutButton
+                variant="text"
                   className="block w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-black/5 transition-colors duration-200"
-                  onLogoutComplete={handleLogoutComplete}
-                />
+                onLogoutComplete={handleLogoutComplete}
+              />
               </motion.div>
-            )}
+          )}
           </AnimatePresence>
         </div>
       ) : (
@@ -575,7 +575,7 @@ const Navbar = () => {
             className="block w-full text-left py-3 px-4 text-gray-600 hover:text-black hover:bg-black/5 rounded-lg transition-all duration-300 font-light tracking-wide"
             onLogoutComplete={() => {
               setIsSideMenuOpen(false);
-              navigate('/');
+              navigate('/home');
             }}
           />
         </>
@@ -622,15 +622,15 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 relative z-10">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex-shrink-0 flex items-center group">
+            <Link to="/home" className="flex-shrink-0 flex items-center group">
               <motion.div
-                className="flex items-center space-x-3"
+                className="flex items-center space-x-2"
                 whileHover={{ scale: 1.02 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               >
                 {/* Logo SVG */}
                 <motion.div
-                  className="w-8 h-8 flex items-center justify-center"
+                  className="w-8 h-8 flex-shrink-0"
                   animate={{ 
                     rotate: [0, 5, 0, -5, 0]
                   }}
@@ -646,20 +646,20 @@ const Navbar = () => {
                     className="w-full h-full object-contain"
                   />
                 </motion.div>
-                <div className="flex flex-col">
-                  <motion.span 
-                    className="text-xl font-light tracking-[0.2em] text-gray-800 group-hover:text-black transition-colors duration-300"
-                    animate={{ 
-                      opacity: [1, 0.9, 1]
-                    }}
-                    transition={{ 
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  >
-                    I N D U S
-                  </motion.span>
+                <motion.span 
+                  className="text-xl font-light tracking-[0.2em] text-gray-800 group-hover:text-black transition-colors duration-300 whitespace-nowrap"
+                  animate={{ 
+                    opacity: [1, 0.9, 1]
+                  }}
+                  transition={{ 
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  INDUS
+                </motion.span>
+                <div className="absolute left-0 -bottom-4 w-full">
                   <span className="text-[10px] text-gray-500 tracking-wide font-light">
                     Empowering Rural Workforce
                   </span>
@@ -684,7 +684,7 @@ const Navbar = () => {
       </div>
       
       <AnimatePresence>
-        {isSideMenuOpen && (
+      {isSideMenuOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -694,10 +694,10 @@ const Navbar = () => {
             <div className="absolute inset-y-0 right-0 w-80 bg-white/95 backdrop-blur-md border-l border-gray-200 relative overflow-hidden">
               <NavAnimatedGrid opacity={0.02} />
               <NavParticleField count={5} />
-              {renderMobileNav()}
-            </div>
+            {renderMobileNav()}
+          </div>
           </motion.div>
-        )}
+      )}
       </AnimatePresence>
     </nav>
   );

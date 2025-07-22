@@ -5,7 +5,9 @@ const config = {
   },
   production: {
     // Your Render backend URL - replace with your actual Render URL
-    API_BASE_URL: "https://sindh-backend.onrender.com", // Updated to use Render deployment
+    API_BASE_URL: process.env.NODE_ENV === 'production' 
+  ? "https://sindh-backend.onrender.com" 
+  : "http://localhost:10000", // Development uses local backend
   }
 };
 
