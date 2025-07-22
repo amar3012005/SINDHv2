@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const API_URL = process.env.NODE_ENV === 'production' 
   ? 'https://sindh-backend.onrender.com/api'
-  : 'http://localhost:10000/api';
+  : 'https://sindh-backend.onrender.com/api';
 
 // Create axios instance with default config
 const api = axios.create({

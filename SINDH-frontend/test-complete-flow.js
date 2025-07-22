@@ -50,7 +50,7 @@ if (employerApplicationsLink) {
 
 // Test 7: Verify API Endpoints
 console.log('7. Testing API Endpoints...');
-const apiUrl = 'http://localhost:10000';
+const apiUrl = 'https://sindh-backend.onrender.com';
 
 // Test job applications endpoint
 fetch(`${apiUrl}/job-applications/apply`, {

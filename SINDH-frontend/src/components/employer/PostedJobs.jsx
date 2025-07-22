@@ -208,7 +208,7 @@ const PostedJobs = () => {
   const fetchApplicationsForJob = async (jobId) => {
     try {
       setLoadingApplications(true);
-      const response = await fetch(`${getApiUrl()}/job-applications/job/${jobId}`, {
+      const response = await fetch(`${getApiUrl()}/job/${jobId}/applications`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -422,7 +422,7 @@ const PostedJobs = () => {
     
     try {
       // Fetch applications only when user requests to view them
-      const response = await fetch(`${getApiUrl()}/job-applications/job/${job._id}`);
+      const response = await fetch(`${getApiUrl()}/job/${job._id}/applications`);
       
       if (response.ok) {
         const data = await response.json();
@@ -579,7 +579,7 @@ const PostedJobs = () => {
   // Check and update job status after cancellation
   const checkAndUpdateJobStatusAfterCancellation = async (jobId) => {
     try {
-      const response = await fetch(`${getApiUrl()}/job-applications/job/${jobId}`);
+      const response = await fetch(`${getApiUrl()}/job/${jobId}/applications`);
       if (response.ok) {
         const data = await response.json();
         const applications = data.data || [];

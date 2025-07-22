@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { getCurrentUser, logout } from '../utils/authUtils';
-import { Phone, Star, Users, Briefcase, TrendingUp, Wallet, MessageCircle, ArrowRight, Calendar, MapPin, LogOut } from 'lucide-react';
+import { Star, Users, Briefcase, TrendingUp, Wallet, MessageCircle, ArrowRight, MapPin, LogOut } from 'lucide-react';
 import { buildApiUrl } from '../utils/apiUtils';
+import axios from 'axios';
 
 
 
@@ -28,15 +29,61 @@ function Homepage() {
   const [jobCount, setJobCount] = useState(0);
   const [jobCountLoading, setJobCountLoading] = useState(false);
   const [showJobNotification, setShowJobNotification] = useState(false);
+  const [showInProgressNotification, setShowInProgressNotification] = useState(false);
   const [hasShownNotification, setHasShownNotification] = useState(false);
+  const [workerProfile, setWorkerProfile] = useState(null);
+  const profileRefreshInterval = useRef(null);
 
-  // Add missing worker financial states
+  // Worker financial states
   const [workerBalance, setWorkerBalance] = useState(0);
   const [recentEarnings, setRecentEarnings] = useState([]);
 
   // Get user from context and fallback to localStorage if needed
-  const { user: contextUser, isLoadingUser, logoutUser } = useUser();
+  const { user: contextUser, isLoadingUser, logoutUser, fetchUserProfile } = useUser();
   const user = contextUser || getCurrentUser();
+
+  // Continuously update worker profile
+  useEffect(() => {
+    const updateWorkerProfile = async () => {
+      if (!user?.id || user?.type !== 'worker') return;
+      
+      try {
+        console.log('Updating worker profile data...');
+        const response = await axios.get(buildApiUrl(`/workers/${user.id}`), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.data) {
+          console.log('Updated worker profile:', response.data);
+          setWorkerProfile(response.data);
+          
+          // Update location stats if available
+          if (response.data.location) {
+            setStats(prev => ({
+              ...prev,
+              location: response.data.location.state || 'Unknown',
+              city: response.data.location.city || ''
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error updating worker profile:', error);
+      }
+    };
+
+    // Initial fetch
+    updateWorkerProfile();
+    
+    // Set up interval for continuous updates (every 30 seconds)
+    profileRefreshInterval.current = setInterval(updateWorkerProfile, 30000);
+    
+    // Clean up interval on unmount
+    return () => {
+      if (profileRefreshInterval.current) {
+        clearInterval(profileRefreshInterval.current);
+      }
+    };
+  }, [user?.id, user?.type]);
 
   // Logout function
   const handleLogout = () => {
@@ -77,8 +124,8 @@ function Homepage() {
         queryParams.append('workerId', user.id);
       }
       
-      // Use the same filtering logic as AvailableJobs - only active and in-progress jobs
-      queryParams.append('status', 'active,in-progress');
+      // Show only active jobs (not in-progress) for the count
+      queryParams.append('status', 'active');
       
       // Add location filter if user has location
       if (user?.location?.state) {
@@ -104,13 +151,33 @@ function Homepage() {
         console.log('Job count response:', data);
         
         const count = data.count || 0;
-        console.log('🎯 Setting job count to:', count);
+        console.log('🎯 Setting active job count to:', count);
         setJobCount(count);
         setStats(prev => ({ ...prev, totalJobs: count }));
         
-        // Show job notification popup only (remove duplicate toast notification)
-        if (user?.type === 'worker' && count > 0 && !hasShownNotification) {
-          console.log('Showing job notification popup for worker with', count, 'jobs');
+        // If no active jobs, check for in-progress jobs
+        if (count === 0 && user?.type === 'worker') {
+          try {
+            const inProgressResponse = await fetch(buildApiUrl(`/jobs/count?status=in-progress${user?.id ? `&workerId=${user.id}` : ''}`));
+            if (inProgressResponse.ok) {
+              const inProgressData = await inProgressResponse.json();
+              const inProgressCount = inProgressData.count || 0;
+              
+              if (inProgressCount > 0 && !hasShownNotification) {
+                console.log(`Found ${inProgressCount} in-progress jobs`);
+                setTimeout(() => {
+                  setShowInProgressNotification(true);
+                  setHasShownNotification(true);
+                }, 1500);
+              }
+            }
+          } catch (err) {
+            console.error('Error checking in-progress jobs:', err);
+          }
+        }
+        // Show active jobs notification if available
+        else if (user?.type === 'worker' && count > 0 && !hasShownNotification) {
+          console.log('Showing active jobs notification popup for worker with', count, 'jobs');
           
           // Show the job notification popup directly without duplicate toast
           setTimeout(() => {
@@ -159,7 +226,7 @@ function Homepage() {
       }
       
       // Use the same filtering logic as AvailableJobs - only active and in-progress jobs
-      queryParams.append('status', 'active,in-progress');
+      queryParams.append('status', 'active');
       
       console.log('Fetching job count with params:', queryParams.toString());
       
@@ -189,7 +256,7 @@ function Homepage() {
       const categoryPromises = categories.map(async (category) => {
         const queryParams = new URLSearchParams();
         queryParams.append('category', category);
-        queryParams.append('status', 'active,in-progress'); // Same filtering as AvailableJobs
+        queryParams.append('status', 'active'); // Same filtering as AvailableJobs
         
         // Add worker-specific filtering
         if (user.id && user.type === 'worker') {
@@ -231,7 +298,7 @@ function Homepage() {
       }
       
       // Only show active and in-progress jobs (same as AvailableJobs)
-      queryParams.append('status', 'active,in-progress');
+      queryParams.append('status', 'active,in-progres');
       
       const response = await fetch(buildApiUrl(`/api/jobs?${queryParams.toString()}`));
       
@@ -641,10 +708,15 @@ function Homepage() {
                         </div>
                         <div className="ml-3">
                           <h3 className="text-sm md:text-base font-medium text-gray-900 leading-tight">
-                            Welcome back, {user.name?.split(' ')[0] || user.company?.name}
+                            {user?.name 
+                              ? `Welcome back, ${user.name.split(' ')[0]}!` 
+                              : 'Welcome to SINDH Platform!'}
                           </h3>
                           <p className="text-xs md:text-sm text-gray-500 capitalize">
                             {user.type} • Online
+                            {workerProfile?.location 
+                              ? ` • ${workerProfile.location.city ? `${workerProfile.location.city}, ` : ''}${workerProfile.location.state || ''}` 
+                              : ` • ${user?.location?.state || 'Update your location in profile'}`}
                           </p>
                         </div>
                       </div>

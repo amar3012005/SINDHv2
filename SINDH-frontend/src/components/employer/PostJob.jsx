@@ -477,7 +477,7 @@ const PostJob = () => {
       });
 
       console.log('📝 Step 2: Submitting job data to backend API...');
-      console.log('🌐 API Endpoint: http://localhost:10000/api/jobs');
+      console.log('🌐 API Endpoint: https://sindh-backend.onrender.com/api/jobs');
       console.log('📤 Request Method: POST');
       console.log('📦 Request Body:', JSON.stringify(jobData, null, 2));
 

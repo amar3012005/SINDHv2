@@ -32,7 +32,7 @@ const EmployerApplicationProgress = ({ jobId, onStatusChange }) => {
 
   const fetchApplications = async () => {
     try {
-      const response = await fetch(`${getApiUrl()}/job-applications/job/${jobId}`);
+      const response = await fetch(`${getApiUrl()}/job/${jobId}/applications`);
       if (response.ok) {
         const data = await response.json();
         setApplications(data.data || []);

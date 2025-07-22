@@ -228,7 +228,7 @@ npm run dev
 
 #### Frontend (.env)
 ```env
-REACT_APP_API_URL=http://localhost:10000/api
+REACT_APP_API_URL=https://sindh-backend.onrender.com/api
 REACT_APP_FIREBASE_CONFIG=your_firebase_config
 ```
 

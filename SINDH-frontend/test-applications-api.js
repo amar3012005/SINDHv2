@@ -1,5 +1,5 @@
 // Test script to verify frontend-backend connection for applications
-const API_URL = 'http://localhost:10000/api';
+const API_URL = 'https://sindh-backend.onrender.com/api';
 
 async function testApplicationsAPI() {
   try {

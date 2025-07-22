@@ -257,12 +257,25 @@ router.get('/count', async (req, res) => {
     const { location, category, minSalary, employmentType, workerId, status } = req.query;
     let query = {};
 
+    // Log the incoming request for debugging
+    logger.info('Job count request', { 
+      workerId,
+      status,
+      location,
+      category,
+      minSalary,
+      employmentType 
+    });
+
+    // Status handling - ensure it's consistent with the main jobs endpoint
     if (status && status !== 'active,in-progress') {
       query.status = status;
     } else {
+      // Default to active and in-progress jobs
       query.status = { $in: ['active', 'in-progress'] };
     }
 
+    // Apply filters
     if (category) {
       query.category = { $regex: category, $options: 'i' };
     }
@@ -271,8 +284,8 @@ router.get('/count', async (req, res) => {
       query.employmentType = { $regex: employmentType, $options: 'i' };
     }
 
-    if (minSalary) {
-      query.salary = { $gte: parseInt(minSalary) };
+    if (minSalary && !isNaN(minSalary)) {
+      query.salary = { $gte: parseInt(minSalary, 10) };
     }
 
     if (location) {
@@ -282,59 +295,70 @@ router.get('/count', async (req, res) => {
       ];
     }
 
-    let count = await Job.countDocuments(query);
-
+    // If workerId is provided, we need to exclude jobs they've already completed
     if (workerId) {
       try {
-        const completedApplications = await JobApplication.find({
-          worker: workerId,
-          status: 'completed'
-        }).select('job');
-        
-        // Filter and validate job IDs
-        const validJobIds = completedApplications
-          .map(app => {
-            try {
-              // Handle corrupted data where job might be a string or object
-              if (app.job && typeof app.job === 'object' && app.job._id) {
-                return app.job._id.toString();
-              } else if (app.job && typeof app.job === 'string' && app.job.match(/^[0-9a-fA-F]{24}$/)) {
-                return app.job;
-              }
-              return null;
-            } catch (e) {
-              logger.warn(`Invalid job ID in application ${app._id}: ${e.message}`);
-              return null;
+        // Find all jobs this worker has completed
+        const completedJobs = await JobApplication.aggregate([
+          {
+            $match: {
+              worker: mongoose.Types.ObjectId(workerId),
+              status: 'completed'
             }
-          })
-          .filter(Boolean); // Remove null values
+          },
+          {
+            $group: {
+              _id: '$job'
+            }
+          }
+        ]);
+
+        const completedJobIds = completedJobs.map(job => job._id);
         
-        if (validJobIds.length > 0) {
-          const excludeCompletedQuery = {
-            ...query,
-            _id: { $nin: validJobIds }
-          };
-          count = await Job.countDocuments(excludeCompletedQuery);
+        if (completedJobIds.length > 0) {
+          // Exclude completed jobs from the count
+          query._id = { $nin: completedJobIds };
         }
       } catch (error) {
-        logger.error('Error filtering completed jobs from count', { error: error.message, stack: error.stack });
-        // Return original count if filtering fails
+        logger.error('Error filtering completed jobs', { 
+          error: error.message, 
+          stack: error.stack,
+          workerId 
+        });
+        // Continue with the original query if there's an error
       }
     }
+
+    // Get the final count
+    const count = await Job.countDocuments(query);
+    
+    logger.info('Job count result', { 
+      count,
+      workerId,
+      status: query.status,
+      filterCount: Object.keys(query).length
+    });
     
     res.json({
       success: true,
       count: count,
-      filters: req.query
+      filters: req.query,
+      timestamp: new Date().toISOString()
     });
     
   } catch (error) {
-    logger.error('Error getting job count', { error: error.message, stack: error.stack });
+    logger.error('Error getting job count', { 
+      error: error.message, 
+      stack: error.stack,
+      query: req.query 
+    });
+    
     res.status(500).json({ 
       success: false,
       message: 'Failed to get job count',
       count: 0,
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -562,6 +586,55 @@ router.get('/employer/:employerId/applications', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching job applications', { error: error.message, stack: error.stack });
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Get applications for a specific job - MUST be before /:id route
+router.get('/:jobId/applications', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    // Validate ObjectId format
+    if (!jobId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid job ID format'
+      });
+    }
+    
+    // Check if job exists
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+    
+    // Find all applications for this job
+    const applications = await JobApplication.find({ job: jobId })
+      .populate('worker', 'name email phone skills experience_years')
+      .populate('employer', 'name companyName')
+      .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      count: applications.length,
+      data: applications
+    });
+    
+  } catch (error) {
+    logger.error('Error fetching job applications', { 
+      error: error.message, 
+      stack: error.stack,
+      jobId: req.params.jobId 
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch job applications',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

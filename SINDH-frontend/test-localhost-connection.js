@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const LOCALHOST_API = 'http://localhost:10000/api';
+const LOCALHOST_API = 'https://sindh-backend.onrender.com/api';
 
 async function testLocalhostConnection() {
   console.log('🔧 TESTING LOCALHOST BACKEND CONNECTION\n');
@@ -77,7 +77,7 @@ async function testLocalhostConnection() {
 
   } catch (error) {
     console.error('❌ Test failed:', error.message);
-    console.error('💡 Make sure the backend is running on http://localhost:10000');
+    console.error('💡 Make sure the backend is running on https://sindh-backend.onrender.com');
   }
 }
 

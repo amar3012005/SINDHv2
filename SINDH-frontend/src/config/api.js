@@ -30,7 +30,7 @@ const getApiUrl = () => {
   // }
   
   // For local development (including mobile app development), use localhost
-  return 'http://localhost:10000/api';
+  return 'https://sindh-backend.onrender.com/api';
 };
 
 const API_URL = getApiUrl();
@@ -70,7 +70,7 @@ const checkConnection = async () => {
       error: error.message,
       suggestion: process.env.NODE_ENV === 'production' 
         ? 'Check if backend is deployed on Render'
-        : 'Make sure backend server is running on http://localhost:10000'
+        : 'Make sure backend server is running on https://sindh-backend.onrender.com'
     });
     return false;
   }
