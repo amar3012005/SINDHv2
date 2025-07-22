@@ -1,12 +1,13 @@
-import API_URL from '../config/api.js';
+import { getApiUrl as getApiUrlAsyncImport, getApiUrlSync } from '../config/api.js';
 
-// Centralized API URL utility
-export const getApiUrl = () => API_URL;
+// Centralized API URL utilities
+export const getApiUrl = getApiUrlSync; // Synchronous version for immediate use
+export const getApiUrlAsync = getApiUrlAsyncImport; // Async version for detection
 
 // Helper function to build full API URLs
 export const buildApiUrl = (endpoint) => {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${API_URL}${cleanEndpoint}`;
+  return `${getApiUrl()}${cleanEndpoint}`;
 };
 
 // Enhanced fetch wrapper with consistent error handling
@@ -103,7 +104,7 @@ export const isMobileApp = () => !!(window.Capacitor || window.cordova);
 
 // Log current API configuration
 console.log('🔧 API Utils initialized:', {
-  apiUrl: API_URL,
+  apiUrl: getApiUrl(),
   environment: process.env.NODE_ENV,
   isMobileApp: isMobileApp(),
   isProduction: isProduction()

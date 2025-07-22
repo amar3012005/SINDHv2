@@ -18,26 +18,108 @@
 
 import axios from 'axios';
 
-// Enhanced API URL configuration
-const getApiUrl = () => {
+// Enhanced API URL configuration with dynamic backend detection
+let cachedApiUrl = null;
+let lastCheckTime = 0;
+const CHECK_INTERVAL = 30000; // Check every 30 seconds
+
+const getApiUrl = async () => {
   // Check if we're in a mobile app environment (Capacitor)
   const isMobileApp = window.Capacitor || window.cordova;
   
-  // Always use localhost for development and testing
-  // Comment out the production check to force localhost usage
-  // if (process.env.NODE_ENV === 'production') {
-  //   return 'https://sindh-backend.onrender.com/api';
-  // }
+  // For mobile apps, always use Render backend (can't access localhost)
+  if (isMobileApp) {
+    return 'https://sindh-backend.onrender.com/api';
+  }
   
-  // For local development (including mobile app development), use localhost
-  return 'https://sindh-backend.onrender.com/api';
+  // Use cached result if recent
+  const now = Date.now();
+  if (cachedApiUrl && (now - lastCheckTime) < CHECK_INTERVAL) {
+    return cachedApiUrl;
+  }
+  
+  // Try to detect local backend
+  const localUrl = 'http://localhost:10000/api';
+  const renderUrl = 'https://sindh-backend.onrender.com/api';
+  
+  try {
+    // Quick health check to local backend
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+    
+    const response = await fetch(`${localUrl}/health`, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      console.log('🔗 Local backend detected - using localhost');
+      cachedApiUrl = localUrl;
+      lastCheckTime = now;
+      return localUrl;
+    }
+  } catch (error) {
+    // Local backend not available, use Render
+    console.log('🌐 Local backend not available - using Render backend');
+  }
+  
+  cachedApiUrl = renderUrl;
+  lastCheckTime = now;
+  return renderUrl;
 };
 
-const API_URL = getApiUrl();
+// Synchronous version for immediate use (uses cached or default)
+const getApiUrlSync = () => {
+  const isMobileApp = window.Capacitor || window.cordova;
+  
+  if (isMobileApp) {
+    return 'https://sindh-backend.onrender.com/api';
+  }
+  
+  return cachedApiUrl || 'https://sindh-backend.onrender.com/api';
+};
+
+// Initialize API URL detection on startup
+let API_URL = 'https://sindh-backend.onrender.com/api'; // Default fallback
+
+// Initialize backend detection
+const initializeApiUrl = async () => {
+  try {
+    API_URL = await getApiUrl();
+    console.log('🌐 API Configuration Initialized:', {
+      environment: process.env.NODE_ENV,
+      apiUrl: API_URL,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.warn('⚠️ API URL detection failed, using default:', error.message);
+  }
+};
+
+// Start detection immediately
+initializeApiUrl();
+
+// Re-check periodically
+setInterval(async () => {
+  try {
+    const newUrl = await getApiUrl();
+    if (newUrl !== API_URL) {
+      API_URL = newUrl;
+      console.log('🔄 API URL updated:', API_URL);
+    }
+  } catch (error) {
+    console.warn('⚠️ Periodic API check failed:', error.message);
+  }
+}, CHECK_INTERVAL);
 
 console.log('🌐 API Configuration:', {
   environment: process.env.NODE_ENV,
-  apiUrl: API_URL,
+  initialApiUrl: API_URL,
   mode: process.env.NODE_ENV === 'production' ? 'PRODUCTION' : 'DEVELOPMENT',
   host: window.location.host,
   isMobileApp: !!(window.Capacitor || window.cordova),
@@ -111,6 +193,6 @@ api.interceptors.response.use(
   }
 );
 
-// Export the axios instance as a named export and API_URL as default
-export { api };
+// Export the axios instance, API URL functions, and API_URL as default
+export { api, getApiUrl, getApiUrlSync };
 export default API_URL;

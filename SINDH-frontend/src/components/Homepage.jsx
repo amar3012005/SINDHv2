@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { getCurrentUser, logout } from '../utils/authUtils';
 import { Star, Users, Briefcase, TrendingUp, Wallet, MessageCircle, ArrowRight, MapPin, LogOut } from 'lucide-react';
-import { buildApiUrl } from '../utils/apiUtils';
+import { buildApiUrl, getApiUrl } from '../utils/apiUtils';
 import axios from 'axios';
 
 
@@ -38,9 +38,61 @@ function Homepage() {
   const [workerBalance, setWorkerBalance] = useState(0);
   const [recentEarnings, setRecentEarnings] = useState([]);
 
+  // Backend connection status
+  const [backendStatus, setBackendStatus] = useState(null);
+  const [hasShownConnectionStatus, setHasShownConnectionStatus] = useState(false);
+
   // Get user from context and fallback to localStorage if needed
   const { user: contextUser, isLoadingUser, logoutUser, fetchUserProfile } = useUser();
   const user = contextUser || getCurrentUser();
+
+  // Backend connection detection function
+  const detectAndShowBackendConnection = useCallback(async () => {
+    if (hasShownConnectionStatus) return;
+    
+    try {
+      const currentApiUrl = getApiUrl();
+      const isLocalBackend = currentApiUrl.includes('localhost');
+      const backendType = isLocalBackend ? 'Local' : 'Render';
+      
+      setBackendStatus(backendType);
+      
+      // Show connection status toast
+      const toastMessage = isLocalBackend 
+        ? '🔗 Connected to Local Backend'
+        : '🌐 Connected to Render Backend';
+      
+      toast.success(toastMessage, {
+        position: 'top-right',
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        style: {
+          backgroundColor: isLocalBackend ? '#10B981' : '#3B82F6',
+          color: 'white',
+          fontWeight: '500'
+        }
+      });
+      
+      setHasShownConnectionStatus(true);
+      console.log(`📡 Backend Connection Status: ${backendType} (${currentApiUrl})`);
+      
+    } catch (error) {
+      console.error('Error detecting backend connection:', error);
+    }
+  }, [hasShownConnectionStatus]);
+
+  // Backend connection detection on homepage load
+  useEffect(() => {
+    // Small delay to ensure API configuration is initialized
+    const timer = setTimeout(() => {
+      detectAndShowBackendConnection();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [detectAndShowBackendConnection]);
 
   // Continuously update worker profile
   useEffect(() => {
