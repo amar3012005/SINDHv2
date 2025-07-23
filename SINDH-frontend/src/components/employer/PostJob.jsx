@@ -148,10 +148,10 @@ const PostJob = () => {
           // Pre-fill form with employer data
           setFormData(prev => ({
             ...prev,
-            companyName: profile.companyName || profile.name || '',
+            companyName: profile.company?.name || profile.name || '',
             location: {
               ...prev.location,
-              city: profile.location?.city || '',
+              city: profile.location?.village || profile.location?.city || '',
               state: profile.location?.state || '',
               pincode: profile.location?.pincode || ''
             }
@@ -163,7 +163,7 @@ const PostJob = () => {
             setEmployerProfile(user);
             setFormData(prev => ({
               ...prev,
-              companyName: user.name || ''
+              companyName: user.company?.name || user.name || ''
             }));
           }
         }
@@ -181,10 +181,10 @@ const PostJob = () => {
               // Update form data with fresh profile
               setFormData(prev => ({
                 ...prev,
-                companyName: profile.companyName || profile.name || prev.companyName,
+                companyName: profile.company?.name || profile.name || prev.companyName,
                 location: {
                   ...prev.location,
-                  city: profile.location?.city || prev.location.city,
+                  city: profile.location?.village || profile.location?.city || prev.location.city,
                   state: profile.location?.state || prev.location.state,
                   pincode: profile.location?.pincode || prev.location.pincode
                 }
@@ -418,8 +418,8 @@ const PostJob = () => {
 
       // Get consistent company name
       const getCompanyName = () => {
-        // Priority order: formData.companyName > employerProfile.companyName > employerProfile.name > user.name > fallback
-        const companyName = formData.companyName || employerProfile.companyName || employerProfile.name || user.name;
+        // Priority order: formData.companyName > employerProfile.company.name > employerProfile.name > user.name > fallback
+        const companyName = formData.companyName || employerProfile?.company?.name || employerProfile?.name || user?.name;
         
         if (!companyName || companyName.trim() === '') {
           return 'Not Specified';
@@ -455,9 +455,9 @@ const PostJob = () => {
       // Log the company name determination process
       console.log('🏢 Company name determination:', {
         formCompanyName: formData.companyName,
-        employerProfileCompanyName: employerProfile.companyName,
-        employerProfileName: employerProfile.name,
-        userName: user.name,
+        employerProfileCompanyName: employerProfile?.company?.name,
+        employerProfileName: employerProfile?.name,
+        userName: user?.name,
         finalCompanyName: getCompanyName()
       });
 
@@ -477,7 +477,7 @@ const PostJob = () => {
       });
 
       console.log('📝 Step 2: Submitting job data to backend API...');
-      console.log('🌐 API Endpoint: https://sindh-backend.onrender.com/api/jobs');
+      console.log('🌐 API Endpoint: http://localhost:10000/api/jobs');
       console.log('📤 Request Method: POST');
       console.log('📦 Request Body:', JSON.stringify(jobData, null, 2));
 
@@ -643,22 +643,90 @@ const PostJob = () => {
             name={field}
             value={getFieldValue(field)}
             onChange={handleInputChange}
-            placeholder="Enter your company name (optional - will use profile if left empty)"
+            placeholder={`Enter company name (optional - will use "${employerProfile?.company?.name || employerProfile?.name || 'profile name'}" if left empty)`}
             className={baseClasses}
           />
         );
 
       case 'requirements':
+        const commonRequirements = [
+          // Physical Requirements
+          'Physical strength required',
+   
+          
+          // Experience & Skills
+          'Experience with tools preferred',
+       
+          
+          // Work Conditions
+          'Must work in all weather conditions',
+      
+          
+          // Safety & Compliance
+          'Safety training required',
+    
+          
+          // Communication & Teamwork
+          'Good communication skills',
+    
+          
+          // Education & Certification
+          'Basic education preferred',
+         
+        ];
+        
+        const addRequirement = (requirement) => {
+          const currentValue = getFieldValue(field);
+          const newValue = currentValue ? `${currentValue}\n• ${requirement}` : `• ${requirement}`;
+          
+          // Create a synthetic event to trigger handleInputChange
+          const syntheticEvent = {
+            target: {
+              name: field,
+              value: newValue
+            }
+          };
+          handleInputChange(syntheticEvent);
+        };
+        
         return (
-          <textarea
-            name={field}
-            value={getFieldValue(field)}
-            onChange={handleInputChange}
-            placeholder="List skills, experience, or qualifications needed (e.g., 'Physical strength required', 'Experience with tools preferred', 'Must be able to work in heat')"
-            className={`${baseClasses} min-h-[100px] resize-vertical`}
-            rows="3"
-            required
-          />
+          <div className="space-y-4">
+            <textarea
+              name={field}
+              value={getFieldValue(field)}
+              onChange={handleInputChange}
+              placeholder="List skills, experience, or qualifications needed (e.g., 'Physical strength required', 'Experience with tools preferred', 'Must be able to work in heat')"
+              className={`${baseClasses} min-h-[100px] resize-vertical`}
+              rows="3"
+              required
+            />
+            
+            {/* Suggestion Boxes */}
+            <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl p-4 border border-gray-200/50">
+              <h4 className="text-sm font-medium text-gray-600 mb-3 flex items-center">
+                <span className="mr-2 text-base">💡</span>
+                Quick Add:
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {commonRequirements.map((requirement, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => addRequirement(requirement)}
+                    className="group relative px-3 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-[#ff6b35] hover:text-white hover:border-[#ff6b35] hover:scale-[1.02] transition-all duration-200 shadow-sm hover:shadow-md text-left leading-relaxed min-h-[3rem] flex items-center"
+                  >
+                    <span className="block w-full">
+                      {requirement}
+                    </span>
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#ff6b35] text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 font-bold">+</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-3 text-center">
+                📝 Click to add any requirement to your job posting
+              </p>
+            </div>
+          </div>
         );
 
       case 'salary':

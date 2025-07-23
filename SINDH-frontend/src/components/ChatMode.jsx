@@ -836,7 +836,7 @@ const ChatMode = () => {
         break;
       case 'my_applications':
         if (user?.type === 'worker') {
-          navigate('/my-applications');
+          navigate('/worker/applications');
         }
         break;
       default:

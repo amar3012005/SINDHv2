@@ -122,6 +122,19 @@ router.post('/employers/login', asyncHandler(async (req, res) => {
   // Update employer login status
   employer.isLoggedIn = 1;
   employer.lastLogin = new Date();
+  
+  // Check if employer has all required fields before saving
+  if (!employer.age) {
+    logger.warn(`Employer ${employer.phone} missing required age field, redirecting to complete registration`);
+    return res.status(200).json({
+      success: true,
+      incompleteProfile: true,
+      message: 'Please complete your profile by adding missing information',
+      phoneNumber: employer.phone,
+      missingFields: ['age']
+    });
+  }
+  
   await employer.save();
 
   // Generate JWT token

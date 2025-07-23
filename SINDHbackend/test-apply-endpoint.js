@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const API_BASE = 'https://sindh-backend.onrender.com/api';
+const API_BASE = 'http://localhost:10000/api';
 
 async function testApplyEndpoint() {
   try {

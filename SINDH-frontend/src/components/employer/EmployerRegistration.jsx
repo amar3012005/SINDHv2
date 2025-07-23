@@ -93,15 +93,17 @@ const EnhancedEmployerRegistration = () => {
   const [showSuccessMsg, setShowSuccessMsg] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
 
-  // Keep the same form data structure as original
+  // Keep the same form data structure as original with new fields
   const [formData, setFormData] = useState({
     name: '',
+    age: '',
     phone: '',
     email: '',
     company: {
       name: '',
       type: '',
-      industry: ''
+      industry: [],
+      primaryIndustry: ''
     },
     location: {
       village: '',
@@ -114,6 +116,7 @@ const EnhancedEmployerRegistration = () => {
       }
     },
     businessDescription: '',
+    workerType: '',
     verificationDocuments: {
       aadharNumber: '',
       panNumber: '',
@@ -137,6 +140,51 @@ const EnhancedEmployerRegistration = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [completedSteps, setCompletedSteps] = useState(new Set());
+  const [selectedIndustries, setSelectedIndustries] = useState([]);
+  const [showPrimaryIndustrySelection, setShowPrimaryIndustrySelection] = useState(false);
+
+  // Enhanced location fetching function (same as WorkerRegistration)
+  const fetchLocationFromPincode = async (pincode) => {
+    try {
+      addBotMessage('🔍 Fetching location details for your pincode...', [], 500);
+      
+      // Using Indian Postal Pincode API
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+      const data = await response.json();
+      
+      if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+        const postOffice = data[0].PostOffice[0];
+        const district = postOffice.District;
+        const state = postOffice.State;
+        
+        // Update form data with fetched location
+        setFormData(prev => ({
+          ...prev,
+          location: {
+            ...prev.location,
+            pincode: pincode,
+            district: district,
+            state: state
+          }
+        }));
+        
+        // Show success message with fetched details
+        setTimeout(() => {
+          addBotMessage(`✅ Great! I found your business location: ${district}, ${state}. Now I'll ask for your village/area name.`, [], 800);
+        }, 1000);
+        
+        return { district, state };
+      } else {
+        throw new Error('Invalid pincode or location not found');
+      }
+    } catch (error) {
+      console.error('Error fetching location:', error);
+      setTimeout(() => {
+        addBotMessage('❌ Sorry, I couldn\'t fetch location details for this pincode. Please make sure it\'s a valid 6-digit Indian pincode and try again.', [], 800);
+      }, 500);
+      return null;
+    }
+  };
 
   const businessTypeOptions = [
     'Agricultural Farm',
@@ -179,13 +227,39 @@ const EnhancedEmployerRegistration = () => {
       validation: (value) => value.trim().length >= 2 ? null : "Please enter your full name"
     },
     {
-      id: 'phone',
+      id: 'age',
       type: 'question',
-      text: "What's your mobile number? Please enter 10 digits without country code (like 9876543210)",
-      field: 'phone',
+      text: "What's your age? Please enter your age in years.",
+      field: 'age',
+      validation: (value) => {
+        const age = parseInt(value);
+        return (age >= 18 && age <= 100) ? null : "Please enter a valid age between 18 and 100";
+      }
+    },
+    {
+      id: 'pincode',
+      type: 'question',
+      text: "What's your business pincode? Please enter your 6-digit postal code (e.g., 400001)",
+      field: 'pincode',
       validation: (value) => {
         const cleaned = value.replace(/[^\d]/g, '');
-        return cleaned.length === 10 ? null : "Please enter a valid 10-digit mobile number";
+        return cleaned.length === 6 ? null : "Please enter a valid 6-digit pincode";
+      },
+      autoFetch: true // Special flag to trigger location fetch
+    },
+    {
+      id: 'village',
+      type: 'question',
+      text: () => {
+        const district = formData.location?.district || 'District';
+        const state = formData.location?.state || 'State';
+        const pincode = formData.location?.pincode || 'Pincode';
+        return `Great! I found your business location details:\n\n📍 District: ${district}\n🏢 State: ${state}\n📦 Pincode: ${pincode}\n\nNow, what's your village or area name within ${district} where your business is located?`;
+      },
+      field: 'village',
+      validation: (value) => {
+        const trimmed = value.trim();
+        return trimmed.length >= 2 ? null : "Please enter your village or area name";
       }
     },
     {
@@ -199,73 +273,74 @@ const EnhancedEmployerRegistration = () => {
       }
     },
     {
-      id: 'aadhar',
-      type: 'question',
-      text: "For verification, please enter your 12-digit Aadhar number:",
-      field: 'aadharNumber',
+      id: 'industry',
+      type: 'multi-select',
+      text: "What industries does your business operate in? You can select multiple options that apply to your business.",
+      field: 'industry',
+      suggestions: industryOptions,
+      multiSelect: true,
       validation: (value) => {
-        const cleaned = value.replace(/[^\d]/g, '');
-        return cleaned.length === 12 ? null : "Please enter a valid 12-digit Aadhar number";
+        const selected = Array.isArray(value) ? value : (value ? [value] : []);
+        return selected.length > 0 ? null : "Please select at least one industry";
+      },
+      followUp: {
+        text: "Which of these is your PRIMARY industry? This will be shown prominently on your profile.",
+        field: 'primaryIndustry',
+        suggestions: () => {
+          const selectedIndustries = formData.company?.industry || userResponses.industry || [];
+          return Array.isArray(selectedIndustries) ? selectedIndustries : [selectedIndustries].filter(Boolean);
+        },
+        validation: (value) => value.trim() ? null : "Please select your primary industry"
       }
     },
     {
       id: 'businessName',
       type: 'question',
-      text: "What's the name of your business or farm?",
+      text: () => {
+        const primaryIndustry = formData.company?.primaryIndustry || userResponses.primaryIndustry || 'business';
+        return `What's the name of your ${primaryIndustry.toLowerCase()} business?`;
+      },
       field: 'businessName',
+      suggestions: () => {
+        const industry = formData.company?.primaryIndustry || userResponses.primaryIndustry || '';
+        const suggestions = {
+          'Agriculture': ['Green Valley Farm', 'Sunrise Agriculture', 'Golden Harvest Farm', 'Nature\'s Bounty Farm'],
+          'Construction': ['Strong Build Construction', 'Prime Builders', 'Reliable Construction Co.', 'Elite Contractors'],
+          'Manufacturing': ['Quality Manufacturing', 'Precision Industries', 'Modern Manufacturing', 'Excellence Products'],
+          'Retail': ['Local Market Store', 'Community Shop', 'Daily Needs Store', 'Neighborhood Mart'],
+          'Services': ['Professional Services', 'Quality Solutions', 'Expert Services', 'Reliable Support'],
+          'Food Processing': ['Fresh Food Processing', 'Quality Foods', 'Healthy Processing Co.', 'Pure Foods Ltd'],
+          'Handicrafts': ['Traditional Crafts', 'Artisan Creations', 'Heritage Handicrafts', 'Skilled Crafts'],
+          'Local Trade': ['Local Trading Co.', 'Community Trade', 'Regional Commerce', 'Local Business Hub']
+        };
+        return suggestions[industry] || ['My Business', 'Local Enterprise', 'Quality Services', 'Professional Solutions'];
+      },
       validation: (value) => value.trim().length >= 2 ? null : "Please enter your business name"
     },
     {
-      id: 'businessType',
+      id: 'aadhar',
       type: 'question',
-      text: "What type of business do you run?",
-      field: 'businessType',
-      suggestions: businessTypeOptions,
-      validation: (value) => value.trim() ? null : "Please select your business type"
-    },
-    {
-      id: 'industry',
-      type: 'question',
-      text: "What's your primary industry or activity?",
-      field: 'industry',
-      suggestions: industryOptions,
-      validation: (value) => value.trim() ? null : "Please select your primary industry"
-    },
-    {
-      id: 'village',
-      type: 'question',
-      text: "Which village or town is your business located in?",
-      field: 'village',
-      validation: (value) => value.trim() ? null : "Please enter your village/town"
-    },
-    {
-      id: 'district',
-      type: 'question',
-      text: "Which district?",
-      field: 'district',
-      validation: (value) => value.trim() ? null : "Please enter your district"
-    },
-    {
-      id: 'state',
-      type: 'question',
-      text: "Which state?",
-      field: 'state',
-      validation: (value) => value.trim() ? null : "Please enter your state"
-    },
-    {
-      id: 'pincode',
-      type: 'question',
-      text: "What's your area pincode?",
-      field: 'pincode',
+      text: "For verification purposes, we need your Aadhar number. You can verify it now or later when posting your first job. What would you prefer?",
+      field: 'aadharNumber',
+      suggestions: ['Verify later', 'Enter Aadhar number now'],
       validation: (value) => {
+        if (value === 'Verify later') return null;
         const cleaned = value.replace(/[^\d]/g, '');
-        return cleaned.length === 6 ? null : "Please enter a valid 6-digit pincode";
+        return cleaned.length === 12 ? null : "Please enter a valid 12-digit Aadhar number";
       }
+    },
+    {
+      id: 'workerType',
+      type: 'question',
+      text: "What kind of workers do you typically need for your business?",
+      field: 'workerType',
+      suggestions: ['Full-time workers', 'Part-time workers', 'Daily wage workers', 'Seasonal workers', 'Contract workers', 'Skilled craftsmen', 'General laborers'],
+      validation: (value) => value.trim() ? null : "Please select the type of workers you need"
     },
     {
       id: 'businessDescription',
       type: 'question',
-      text: "Tell me about your business and what kind of workers you typically need. This helps workers understand what you do!",
+      text: "Tell me briefly about your business and what kind of work you offer. This helps workers understand what you do!",
       field: 'businessDescription',
       validation: (value) => value.trim().length >= 10 ? null : "Please provide a brief description of your business"
     },
@@ -440,16 +515,24 @@ const EnhancedEmployerRegistration = () => {
       // Update formData with the same structure as original
       if (question.field === 'name') {
         setFormData(prev => ({ ...prev, name: processedResponse }));
+      } else if (question.field === 'age') {
+        setFormData(prev => ({ ...prev, age: processedResponse }));
       } else if (question.field === 'phone') {
         setFormData(prev => ({ ...prev, phone: processedResponse }));
       } else if (question.field === 'email') {
         setFormData(prev => ({ ...prev, email: processedResponse }));
       } else if (question.field === 'aadharNumber') {
+        // Handle "Verify later" option
+        let aadharValue = processedResponse;
+        if (processedResponse === 'Verify later') {
+          aadharValue = 'not provided';
+          addBotMessage('✅ No problem! You can verify your Aadhar later when posting your first job. This helps maintain security while letting you get started quickly.', [], 1000);
+        }
         setFormData(prev => ({ 
           ...prev, 
           verificationDocuments: { 
             ...prev.verificationDocuments, 
-            aadharNumber: processedResponse 
+            aadharNumber: aadharValue 
           } 
         }));
       } else if (question.field === 'businessName') {
@@ -460,6 +543,8 @@ const EnhancedEmployerRegistration = () => {
             name: processedResponse 
           } 
         }));
+      } else if (question.field === 'workerType') {
+        setFormData(prev => ({ ...prev, workerType: processedResponse }));
       } else if (question.field === 'businessType') {
         setFormData(prev => ({ 
           ...prev, 
@@ -469,13 +554,46 @@ const EnhancedEmployerRegistration = () => {
           } 
         }));
       } else if (question.field === 'industry') {
+        // Handle multi-select for industries
+        const currentSelected = selectedIndustries;
+        let newSelected;
+        
+        if (currentSelected.includes(processedResponse)) {
+          // Remove if already selected
+          newSelected = currentSelected.filter(item => item !== processedResponse);
+        } else {
+          // Add if not selected
+          newSelected = [...currentSelected, processedResponse];
+        }
+        
+        setSelectedIndustries(newSelected);
         setFormData(prev => ({ 
           ...prev, 
           company: { 
             ...prev.company, 
-            industry: processedResponse 
+            industry: newSelected 
           } 
         }));
+        
+        // Don't move to next question yet - let user select multiple
+        // Show continue button when at least one is selected
+        if (newSelected.length > 0) {
+          // Show primary industry selection after user finishes selecting
+          setTimeout(() => {
+            addBotMessage('Great choices! Now, which of these is your PRIMARY industry? This will be shown prominently on your profile.', newSelected, 1000);
+            setShowPrimaryIndustrySelection(true);
+          }, 500);
+        }
+        return; // Don't proceed to next question automatically
+      } else if (question.field === 'primaryIndustry') {
+        setFormData(prev => ({ 
+          ...prev, 
+          company: { 
+            ...prev.company, 
+            primaryIndustry: processedResponse 
+          } 
+        }));
+        setShowPrimaryIndustrySelection(false);
       } else if (question.field === 'village') {
         setFormData(prev => ({ 
           ...prev, 
@@ -508,6 +626,22 @@ const EnhancedEmployerRegistration = () => {
             pincode: processedResponse 
           } 
         }));
+        
+        // Auto-fetch location details when pincode is entered
+        if (question.autoFetch && processedResponse.length === 6) {
+          const locationData = await fetchLocationFromPincode(processedResponse);
+          if (locationData) {
+            // Location data is already updated in fetchLocationFromPincode
+            // Continue to next question after a brief delay
+            setTimeout(() => {
+              // The next question (village) will show the fetched location details
+            }, 1500);
+          } else {
+            // If location fetch failed, don't proceed to next question
+            // User needs to re-enter pincode
+            return;
+          }
+        }
       } else if (question.field === 'businessDescription') {
         setFormData(prev => ({ ...prev, businessDescription: processedResponse }));
       }
@@ -543,6 +677,12 @@ const EnhancedEmployerRegistration = () => {
       // Debug: Log current form data
       console.log('🔍 Current formData:', formData);
       console.log('🔍 Current userResponses:', userResponses);
+      console.log('🔍 Age from formData:', formData.age);
+      console.log('🔍 Age from userResponses:', userResponses.age);
+      console.log('🔍 WorkerType from formData:', formData.workerType);
+      console.log('🔍 WorkerType from userResponses:', userResponses.workerType);
+      console.log('🔍 Aadhar from formData:', formData.verificationDocuments?.aadharNumber);
+      console.log('🔍 Aadhar from userResponses:', userResponses.aadharNumber);
       
       // Ensure phone number is properly formatted (remove spaces and ensure it starts with 6-9)
       let phoneNumber = formData.phone || userResponses.phone;
@@ -560,14 +700,22 @@ const EnhancedEmployerRegistration = () => {
       console.log('🔍 Processed phone number:', phoneNumber);
 
       // Build the exact schema expected by backend
+      // Prepare aadharNumber - use 'not provided' if empty
+      const aadharNumber = formData.verificationDocuments?.aadharNumber || userResponses.aadharNumber || 'not provided';
+      const finalAadharNumber = (!aadharNumber || aadharNumber.trim() === '') ? 'not provided' : aadharNumber;
+      
       const registrationData = {
         name: formData.name || userResponses.name,
+        age: parseInt(formData.age || userResponses.age),
         phone: phoneNumber,
-        email: formData.email || userResponses.email,
+        email: formData.email || userResponses.email || '',
         company: {
           name: formData.company?.name || userResponses.businessName,
           type: formData.company?.type || userResponses.businessType || '',
-          industry: formData.company?.industry || userResponses.industry || '',
+          industry: Array.isArray(formData.company?.industry || userResponses.industry) 
+            ? (formData.company?.industry || userResponses.industry)
+            : [(formData.company?.industry || userResponses.industry)].filter(Boolean),
+          primaryIndustry: formData.company?.primaryIndustry || userResponses.primaryIndustry || '',
           description: formData.company?.description || '',
           registrationNumber: formData.company?.registrationNumber || ''
         },
@@ -579,8 +727,9 @@ const EnhancedEmployerRegistration = () => {
           address: formData.location?.address || ''
         },
         businessDescription: formData.businessDescription || userResponses.businessDescription || '',
+        workerType: formData.workerType || userResponses.workerType || 'Daily wage workers',
         verificationDocuments: {
-          aadharNumber: formData.verificationDocuments?.aadharNumber || userResponses.aadharNumber || '',
+          aadharNumber: finalAadharNumber,
           panNumber: formData.verificationDocuments?.panNumber || '',
           businessLicense: formData.verificationDocuments?.businessLicense || ''
         },
@@ -597,7 +746,10 @@ const EnhancedEmployerRegistration = () => {
         lastLogin: new Date().toISOString()
       };
 
-      console.log('🚀 Sending registration data:', JSON.stringify(registrationData, null, 2));
+      console.log('🚀 Final registration data with all fields:', JSON.stringify(registrationData, null, 2));
+      console.log('🔍 Validation check - Age:', registrationData.age, typeof registrationData.age);
+      console.log('🔍 Validation check - WorkerType:', registrationData.workerType);
+      console.log('🔍 Validation check - Aadhar:', registrationData.verificationDocuments.aadharNumber);
       console.log('🔗 API URL:', `${API_BASE_URL}/api/employers/register`);
 
       const response = await fetch(`${API_BASE_URL}/api/employers/register`, {
@@ -769,31 +921,54 @@ const EnhancedEmployerRegistration = () => {
         >
           {/* Question/Prompt */}
           <div className="text-left">
-            <h2 className="text-3xl md:text-4xl font-extrabold text-[#222] mb-3 leading-tight" style={{ letterSpacing: '-0.5px' }}>
-              {currentQ.text.split(/[.!?]/)[0].toUpperCase()}
-            </h2>
-            {currentQ.text.split(/[.!?]/)[1] && (
-              <p className="text-lg md:text-xl text-[#222]/70 mt-2">{currentQ.text.split(/[.!?]/)[1]}</p>
-            )}
+            {(() => {
+              // Handle dynamic text functions (like village question showing fetched location)
+              const questionText = typeof currentQ.text === 'function' ? currentQ.text() : currentQ.text;
+              const textParts = questionText.split(/[.!?]/);
+              
+              return (
+                <>
+                  <h2 className="text-3xl md:text-4xl font-extrabold text-[#222] mb-3 leading-tight" style={{ letterSpacing: '-0.5px' }}>
+                    {textParts[0].toUpperCase()}
+                  </h2>
+                  {textParts[1] && (
+                    <p className="text-lg md:text-xl text-[#222]/70 mt-2 whitespace-pre-line">{textParts[1]}</p>
+                  )}
+                  {/* Handle multi-line text for location display */}
+                  {questionText.includes('\n') && (
+                    <div className="text-lg md:text-xl text-[#222]/70 mt-2 whitespace-pre-line">
+                      {questionText.split('\n').slice(1).join('\n')}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
           {/* Input or Suggestions */}
-          {currentQ.suggestions && currentQ.suggestions.length > 0 ? (
-            <div className="flex flex-col gap-6">
-              {currentQ.suggestions.map((suggestion, idx) => (
-                <motion.button
-                  key={idx}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200"
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  aria-label={suggestion}
-                >
-                  {suggestion}
-                  <span className="ml-2">→</span>
-                </motion.button>
-              ))}
-            </div>
-          ) : currentQ.id === 'summary' ? (
+          {(() => {
+            // Handle dynamic suggestions (functions) and static suggestions (arrays)
+            const suggestions = typeof currentQ.suggestions === 'function' ? currentQ.suggestions() : currentQ.suggestions;
+            
+            if (suggestions && suggestions.length > 0) {
+              return (
+                <div className="flex flex-col gap-6">
+                  {suggestions.map((suggestion, idx) => (
+                    <motion.button
+                      key={idx}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200"
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      aria-label={suggestion}
+                    >
+                      {suggestion}
+                      <span className="ml-2">→</span>
+                    </motion.button>
+                  ))}
+                </div>
+              );
+            } else if (currentQ.id === 'summary') {
+              return (
             <div className="flex flex-col gap-8">
               {/* Simple "All set!" message */}
               <div className="text-center">
@@ -826,48 +1001,54 @@ const EnhancedEmployerRegistration = () => {
                 )}
               </motion.button>
             </div>
-          ) : !isLastStep ? (
-            <form onSubmit={handleInputSubmit} className="flex flex-col gap-8">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={currentInput}
-                  onChange={(e) => setCurrentInput(e.target.value)}
-                  placeholder=" "
-                  disabled={!isWaitingForInput || isSubmitting}
-                  className={`w-full py-5 px-4 text-xl bg-transparent border-b-2 border-[#e0e0e0] text-[#222] focus:outline-none focus:border-[#ff6b35] transition-all duration-300 peer rounded-none ${inputError ? 'animate-shake border-red-500' : ''}`}
-                  aria-label="Type your response"
-                  autoFocus
-                />
-                <label className="absolute left-4 top-1/2 -translate-y-1/2 text-[#222]/60 text-xl pointer-events-none transition-all duration-300 peer-focus:top-0 peer-focus:text-sm peer-focus:text-[#ff6b35] peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-xl peer-placeholder-shown:text-[#222]/60">
-                  {isWaitingForInput ? "Type your response..." : ""}
-                </label>
-              </div>
-              <motion.button
-                type="submit"
-                disabled={!currentInput.trim() || !isWaitingForInput || isSubmitting}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 disabled:bg-[#e0e0e0] disabled:text-[#aaa]"
-                aria-label="Continue"
-              >
-                CONTINUE <span className="ml-2">→</span>
-              </motion.button>
-            </form>
-          ) : (
-            <div className="flex flex-col gap-8 items-center justify-center">
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.5, type: 'spring' }}
-                className="w-20 h-20 rounded-full bg-[#ff6b35] flex items-center justify-center text-white text-4xl mb-4"
-                aria-label="Success"
-              >
-                ✓
-              </motion.div>
-              <p className="text-xl text-[#222] font-semibold text-center">Your employer profile has been created successfully!</p>
-            </div>
-          )}
+              );
+            } else if (currentQ.id === 'complete') {
+              return (
+                <div className="flex flex-col gap-8 items-center justify-center">
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.5, type: 'spring' }}
+                    className="w-20 h-20 rounded-full bg-[#ff6b35] flex items-center justify-center text-white text-4xl mb-4"
+                    aria-label="Success"
+                  >
+                    ✓
+                  </motion.div>
+                  <p className="text-xl text-[#222] font-semibold text-center">Your employer profile has been created successfully!</p>
+                </div>
+              );
+            } else {
+              return (
+                <form onSubmit={handleInputSubmit} className="flex flex-col gap-8">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={currentInput}
+                      onChange={(e) => setCurrentInput(e.target.value)}
+                      placeholder=" "
+                      disabled={!isWaitingForInput || isSubmitting}
+                      className={`w-full py-5 px-4 text-xl bg-transparent border-b-2 border-[#e0e0e0] text-[#222] focus:outline-none focus:border-[#ff6b35] transition-all duration-300 peer rounded-none ${inputError ? 'animate-shake border-red-500' : ''}`}
+                      aria-label="Type your response"
+                      autoFocus
+                    />
+                    <label className="absolute left-4 top-1/2 -translate-y-1/2 text-[#222]/60 text-xl pointer-events-none transition-all duration-300 peer-focus:top-0 peer-focus:text-sm peer-focus:text-[#ff6b35] peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-xl peer-placeholder-shown:text-[#222]/60">
+                      {isWaitingForInput ? "Type your response..." : ""}
+                    </label>
+                  </div>
+                  <motion.button
+                    type="submit"
+                    disabled={!currentInput.trim() || !isWaitingForInput || isSubmitting}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 disabled:bg-[#e0e0e0] disabled:text-[#aaa]"
+                    aria-label="Continue"
+                  >
+                    CONTINUE <span className="ml-2">→</span>
+                  </motion.button>
+                </form>
+              );
+            }
+          })()}
         </motion.div>
       </div>
       {/* Slide-in success message (Framer Motion) */}

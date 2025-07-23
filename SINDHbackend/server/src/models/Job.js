@@ -72,6 +72,20 @@ const jobSchema = new mongoose.Schema({
     type: String,
     default: 'Basic requirements apply'
   },
+  // Dual status system for better tracking
+  workerStatus: {
+    type: String,
+    enum: ['active', 'applied', 'accepted', 'got paid'],
+    default: 'active',
+    description: 'Status from worker perspective'
+  },
+  employerStatus: {
+    type: String,
+    enum: ['active', 'accepted', 'paid'],
+    default: 'active',
+    description: 'Status from employer perspective'
+  },
+  // Keep legacy status for backward compatibility
   status: {
     type: String,
     enum: ['active', 'in-progress', 'completed', 'cancelled'],

@@ -176,8 +176,8 @@ function Homepage() {
         queryParams.append('workerId', user.id);
       }
       
-      // Show only active jobs (not in-progress) for the count
-      queryParams.append('status', 'active');
+      // Use dual status system - only count jobs where both worker and employer status are 'active'
+      // This ensures we only show truly available jobs
       
       // Add location filter if user has location
       if (user?.location?.state) {
@@ -185,7 +185,8 @@ function Homepage() {
         console.log('Adding location filter:', user.location.state);
       }
 
-              const url = buildApiUrl(`/jobs/count?${queryParams.toString()}`);
+      // Use the new dual-status endpoint for accurate job counting
+      const url = buildApiUrl(`/jobs/dual-status?${queryParams.toString()}`);
       console.log('Fetching from URL:', url);
 
       const response = await fetch(url, {
@@ -200,10 +201,15 @@ function Homepage() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Job count response:', data);
+        console.log('📊 Dual status response:', data);
         
-        const count = data.count || 0;
-        console.log('🎯 Setting active job count to:', count);
+        // Filter jobs where both worker and employer status are 'active'
+        const activeJobs = data.jobs?.filter(job => 
+          job.workerStatus === 'active' && job.employerStatus === 'active'
+        ) || [];
+        
+        const count = activeJobs.length;
+        console.log('🎯 Setting active job count to:', count, '(filtered from', data.jobs?.length || 0, 'total jobs)');
         setJobCount(count);
         setStats(prev => ({ ...prev, totalJobs: count }));
         
@@ -277,20 +283,26 @@ function Homepage() {
         queryParams.append('workerId', user.id);
       }
       
-      // Use the same filtering logic as AvailableJobs - only active and in-progress jobs
-      queryParams.append('status', 'active');
+      // Use dual status system - only count jobs where both worker and employer status are 'active'
       
-      console.log('Fetching job count with params:', queryParams.toString());
+      console.log('Fetching job stats with dual status params:', queryParams.toString());
       
-              const response = await fetch(buildApiUrl(`/jobs/count?${queryParams.toString()}`));
+      const response = await fetch(buildApiUrl(`/jobs/dual-status?${queryParams.toString()}`));
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Job count response:', data);
-        console.log('📊 Setting stats totalJobs to:', data.count || 0);
+        console.log('📊 Dual status stats response:', data);
+        
+        // Filter jobs where both worker and employer status are 'active'
+        const activeJobs = data.jobs?.filter(job => 
+          job.workerStatus === 'active' && job.employerStatus === 'active'
+        ) || [];
+        
+        const count = activeJobs.length;
+        console.log('📊 Setting stats totalJobs to:', count, '(filtered from', data.jobs?.length || 0, 'total jobs)');
         setStats(prev => ({
           ...prev,
-          totalJobs: data.count || 0
+          totalJobs: count
         }));
       } else {
         console.warn('Failed to fetch job count:', response.status);

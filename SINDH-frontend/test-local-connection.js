@@ -5,7 +5,7 @@ async function testLocalConnection() {
   try {
     // Test 1: Check if backend is running
     console.log('📡 Testing backend connection...');
-    const response = await fetch('https://sindh-backend.onrender.com/api/health');
+    const response = await fetch('http://localhost:10000/api/health');
     
     if (response.ok) {
       const data = await response.json();
@@ -19,7 +19,7 @@ async function testLocalConnection() {
     
     // Test 2: Check jobs endpoint
     console.log('\n📋 Testing jobs endpoint...');
-    const jobsResponse = await fetch('https://sindh-backend.onrender.com/api/jobs');
+    const jobsResponse = await fetch('http://localhost:10000/api/jobs');
     
     if (jobsResponse.ok) {
       const jobs = await jobsResponse.json();
@@ -39,7 +39,7 @@ async function testLocalConnection() {
     
     // Test 3: Check job applications endpoint
     console.log('\n📝 Testing job applications endpoint...');
-    const applicationsResponse = await fetch('https://sindh-backend.onrender.com/api/job-applications');
+    const applicationsResponse = await fetch('http://localhost:10000/api/job-applications');
     
     if (applicationsResponse.ok) {
       console.log('✅ Job applications endpoint working!');
@@ -53,7 +53,7 @@ async function testLocalConnection() {
   } catch (error) {
     console.error('❌ Test failed:', error);
     console.log('\n💡 Make sure:');
-    console.log('1. Backend is running on https://sindh-backend.onrender.com');
+    console.log('1. Backend is running on http://localhost:10000');
     console.log('2. MongoDB is connected');
     console.log('3. No firewall blocking the connection');
   }

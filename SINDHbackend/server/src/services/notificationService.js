@@ -102,6 +102,11 @@ class NotificationService {
 
   // Specific notification creators
   static async notifyApplicationAccepted(application, job, employer) {
+    if (!employer) {
+      console.warn('⚠️ Cannot send notification: employer is null');
+      return null;
+    }
+    
     return this.createNotification({
       recipient: application.worker,
       recipientModel: 'Worker',

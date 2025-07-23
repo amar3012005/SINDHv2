@@ -30,7 +30,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   logger.info('Employer registration request');
   
   console.log('📝 Request body received:', JSON.stringify(req.body, null, 2));
-  const { name, phone, email, company, location, businessDescription, verificationDocuments } = req.body;
+  const { name, age, phone, email, company, location, businessDescription, workerType, verificationDocuments } = req.body;
 
   console.log('🔍 Checking for existing employer with phone:', phone);
   let employer = await Employer.findOne({ phone });
@@ -54,6 +54,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   employer = new Employer({
     name,
+    age,
     phone,
     email,
     company: formattedCompany,
@@ -65,6 +66,7 @@ router.post('/register', asyncHandler(async (req, res) => {
       address: formattedLocationAddress
     },
     businessDescription,
+    workerType,
     verificationDocuments,
     documents: req.body.documents || [],
     preferredLanguages: req.body.preferredLanguages || [],

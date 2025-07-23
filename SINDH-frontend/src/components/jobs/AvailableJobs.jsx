@@ -57,9 +57,6 @@ const AvailableJobs = () => {
         console.log('👤 Adding workerId to query:', user.id);
       }
       
-      // Only show active jobs, not in-progress ones
-      queryParams.append('status', 'active');
-      
       // Add filters
       Object.entries(filters).forEach(([key, value]) => {
         if (value && value.trim() !== '') {
@@ -68,8 +65,8 @@ const AvailableJobs = () => {
         }
       });
       
-      // Use the correct API endpoint pattern
-      const apiUrl = buildApiUrl(`/jobs?${queryParams.toString()}`);
+      // Use dual status endpoint for better job filtering
+      const apiUrl = buildApiUrl(`/jobs/dual-status?${queryParams.toString()}`);
       console.log('🌐 Fetching from API:', apiUrl);
       
       const response = await fetch(apiUrl, {
@@ -121,6 +118,25 @@ const AvailableJobs = () => {
       
       console.log('📋 Processed jobs array length:', jobsArray.length);
       
+      // Apply dual status filtering for Available Jobs page
+      // Show jobs where:
+      // 1. Worker status is 'active' (available for application) OR 'applied' (already applied)
+      // 2. Employer status is 'active' (still accepting applications)
+      const availableJobs = jobsArray.filter(job => {
+        const workerStatusValid = ['active', 'applied'].includes(job.workerStatus);
+        const employerStatusValid = job.employerStatus === 'active';
+        
+        return workerStatusValid && employerStatusValid;
+      });
+      
+      console.log('📊 Dual status filtering results:');
+      console.log('  Total jobs from API:', jobsArray.length);
+      console.log('  Available jobs after filtering:', availableJobs.length);
+      console.log('  Filter criteria: workerStatus in ["active", "applied"] AND employerStatus === "active"');
+      
+      // Use filtered jobs for further processing
+      jobsArray = availableJobs;
+      
       // Validate jobs data structure
       if (jobsArray.length > 0) {
         const sampleJob = jobsArray[0];
@@ -129,7 +145,10 @@ const AvailableJobs = () => {
           title: sampleJob.title,
           companyName: sampleJob.companyName,
           location: sampleJob.location,
-          salary: sampleJob.salary
+          salary: sampleJob.salary,
+          workerStatus: sampleJob.workerStatus,
+          employerStatus: sampleJob.employerStatus,
+          hasApplied: sampleJob.hasApplied
         });
         
         // Log all jobs for debugging
@@ -372,7 +391,7 @@ const AvailableJobs = () => {
           <div>
             <div>{successMessage}</div>
             <button 
-              onClick={() => navigate('/my-applications')}
+              onClick={() => navigate('/worker/applications')}
               className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
             >
               View My Applications

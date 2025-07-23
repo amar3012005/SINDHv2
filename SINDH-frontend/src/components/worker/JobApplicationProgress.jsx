@@ -15,17 +15,56 @@ import {
 } from 'lucide-react';
 import { getApiUrl } from '../../utils/apiUtils.js';
 
-const JobApplicationProgress = ({ applicationId, onStatusChange }) => {
+const JobApplicationProgress = ({ applicationId, workerStatus, employerStatus, applicationStatus, jobData, onStatusChange }) => {
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
-    fetchApplicationStatus();
-    // Poll for updates every 30 seconds
-    const interval = setInterval(fetchApplicationStatus, 30000);
-    return () => clearInterval(interval);
-  }, [applicationId]);
+    console.log('🔄 JobApplicationProgress props:', { 
+      applicationId, 
+      workerStatus, 
+      employerStatus, 
+      applicationStatus,
+      jobData: jobData ? { title: jobData.title, salary: jobData.salary } : null
+    });
+    
+    // If we have status props, use them directly instead of fetching
+    if (workerStatus && employerStatus) {
+      console.log('✅ Using provided dual status props');
+      const appData = {
+        workerStatus,
+        employerStatus,
+        applicationStatus,
+        job: jobData
+      };
+      setApplication(appData);
+      updateCurrentStep(workerStatus, employerStatus);
+      setLoading(false);
+    } else if (applicationStatus) {
+      console.log('🔄 Using legacy application status:', applicationStatus);
+      // Map legacy status to dual status
+      const mappedStatus = mapLegacyStatusToDualStatus(applicationStatus);
+      const appData = {
+        workerStatus: mappedStatus.workerStatus,
+        employerStatus: mappedStatus.employerStatus,
+        applicationStatus,
+        job: jobData
+      };
+      setApplication(appData);
+      updateCurrentStep(mappedStatus.workerStatus, mappedStatus.employerStatus);
+      setLoading(false);
+    } else if (applicationId) {
+      console.log('🔍 Fetching application status for ID:', applicationId);
+      fetchApplicationStatus();
+      // Poll for updates every 30 seconds
+      const interval = setInterval(fetchApplicationStatus, 30000);
+      return () => clearInterval(interval);
+    } else {
+      console.log('⚠️ No status props or applicationId provided');
+      setLoading(false);
+    }
+  }, [applicationId, workerStatus, employerStatus, applicationStatus, jobData]);
 
   const fetchApplicationStatus = async () => {
     try {
@@ -33,7 +72,11 @@ const JobApplicationProgress = ({ applicationId, onStatusChange }) => {
       if (response.ok) {
         const data = await response.json();
         setApplication(data);
-        updateCurrentStep(data.status);
+        updateCurrentStep(data.workerStatus, data.employerStatus);
+        // Notify parent component of status change
+        if (onStatusChange) {
+          onStatusChange({ workerStatus: data.workerStatus, employerStatus: data.employerStatus });
+        }
       }
     } catch (error) {
       console.error('Error fetching application status:', error);
@@ -42,31 +85,70 @@ const JobApplicationProgress = ({ applicationId, onStatusChange }) => {
     }
   };
 
-  const updateCurrentStep = (status) => {
-    const stepMap = {
-      'pending': 1,
-      'accepted': 2,
-      'in-progress': 3,
-      'completed': 4,
-      'paid': 5
-    };
-    setCurrentStep(stepMap[status] || 0);
+  const mapLegacyStatusToDualStatus = (applicationStatus) => {
+    console.log('🔄 Mapping legacy status:', applicationStatus);
+    
+    switch (applicationStatus) {
+      case 'pending':
+        return { workerStatus: 'applied', employerStatus: 'active' };
+      case 'accepted':
+        return { workerStatus: 'applied', employerStatus: 'accepted' };
+      case 'in-progress':
+        return { workerStatus: 'applied', employerStatus: 'paid' };
+      case 'completed':
+        return { workerStatus: 'accepted', employerStatus: 'accepted' };
+      case 'rejected':
+      case 'cancelled':
+        return { workerStatus: 'applied', employerStatus: 'active' };
+      default:
+        return { workerStatus: 'applied', employerStatus: 'active' };
+    }
+  };
+
+  const updateCurrentStep = (workerStatus, employerStatus) => {
+    console.log('📊 Updating progress step:', { workerStatus, employerStatus });
+    
+    // Map dual status to progress steps
+    let step = 1; // Default to first step
+    
+    if (workerStatus === 'applied') {
+      switch (employerStatus) {
+        case 'active':
+          step = 1; // Application submitted, under review
+          break;
+        case 'accepted':
+          step = 2; // Application accepted by employer
+          break;
+        case 'paid':
+          step = 3; // Work in progress
+          break;
+        default:
+          step = 1;
+      }
+    } else if (workerStatus === 'accepted') {
+      step = 4; // Job completed
+    } else if (workerStatus === 'got paid') {
+      step = 5; // Payment received
+    }
+    
+    console.log('📊 Setting current step to:', step);
+    setCurrentStep(step);
   };
 
   const getStepConfig = (step) => {
     const steps = [
       {
         id: 1,
-        title: 'Application Submitted',
-        description: 'Your application has been sent to the employer',
+        title: 'Application Under Review',
+        description: 'Your application is being reviewed by the employer',
         icon: Clock,
         color: 'yellow',
-        status: 'pending'
+        status: 'under-review'
       },
       {
         id: 2,
         title: 'Application Accepted',
-        description: 'Employer has accepted your application',
+        description: 'Congratulations! Employer has accepted your application',
         icon: CheckCircle,
         color: 'green',
         status: 'accepted'
@@ -102,8 +184,32 @@ const JobApplicationProgress = ({ applicationId, onStatusChange }) => {
   const getProgressPercentage = () => {
     if (!application) return 0;
     const totalSteps = 5;
-    const currentStep = getStepConfig(application.status).id;
     return (currentStep / totalSteps) * 100;
+  };
+
+  const getDualStatusText = () => {
+    if (!application) return 'Loading...';
+    
+    const { workerStatus, employerStatus } = application;
+    
+    if (workerStatus === 'applied') {
+      switch (employerStatus) {
+        case 'active':
+          return 'Application submitted and under review';
+        case 'accepted':
+          return 'Application accepted - Ready to start work';
+        case 'paid':
+          return 'Work is in progress';
+        default:
+          return 'Application status unknown';
+      }
+    } else if (workerStatus === 'accepted') {
+      return 'Job completed successfully';
+    } else if (workerStatus === 'got paid') {
+      return 'Payment received - Job fully completed';
+    }
+    
+    return 'Status unknown';
   };
 
   if (loading) {
@@ -130,7 +236,8 @@ const JobApplicationProgress = ({ applicationId, onStatusChange }) => {
   }
 
   const progressPercentage = getProgressPercentage();
-  const currentStepConfig = getStepConfig(application.status);
+  const currentStepConfig = getStepConfig(currentStep);
+  const statusText = getDualStatusText();
 
   return (
     <motion.div

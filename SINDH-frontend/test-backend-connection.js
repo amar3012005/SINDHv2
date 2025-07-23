@@ -1,6 +1,6 @@
 // Simple test to check backend connectivity
 const testBackendConnection = async () => {
-  const baseUrl = 'https://sindh-backend.onrender.com';
+  const baseUrl = 'http://localhost:10000';
   
   try {
     console.log('🧪 Testing backend connection...');

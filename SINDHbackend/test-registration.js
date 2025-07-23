@@ -36,8 +36,8 @@ async function testDatabaseConnection() {
 // Test registration endpoints
 async function testRegistrationEndpoints() {
   const baseUrl = process.env.NODE_ENV === 'production' 
-  ? 'https://sindh-backend.onrender.com'
-  : 'https://sindh-backend.onrender.com';
+  ? 'http://localhost:10000'
+  : 'http://localhost:10000';
   
   // Test worker registration
   const workerData = {

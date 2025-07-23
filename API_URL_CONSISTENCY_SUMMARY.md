@@ -79,9 +79,9 @@ This document summarizes the comprehensive update to ensure consistent API URL h
 ```javascript
 const getApiUrl = () => {
   if (process.env.NODE_ENV === 'production') {
-    return 'https://sindh-backend.onrender.com/api';
+    return 'http://localhost:10000/api';
   }
-  return 'https://sindh-backend.onrender.com/api';
+  return 'http://localhost:10000/api';
 };
 ```
 

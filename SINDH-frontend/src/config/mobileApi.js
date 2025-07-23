@@ -17,9 +17,33 @@ const getMobileApiUrl = () => {
     return null;
   }
   
-  // For mobile app, always use the production backend
-  // Android emulators can access the internet directly
-  return 'https://sindh-backend.onrender.com/api';
+  // For mobile app, try multiple ports to find available backend
+  const possibleUrls = [
+    'http://localhost:10000/api',  // Primary backend port
+    'http://localhost:3001/api',   // Alternative frontend port
+    'http://localhost:3000/api'    // Common React dev port
+  ];
+  
+  // Try to detect which backend is available (synchronous for mobile)
+  for (const testUrl of possibleUrls) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `${testUrl}/health`, false); // synchronous
+      xhr.timeout = 1000;
+      xhr.send();
+      
+      if (xhr.status === 200) {
+        console.log(`📱 Mobile backend found at: ${testUrl}`);
+        return testUrl;
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  
+  // Fallback to default
+  console.log('📱 Using default mobile backend port');
+  return 'http://localhost:10000/api';
 };
 
 const MOBILE_API_URL = getMobileApiUrl();

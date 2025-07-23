@@ -93,7 +93,7 @@ const initializeServer = async () => {
       console.log(`🔗 Allowed CORS origins:`, getCorsOrigins());
       
       if (process.env.NODE_ENV === 'production') {
-        console.log(`📡 API available at https://sindh-backend.onrender.com/api`);
+        console.log(`📡 API available at http://localhost:10000/api`);
       } else {
         console.log(`📡 API available at http://localhost:${PORT}/api`);
         console.log(`🔗 Local development URL: http://localhost:${PORT}/api`);

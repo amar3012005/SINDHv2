@@ -4,9 +4,9 @@ const Worker = require('./server/src/models/Worker');
 // API URL configuration
 const getApiUrl = () => {
   if (process.env.NODE_ENV === 'production') {
-    return 'https://sindh-backend.onrender.com/api';
+    return 'http://localhost:10000/api';
   }
-  return 'https://sindh-backend.onrender.com/api';
+  return 'http://localhost:10000/api';
 };
 
 async function testWalletAPI() {

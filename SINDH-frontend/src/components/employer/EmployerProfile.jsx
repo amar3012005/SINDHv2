@@ -43,7 +43,7 @@ const EmployerProfilePage = () => {
 
   // API URL helper function
   const getApiUrl = (endpoint) => {
-    const baseUrl = process.env.REACT_APP_API_URL || 'https://sindh-backend.onrender.com';
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:10000';
     return `${baseUrl}${endpoint}`;
   };
 
@@ -492,6 +492,14 @@ const EmployerProfilePage = () => {
                     {employerData?.company?.name}
                   </p>
                   
+                  {/* Age display */}
+                  {employerData?.age && (
+                    <p className="text-sm sm:text-base text-[#666] mb-2 flex items-center">
+                      <User className="w-4 h-4 mr-2" />
+                      {employerData.age} years old
+                    </p>
+                  )}
+                  
                   <div className="flex flex-wrap gap-1 sm:gap-2 mb-3 sm:mb-4">
                     <span className="px-2 sm:px-4 py-1 sm:py-2 bg-[#ff6b35]/10 text-[#ff6b35] rounded-lg text-xs sm:text-sm font-medium">
                       {employerData?.company?.type}
@@ -499,6 +507,12 @@ const EmployerProfilePage = () => {
                     <span className="px-2 sm:px-4 py-1 sm:py-2 bg-[#222]/10 text-[#222] rounded-lg text-xs sm:text-sm font-medium">
                       {employerData?.company?.industry}
                     </span>
+                    {employerData?.workerType && (
+                      <span className="px-2 sm:px-4 py-1 sm:py-2 bg-blue-100 text-blue-700 rounded-lg text-xs sm:text-sm font-medium flex items-center">
+                        <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                        {employerData.workerType}
+                      </span>
+                    )}
                     <span className="px-2 sm:px-4 py-1 sm:py-2 bg-[#ff6b35]/10 text-[#ff6b35] rounded-lg text-xs sm:text-sm font-medium flex items-center">
                       <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                       Employer
@@ -600,6 +614,124 @@ const EmployerProfilePage = () => {
                     </p>
                   </div>
 
+                  {/* Business Details Section */}
+                  <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-[#222] mb-3 sm:mb-4 flex items-center">
+                      <Building className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#ff6b35]" />
+                      Business Details
+                    </h3>
+                    <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
+                      {/* Business Type */}
+                      {employerData?.company?.type && (
+                        <div className="flex items-start">
+                          <div className="w-8 h-8 bg-[#ff6b35]/10 rounded-lg flex items-center justify-center mr-3 mt-1">
+                            <Briefcase className="w-4 h-4 text-[#ff6b35]" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-[#222] text-sm sm:text-base mb-1">Business Type</h4>
+                            <p className="text-[#666] text-sm">{employerData.company.type}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Industry */}
+                      {employerData?.company?.industry && (
+                        <div className="flex items-start">
+                          <div className="w-8 h-8 bg-[#ff6b35]/10 rounded-lg flex items-center justify-center mr-3 mt-1">
+                            <Globe className="w-4 h-4 text-[#ff6b35]" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-[#222] text-sm sm:text-base mb-1">Industry</h4>
+                            <p className="text-[#666] text-sm">{employerData.company.industry}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Worker Type Preference */}
+                      {employerData?.workerType && (
+                        <div className="flex items-start">
+                          <div className="w-8 h-8 bg-[#ff6b35]/10 rounded-lg flex items-center justify-center mr-3 mt-1">
+                            <Users className="w-4 h-4 text-[#ff6b35]" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-[#222] text-sm sm:text-base mb-1">Preferred Workers</h4>
+                            <p className="text-[#666] text-sm">{employerData.workerType}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Age */}
+                      {employerData?.age && (
+                        <div className="flex items-start">
+                          <div className="w-8 h-8 bg-[#ff6b35]/10 rounded-lg flex items-center justify-center mr-3 mt-1">
+                            <User className="w-4 h-4 text-[#ff6b35]" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-[#222] text-sm sm:text-base mb-1">Age</h4>
+                            <p className="text-[#666] text-sm">{employerData.age} years old</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Enhanced Location Details */}
+                  <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
+                    <h3 className="text-base sm:text-lg font-semibold text-[#222] mb-3 sm:mb-4 flex items-center">
+                      <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#ff6b35]" />
+                      Location Details
+                    </h3>
+                    <div className="space-y-3">
+                      {employerData?.location?.village && (
+                        <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                          <div className="w-8 h-8 bg-[#ff6b35]/10 rounded-lg flex items-center justify-center mr-3">
+                            <MapPin className="w-4 h-4 text-[#ff6b35]" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-[#222] text-sm">Village/Area</h4>
+                            <p className="text-[#666] text-xs">{employerData.location.village}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="grid md:grid-cols-3 gap-3">
+                        {employerData?.location?.district && (
+                          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div>
+                              <h4 className="font-medium text-[#222] text-sm">District</h4>
+                              <p className="text-[#666] text-xs">{employerData.location.district}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {employerData?.location?.state && (
+                          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div>
+                              <h4 className="font-medium text-[#222] text-sm">State</h4>
+                              <p className="text-[#666] text-xs">{employerData.location.state}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {employerData?.location?.pincode && (
+                          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                            <div>
+                              <h4 className="font-medium text-[#222] text-sm">Pincode</h4>
+                              <p className="text-[#666] text-xs">{employerData.location.pincode}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {employerData?.location?.address && (
+                        <div className="p-3 bg-[#ff6b35]/5 border border-[#ff6b35]/20 rounded-lg">
+                          <h4 className="font-medium text-[#222] text-sm mb-1">Complete Address</h4>
+                          <p className="text-[#666] text-xs leading-relaxed">{employerData.location.address}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Recent Activity */}
                   <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
                     <h3 className="text-base sm:text-lg font-semibold text-[#222] mb-3 sm:mb-4 flex items-center">
@@ -689,7 +821,11 @@ const EmployerProfilePage = () => {
                     <div className="space-y-2 sm:space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[#666] text-sm sm:text-base">Email Verified</span>
-                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
+                        {employerData?.email && employerData.email.trim() !== '' ? (
+                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                        )}
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[#666] text-sm sm:text-base">Phone Verified</span>
@@ -697,13 +833,36 @@ const EmployerProfilePage = () => {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[#666] text-sm sm:text-base">Aadhar Verified</span>
-                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
+                        {employerData?.verificationDocuments?.aadharNumber && 
+                         employerData.verificationDocuments.aadharNumber !== 'not provided' ? (
+                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
+                        ) : (
+                          <div className="flex items-center">
+                            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500 mr-2" />
+                            <span className="text-xs text-yellow-600">Verify Later</span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-[#666] text-sm sm:text-base">Profile Complete</span>
                         <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
                       </div>
                     </div>
+                    
+                    {/* Aadhar Verification Notice */}
+                    {employerData?.verificationDocuments?.aadharNumber === 'not provided' && (
+                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-start">
+                          <AlertCircle className="w-4 h-4 text-yellow-500 mr-2 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-medium text-yellow-800">Aadhar Verification Pending</h4>
+                            <p className="text-xs text-yellow-700 mt-1">
+                              You chose to verify later. Aadhar verification will be required when posting your first job.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Quick Actions */}

@@ -35,30 +35,48 @@ router.post('/apply', asyncHandler(async (req, res) => {
 
   logger.info(`Job ${jobId} current status: ${job.status}`);
 
-  if (job.status !== 'active') {
-    logger.warn(`Job not active for application: ${job.status}`);
+  // Check if job is available for applications using dual status system
+  if (job.workerStatus !== 'active') {
+    logger.warn(`Job not available for worker application: workerStatus=${job.workerStatus}`);
     throw new ValidationError('Job is no longer accepting applications');
   }
 
-  // If job is active, set to in-progress on first application
-  if (job.status === 'active') {
-    logger.info(`Updating job ${jobId} status from 'active' to 'in-progress'`);
-    logger.info(`Job before update:`, { id: job._id, status: job.status, title: job.title });
-    job.status = 'in-progress';
-    await job.save();
-    logger.info(`Job ${jobId} status updated successfully to 'in-progress'`);
-    logger.info(`Job after update:`, { id: job._id, status: job.status, title: job.title });
-    
-    // Verify the job was actually updated in the database
-    const updatedJob = await Job.findById(jobId);
-    logger.info(`Job verification from database:`, { 
-      id: updatedJob._id, 
-      status: updatedJob.status, 
-      title: updatedJob.title 
-    });
-  } else {
-    logger.info(`Job ${jobId} status is already '${job.status}', not updating`);
-  }
+  // Update dual status system when worker applies
+  logger.info(`Updating job ${jobId} dual status - Worker: 'active' → 'applied'`);
+  logger.info(`Job before update:`, { 
+    id: job._id, 
+    workerStatus: job.workerStatus, 
+    employerStatus: job.employerStatus,
+    legacyStatus: job.status,
+    title: job.title 
+  });
+  
+  // Update worker status to 'applied' when worker applies
+  job.workerStatus = 'applied';
+  // Keep employer status as 'active' (still reviewing applications)
+  // Update legacy status for backward compatibility
+  job.status = 'in-progress';
+  
+  await job.save();
+  
+  logger.info(`Job ${jobId} dual status updated successfully`);
+  logger.info(`Job after update:`, { 
+    id: job._id, 
+    workerStatus: job.workerStatus, 
+    employerStatus: job.employerStatus,
+    legacyStatus: job.status,
+    title: job.title 
+  });
+  
+  // Verify the job was actually updated in the database
+  const updatedJob = await Job.findById(jobId);
+  logger.info(`Job verification from database:`, { 
+    id: updatedJob._id, 
+    workerStatus: updatedJob.workerStatus,
+    employerStatus: updatedJob.employerStatus,
+    legacyStatus: updatedJob.status,
+    title: updatedJob.title 
+  });
 
   // Check if job has reached maximum applications (optional limit)
   const existingApplicationsCount = await JobApplication.countDocuments({ job: jobId });
@@ -663,7 +681,15 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
   }
 
   // Get current application to validate transition
-  const currentApplication = await JobApplication.findById(applicationId).populate(['job', 'worker']);
+  const currentApplication = await JobApplication.findById(applicationId)
+    .populate({
+      path: 'job',
+      populate: {
+        path: 'employer',
+        model: 'Employer'
+      }
+    })
+    .populate('worker');
   if (!currentApplication) {
     logger.warn(`❌ Application not found for status update: ${applicationId}`);
     throw new NotFoundError('Application not found');
@@ -719,10 +745,10 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
   // Handle job status updates based on application status
   await handleJobStatusUpdate(application, status, currentStatus);
 
-  // Get employer for notifications
-  const employer = await Employer.findById(application.job.employer);
+  // Get employer for notifications (use populated employer if available)
+  const employer = application.job.employer || await Employer.findById(application.job.employer);
   if (!employer) {
-    logger.warn(`⚠️ Employer not found for job ${application.job.employer} during notification`);
+    logger.warn(`⚠️ Employer not found for job ${application.job._id} during notification`);
   }
 
   // Send notifications
@@ -756,57 +782,77 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
   });
 }));
 
-// Helper function to handle job status updates
+// Helper function to handle dual job status updates (worker + employer perspectives)
 async function handleJobStatusUpdate(application, newApplicationStatus, previousApplicationStatus) {
   try {
     const job = application.job;
-    let newJobStatus = null;
+    // Initialize status fields if they don't exist (for backward compatibility)
+    let newWorkerStatus = job.workerStatus || 'applied';
+    let newEmployerStatus = job.employerStatus || 'active';
+    let newLegacyStatus = job.status || 'active';
+
+    logger.info(`🔄 Dual Status Update - Application: ${previousApplicationStatus} → ${newApplicationStatus}`);
+    logger.info(`📊 Current Job Status - Worker: ${newWorkerStatus}, Employer: ${newEmployerStatus}`);
 
     switch (newApplicationStatus) {
       case 'accepted':
-        // Update job to in-progress when first application is accepted
-        if (job.status === 'active') {
-          newJobStatus = 'in-progress';
-        }
+        // When employer accepts worker application
+        logger.info('✅ Employer accepted worker - updating dual status');
+        newWorkerStatus = 'accepted';     // Worker: applied → accepted
+        newEmployerStatus = 'accepted';   // Employer: active → accepted
+        newLegacyStatus = 'in-progress';  // Legacy compatibility
         break;
         
       case 'completed':
-        // Check if all accepted applications are completed
-        const allApplications = await JobApplication.find({ job: job._id });
-        const acceptedApplications = allApplications.filter(app => 
-          ['accepted', 'in-progress', 'completed'].includes(app.status)
-        );
-        const completedApplications = allApplications.filter(app => app.status === 'completed');
-        
-        if (acceptedApplications.length > 0 && completedApplications.length === acceptedApplications.length) {
-          newJobStatus = 'completed';
-        }
+        // When work is completed, check payment status
+        logger.info('🏁 Work completed - checking payment status');
+        // Status will be updated in payment processing
         break;
         
       case 'cancelled':
-        // Check if all applications are cancelled/rejected
+      case 'rejected':
+        // Reset statuses if application is cancelled/rejected
+        logger.info('❌ Application cancelled/rejected - resetting status');
         const jobApplications = await JobApplication.find({ job: job._id });
         const activeApplications = jobApplications.filter(app => 
           !['cancelled', 'rejected'].includes(app.status)
         );
         
         if (activeApplications.length === 0) {
-          newJobStatus = 'active'; // Revert to active if no active applications
+          newWorkerStatus = 'active';   // Revert to active for new applications
+          newEmployerStatus = 'active'; // Employer can review new applications
+          newLegacyStatus = 'active';   // Legacy compatibility
         }
         break;
     }
 
-    if (newJobStatus && job.status !== newJobStatus) {
-      await Job.findByIdAndUpdate(job._id, {
-        status: newJobStatus,
-        updatedAt: new Date(),
-        ...(newJobStatus === 'completed' && { completedAt: new Date() })
-      });
+    // Update job with dual status system
+    if (newWorkerStatus !== job.workerStatus || 
+        newEmployerStatus !== job.employerStatus || 
+        newLegacyStatus !== job.status) {
       
-      logger.info(`✅ Job ${job._id} status updated to ${newJobStatus}`);
+      const updateData = {
+        workerStatus: newWorkerStatus,
+        employerStatus: newEmployerStatus,
+        status: newLegacyStatus, // Legacy compatibility
+        updatedAt: new Date()
+      };
+
+      if (newLegacyStatus === 'completed') {
+        updateData.completedAt = new Date();
+      }
+
+      await Job.findByIdAndUpdate(job._id, updateData);
+      
+      logger.info(`✅ Job ${job._id} dual status updated:`);
+      logger.info(`   Worker: ${job.workerStatus} → ${newWorkerStatus}`);
+      logger.info(`   Employer: ${job.employerStatus} → ${newEmployerStatus}`);
+      logger.info(`   Legacy: ${job.status} → ${newLegacyStatus}`);
+    } else {
+      logger.info('📝 No status changes needed');
     }
   } catch (error) {
-    logger.error('❌ Error updating job status:', error);
+    logger.error('❌ Error updating dual job status:', error);
   }
 }
 
@@ -1030,7 +1076,19 @@ router.patch('/:id/process-payment', async (req, res) => {
     application.paymentDate = new Date();
     
     await application.save();
-    logger.info('Application payment status updated');
+    logger.info('💰 Application payment status updated');
+    
+    // Update dual status system for payment processing
+    const job = await Job.findById(application.job._id);
+    if (job) {
+      // When employer processes payment
+      job.employerStatus = 'paid';  // Employer: accepted → paid
+      // Worker status remains 'accepted' until money is added to wallet
+      
+      await job.save();
+      logger.info(`💳 Job ${job._id} employer status updated to 'paid'`);
+      logger.info(`📊 Current Job Status - Worker: ${job.workerStatus}, Employer: ${job.employerStatus}`);
+    }
     
     await updateWorkerBalanceForPayment(application, finalPaymentAmount);
     
@@ -1108,7 +1166,17 @@ async function updateWorkerBalanceForPayment(application, finalPaymentAmount) {
       
       await correctWorker.save();
       
-      logger.info(`Worker balance updated: ${correctWorker.name} - New balance: ₹${correctWorker.balance}`);
+      logger.info(`💰 Worker balance updated: ${correctWorker.name} - New balance: ₹${correctWorker.balance}`);
+      
+      // Update job worker status to 'got paid' when money is added to wallet
+      const job = await Job.findById(application.job._id);
+      if (job && job.workerStatus === 'accepted') {
+        job.workerStatus = 'got paid';  // Worker: accepted → got paid
+        await job.save();
+        
+        logger.info(`💵 Job ${job._id} worker status updated to 'got paid'`);
+        logger.info(`🏆 Final Job Status - Worker: ${job.workerStatus}, Employer: ${job.employerStatus}`);
+      }
     } else {
       logger.info('Payment already exists in worker earnings');
     }

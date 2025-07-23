@@ -146,6 +146,49 @@ const EnhancedWorkerRegistration = () => {
     'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Odia', 'Urdu'
   ];
 
+  // Function to fetch location details from pincode
+  const fetchLocationFromPincode = async (pincode) => {
+    try {
+      addBotMessage('🔍 Fetching location details for your pincode...', [], 500);
+      
+      // Using Indian Postal Pincode API
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+      const data = await response.json();
+      
+      if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+        const postOffice = data[0].PostOffice[0];
+        const district = postOffice.District;
+        const state = postOffice.State;
+        
+        // Update form data with fetched location
+        setFormData(prev => ({
+          ...prev,
+          location: {
+            ...prev.location,
+            pincode: pincode,
+            district: district,
+            state: state
+          }
+        }));
+        
+        // Show success message with fetched details
+        setTimeout(() => {
+          addBotMessage(`✅ Great! I found your location: ${district}, ${state}. Now I'll ask for your village/area name.`, [], 800);
+        }, 1000);
+        
+        return { district, state };
+      } else {
+        throw new Error('Invalid pincode or location not found');
+      }
+    } catch (error) {
+      console.error('Error fetching location:', error);
+      setTimeout(() => {
+        addBotMessage('❌ Sorry, I couldn\'t fetch location details for this pincode. Please make sure it\'s a valid 6-digit Indian pincode and try again.', [], 800);
+      }, 500);
+      return null;
+    }
+  };
+
   // Convert the original steps to chat-style questions
   const chatQuestions = [
     {
@@ -153,7 +196,7 @@ const EnhancedWorkerRegistration = () => {
       type: 'system',
       text: "👋 Welcome to SINDH! I'm here to help you create your worker profile so you can start finding jobs and earning. Ready to get started?",
       field: null,
-      suggestions: ['Yes, let\'s start!', 'I\'m ready to begin']
+      suggestions: ['Yes, let\'s start!']
     },
     {
       id: 'name',
@@ -183,12 +226,39 @@ const EnhancedWorkerRegistration = () => {
       }
     },
     {
+      id: 'pincode',
+      type: 'question',
+      text: "What's your pincode? Please enter your 6-digit postal code (e.g., 400001)",
+      field: 'pincode',
+      validation: (value) => {
+        const cleaned = value.replace(/[^\d]/g, '');
+        return cleaned.length === 6 ? null : "Please enter a valid 6-digit pincode";
+      },
+      autoFetch: true // Special flag to trigger location fetch
+    },
+    {
+      id: 'village',
+      type: 'question',
+      text: () => {
+        const district = formData.location?.district || 'District';
+        const state = formData.location?.state || 'State';
+        const pincode = formData.location?.pincode || 'Pincode';
+        return `Great! I found your location details:\n\n📍 District: ${district}\n🏛️ State: ${state}\n📮 Pincode: ${pincode}\n\nNow, what's your village or area name within ${district}?`;
+      },
+      field: 'village',
+      validation: (value) => {
+        const trimmed = value.trim();
+        return trimmed.length >= 2 ? null : "Please enter your village or area name";
+      }
+    },
+    {
       id: 'email',
       type: 'question',
-      text: "What's your email address? (Optional but recommended for notifications)",
+      text: "Would you like to provide your email address for job notifications? (This is completely optional)",
       field: 'email',
+      suggestions: ['Skip this step', 'Enter email address'],
       validation: (value) => {
-        if (!value.trim()) return null; // Optional field
+        if (!value.trim() || value === 'Skip this step') return null; // Optional field
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(value) ? null : "Please enter a valid email address";
       }
@@ -204,12 +274,30 @@ const EnhancedWorkerRegistration = () => {
     {
       id: 'aadhar',
       type: 'question',
-      text: "For verification, please enter your 12-digit Aadhar number:",
+      text: "For verification, would you like to provide your 12-digit Aadhar number now or verify it later?\n\n💡 Note: If you choose 'Verify later', you'll be asked to verify your Aadhar when you apply for your first job.",
       field: 'aadharNumber',
+      suggestions: ['Verify later', 'Enter Aadhar number now'],
       validation: (value) => {
+        if (value === 'Verify later') return null; // Allow skip
         const cleaned = value.replace(/[^\d]/g, '');
         return cleaned.length === 12 ? null : "Please enter a valid 12-digit Aadhar number";
       }
+    },
+    {
+      id: 'preferredCategory',
+      type: 'question',
+      text: "What type of work do you prefer?",
+      field: 'preferredCategory',
+      suggestions: [
+        'Construction',
+        'Agriculture',
+        'Household',
+        'Transportation',
+        'Manufacturing',
+        'Services',
+        'Other'
+      ],
+      validation: (value) => value.trim() ? null : "Please select your preferred work category"
     },
     {
       id: 'skills',
@@ -233,22 +321,7 @@ const EnhancedWorkerRegistration = () => {
       ],
       validation: (value) => value.trim() ? null : "Please select your experience level"
     },
-    {
-      id: 'preferredCategory',
-      type: 'question',
-      text: "What type of work do you prefer?",
-      field: 'preferredCategory',
-      suggestions: [
-        'Construction',
-        'Agriculture',
-        'Household',
-        'Transportation',
-        'Manufacturing',
-        'Services',
-        'Other'
-      ],
-      validation: (value) => value.trim() ? null : "Please select your preferred work category"
-    },
+    
     {
       id: 'expectedSalary',
       type: 'question',
@@ -264,64 +337,7 @@ const EnhancedWorkerRegistration = () => {
       suggestions: languageOptions,
       validation: (value) => value && value.length > 0 ? null : "Please select at least one language"
     },
-    {
-      id: 'village',
-      type: 'question',
-      text: "Which village or town do you live in?",
-      field: 'village',
-      validation: (value) => value.trim() ? null : "Please enter your village/town"
-    },
-    {
-      id: 'district',
-      type: 'question',
-      text: "Which district?",
-      field: 'district',
-      validation: (value) => value.trim() ? null : "Please enter your district"
-    },
-    {
-      id: 'state',
-      type: 'question',
-      text: "Which state?",
-      field: 'state',
-      validation: (value) => value.trim() ? null : "Please enter your state"
-    },
-    {
-      id: 'pincode',
-      type: 'question',
-      text: "What's your area pincode?",
-      field: 'pincode',
-      validation: (value) => {
-        const cleaned = value.replace(/[^\d]/g, '');
-        return cleaned.length === 6 ? null : "Please enter a valid 6-digit pincode";
-      }
-    },
-    {
-      id: 'preferredWorkType',
-      type: 'question',
-      text: "What type of work arrangement do you prefer?",
-      field: 'preferredWorkType',
-      suggestions: [
-        'Full-time daily work',
-        'Part-time work',
-        'Contract work',
-        'Seasonal work',
-        'On-demand work'
-      ],
-      validation: (value) => value.trim() ? null : "Please select your preferred work type"
-    },
-    {
-      id: 'availability',
-      type: 'question',
-      text: "When are you available to start work?",
-      field: 'availability',
-      suggestions: [
-        'Available immediately',
-        'Available next week',
-        'Available next month',
-        'Available on specific dates'
-      ],
-      validation: (value) => value.trim() ? null : "Please select your availability"
-    },
+ 
     {
       id: 'workRadius',
       type: 'question',
@@ -427,6 +443,73 @@ const EnhancedWorkerRegistration = () => {
     setIsWaitingForInput(false);
   };
 
+  const handleSuggestionClick = async (suggestion) => {
+    const currentQ = chatQuestions[currentQuestion];
+    
+    // Special handling for email field
+    if (currentQ.field === 'email') {
+      if (suggestion === 'Skip this step') {
+        addUserMessage(suggestion);
+        await processUserResponse(suggestion);
+        return;
+      } else if (suggestion === 'Enter email address') {
+        addUserMessage('I want to enter my email address');
+        // Clear suggestions to show input field
+        setShowSuggestions(false);
+        setIsWaitingForInput(true);
+        addBotMessage('Please enter your email address:', [], 500);
+        return;
+      }
+    }
+    
+    // Special handling for Aadhar field
+    if (currentQ.field === 'aadharNumber') {
+      if (suggestion === 'Verify later') {
+        addUserMessage(suggestion);
+        // Add confirmation message for verify later
+        setTimeout(() => {
+          addBotMessage('✅ No problem! You can verify your Aadhar number when you apply for your first job. This helps you get started quickly while maintaining security.', [], 800);
+        }, 500);
+        await processUserResponse(suggestion);
+        return;
+      } else if (suggestion === 'Enter Aadhar number now') {
+        addUserMessage('I want to enter my Aadhar number now');
+        // Clear suggestions to show input field
+        setShowSuggestions(false);
+        setIsWaitingForInput(true);
+        addBotMessage('Please enter your 12-digit Aadhar number:', [], 500);
+        return;
+      }
+    }
+    
+    addUserMessage(suggestion);
+    
+    let question = chatQuestions[currentQuestion];
+    
+    // Handle phone number pre-fill case
+    if (location.state?.phoneNumber && currentQuestion === 0) {
+      // Skip to name question after welcome
+      const nameQuestionIndex = chatQuestions.findIndex(q => q.field === 'name');
+      if (nameQuestionIndex > 0) {
+        setCurrentQuestion(nameQuestionIndex);
+        question = chatQuestions[nameQuestionIndex];
+      }
+    }
+    
+    // Validate the response
+    if (question.validation) {
+      const error = question.validation(suggestion);
+      if (error) {
+        setTimeout(() => {
+          addBotMessage(`❌ ${error}. Please try again:`, question.suggestions, 500);
+        }, 300);
+        return;
+      }
+    }
+    
+    await processUserResponse(suggestion);
+  };
+
   const processUserResponse = async (response) => {
     let question = chatQuestions[currentQuestion];
     
@@ -497,6 +580,10 @@ const EnhancedWorkerRegistration = () => {
         processedResponse = response.replace(/[^\d]/g, '');
       } else if (question.field === 'pincode') {
         processedResponse = response.replace(/[^\d]/g, '');
+        // Auto-fetch location details for pincode
+        if (processedResponse.length === 6) {
+          await fetchLocationFromPincode(processedResponse);
+        }
       } else if (question.field === 'age') {
         processedResponse = response.replace(/[^\d]/g, '');
       }
@@ -515,11 +602,18 @@ const EnhancedWorkerRegistration = () => {
       } else if (question.field === 'phone') {
         setFormData(prev => ({ ...prev, phone: processedResponse }));
       } else if (question.field === 'email') {
-        setFormData(prev => ({ ...prev, email: processedResponse }));
+        // Handle email skip option - send empty string for skip
+        let emailValue = '';
+        if (processedResponse !== 'Skip this step' && processedResponse.trim()) {
+          emailValue = processedResponse.trim();
+        }
+        setFormData(prev => ({ ...prev, email: emailValue }));
       } else if (question.field === 'gender') {
         setFormData(prev => ({ ...prev, gender: processedResponse }));
       } else if (question.field === 'aadharNumber') {
-        setFormData(prev => ({ ...prev, aadharNumber: processedResponse }));
+        // Handle Aadhar verify later option
+        const aadharValue = processedResponse === 'Verify later' ? 'not provided' : processedResponse;
+        setFormData(prev => ({ ...prev, aadharNumber: aadharValue }));
       } else if (question.field === 'skills') {
         setFormData(prev => ({ ...prev, skills: [processedResponse] }));
       } else if (question.field === 'experience') {
@@ -530,36 +624,20 @@ const EnhancedWorkerRegistration = () => {
         setFormData(prev => ({ ...prev, expectedSalary: processedResponse }));
       } else if (question.field === 'languages') {
         setFormData(prev => ({ ...prev, languages: [processedResponse] }));
-      } else if (question.field === 'village') {
-        setFormData(prev => ({ 
-          ...prev, 
-          location: { 
-            ...prev.location, 
-            village: processedResponse 
-          } 
-        }));
-      } else if (question.field === 'district') {
-        setFormData(prev => ({ 
-          ...prev, 
-          location: { 
-            ...prev.location, 
-            district: processedResponse 
-          } 
-        }));
-      } else if (question.field === 'state') {
-        setFormData(prev => ({ 
-          ...prev, 
-          location: { 
-            ...prev.location, 
-            state: processedResponse 
-          } 
-        }));
       } else if (question.field === 'pincode') {
         setFormData(prev => ({ 
           ...prev, 
           location: { 
             ...prev.location, 
             pincode: processedResponse 
+          } 
+        }));
+      } else if (question.field === 'village') {
+        setFormData(prev => ({ 
+          ...prev, 
+          location: { 
+            ...prev.location, 
+            village: processedResponse 
           } 
         }));
       } else if (question.field === 'preferredWorkType') {
@@ -625,20 +703,45 @@ const EnhancedWorkerRegistration = () => {
         name: formData.name || userResponses.name,
         age: parseInt(formData.age || userResponses.age) || 25,
         phone: phoneNumber,
-        email: formData.email || userResponses.email || '',
+        email: (() => {
+          const emailFromForm = formData.email || '';
+          const emailFromResponses = userResponses.email || '';
+          // Filter out 'Skip this step' and return empty string
+          if (emailFromForm && emailFromForm !== 'Skip this step') return emailFromForm;
+          if (emailFromResponses && emailFromResponses !== 'Skip this step') return emailFromResponses;
+          return '';
+        })(),
         gender: formData.gender || userResponses.gender || 'Male',
-        aadharNumber: formData.aadharNumber || userResponses.aadharNumber || '123456789012',
+        aadharNumber: (() => {
+          const aadharFromForm = formData.aadharNumber || '';
+          const aadharFromResponses = userResponses.aadharNumber || '';
+          // Handle 'Verify later' option
+          if (aadharFromForm === 'Verify later') return 'not provided';
+          if (aadharFromResponses === 'Verify later') return 'not provided';
+          if (aadharFromForm && aadharFromForm !== 'Verify later') return aadharFromForm;
+          if (aadharFromResponses && aadharFromResponses !== 'Verify later') return aadharFromResponses;
+          return 'not provided';
+        })(),
         skills: formData.skills || [userResponses.skills] || ['Construction'],
         experience: formData.experience || userResponses.experience || 'Less than 1 year',
         preferredCategory: formData.preferredCategory || userResponses.preferredCategory || 'Construction',
         expectedSalary: formData.expectedSalary || userResponses.expectedSalary || '₹500 per day',
         languages: formData.languages || [userResponses.languages] || ['Hindi'],
         location: {
-          address: formData.location?.address || '',
-          village: formData.location?.village || userResponses.village || 'Village',
-          district: formData.location?.district || userResponses.district || 'District',
-          state: formData.location?.state || userResponses.state || 'State',
-          pincode: formData.location?.pincode || userResponses.pincode || '000000',
+          address: (() => {
+            const village = formData.location?.village || userResponses.village || '';
+            const district = formData.location?.district || userResponses.district || '';
+            const state = formData.location?.state || userResponses.state || '';
+            const pincode = formData.location?.pincode || userResponses.pincode || '';
+            
+            // Construct complete address
+            const addressParts = [village, district, state, pincode].filter(part => part && part.trim());
+            return addressParts.length > 0 ? addressParts.join(', ') : '';
+          })(),
+          village: formData.location?.village || userResponses.village || '',
+          district: formData.location?.district || userResponses.district || '',
+          state: formData.location?.state || userResponses.state || '',
+          pincode: formData.location?.pincode || userResponses.pincode || '',
           coordinates: {
             type: "Point",
             coordinates: [0, 0]
@@ -770,34 +873,7 @@ const EnhancedWorkerRegistration = () => {
     }
   };
 
-  const handleSuggestionClick = async (suggestion) => {
-    addUserMessage(suggestion);
-    
-    let question = chatQuestions[currentQuestion];
-    
-    // Handle phone number pre-fill case
-    if (location.state?.phoneNumber && currentQuestion === 0) {
-      // Skip to name question after welcome
-      const nameQuestionIndex = chatQuestions.findIndex(q => q.field === 'name');
-      if (nameQuestionIndex > 0) {
-        setCurrentQuestion(nameQuestionIndex);
-        question = chatQuestions[nameQuestionIndex];
-      }
-    }
-    
-    // Validate the response
-    if (question.validation) {
-      const error = question.validation(suggestion);
-      if (error) {
-        setTimeout(() => {
-          addBotMessage(`❌ ${error}. Please try again:`, question.suggestions, 500);
-        }, 300);
-        return;
-      }
-    }
-    
-    await processUserResponse(suggestion);
-  };
+
 
   // --- Step Progress Bar ---
   const StepProgress = ({ current, total }) => (
@@ -939,12 +1015,20 @@ const EnhancedWorkerRegistration = () => {
         >
           {/* Question/Prompt */}
           <div className="text-left">
-            <h2 className="text-3xl md:text-4xl font-extrabold text-[#222] mb-3 leading-tight" style={{ letterSpacing: '-0.5px' }}>
-              {currentQ.text.split(/[.!?]/)[0].toUpperCase()}
-            </h2>
-            {currentQ.text.split(/[.!?]/)[1] && (
-              <p className="text-lg md:text-xl text-[#222]/70 mt-2">{currentQ.text.split(/[.!?]/)[1]}</p>
-            )}
+            {(() => {
+              const questionText = typeof currentQ.text === 'function' ? currentQ.text() : currentQ.text;
+              const textParts = questionText.split(/[.!?]/);
+              return (
+                <>
+                  <h2 className="text-3xl md:text-4xl font-extrabold text-[#222] mb-3 leading-tight" style={{ letterSpacing: '-0.5px' }}>
+                    {textParts[0].toUpperCase()}
+                  </h2>
+                  {textParts[1] && (
+                    <p className="text-lg md:text-xl text-[#222]/70 mt-2 whitespace-pre-line">{textParts.slice(1).join('.')}</p>
+                  )}
+                </>
+              );
+            })()}
                           </div>
           {/* Input or Suggestions */}
           {currentQ.suggestions && currentQ.suggestions.length > 0 ? (

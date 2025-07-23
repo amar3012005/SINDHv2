@@ -2,8 +2,8 @@ import { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://sindh-backend.onrender.com/api'
-  : 'https://sindh-backend.onrender.com/api';
+  ? 'http://localhost:10000/api'
+  : 'http://localhost:10000/api';
 
 export const UserContext = createContext();
 

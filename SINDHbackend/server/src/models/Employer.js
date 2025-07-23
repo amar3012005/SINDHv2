@@ -12,8 +12,18 @@ const employerSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: true,
-    unique: true
+    trim: true,
+    lowercase: true,
+    default: '',
+    validate: {
+      validator: function(v) {
+        // Allow empty string, null, or undefined (optional field)
+        if (!v || v === '' || v.trim() === '') return true;
+        // If value exists, validate email format
+        return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v);
+      },
+      message: 'Please enter a valid email or leave empty'
+    }
   },
   otp: {
     code: {
@@ -29,6 +39,12 @@ const employerSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  age: {
+    type: Number,
+    required: true,
+    min: 18,
+    max: 100
+  },
   company: {
     name: {
       type: String,
@@ -39,6 +55,10 @@ const employerSchema = new mongoose.Schema({
       default: ''
     },
     industry: {
+      type: [String],
+      default: []
+    },
+    primaryIndustry: {
       type: String,
       default: ''
     },
@@ -59,8 +79,24 @@ const employerSchema = new mongoose.Schema({
     address: String
   },
   businessDescription: String,
+  workerType: {
+    type: String,
+    enum: ['Full-time workers', 'Part-time workers', 'Daily wage workers', 'Seasonal workers', 'Contract workers', 'Skilled craftsmen', 'General laborers'],
+    default: 'Daily wage workers'
+  },
   verificationDocuments: {
-    aadharNumber: String,
+    aadharNumber: {
+      type: String,
+      required: true,
+      default: 'not provided',
+      validate: {
+        validator: function(v) {
+          if (v === 'not provided') return true;
+          return /^\d{12}$/.test(v);
+        },
+        message: props => `${props.value} is not a valid Aadhar number! Must be 12 digits or 'not provided'.`
+      }
+    },
     panNumber: String,
     businessLicense: String
   },
@@ -126,9 +162,31 @@ const employerSchema = new mongoose.Schema({
 // Create a geospatial index on the location field
 employerSchema.index({ 'location.coordinates': '2dsphere' });
 
-// Pre-save middleware to update timestamps
-employerSchema.pre('save', function(next) {
+// Pre-save middleware to update timestamps and handle uniqueness
+employerSchema.pre('save', async function(next) {
   this.updatedAt = Date.now();
+  
+  // Check for unique phone and aadhar (excluding 'not provided')
+  const queryConditions = [{ phone: this.phone }];
+  if (this.verificationDocuments?.aadharNumber && this.verificationDocuments.aadharNumber !== 'not provided') {
+    queryConditions.push({ 'verificationDocuments.aadharNumber': this.verificationDocuments.aadharNumber });
+  }
+  
+  const existingEmployer = await this.constructor.findOne({
+    $or: queryConditions,
+    _id: { $ne: this._id }
+  });
+  
+  if (existingEmployer) {
+    if (existingEmployer.phone === this.phone) {
+      throw new Error('Phone number already registered');
+    }
+    if (existingEmployer.verificationDocuments?.aadharNumber === this.verificationDocuments?.aadharNumber && 
+        this.verificationDocuments?.aadharNumber !== 'not provided') {
+      throw new Error('Aadhar number already registered');
+    }
+  }
+  
   next();
 });
 

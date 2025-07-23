@@ -29,7 +29,7 @@ const getApiUrl = async () => {
   
   // For mobile apps, always use Render backend (can't access localhost)
   if (isMobileApp) {
-    return 'https://sindh-backend.onrender.com/api';
+    return 'http://localhost:10000/api';
   }
   
   // Use cached result if recent
@@ -38,73 +38,119 @@ const getApiUrl = async () => {
     return cachedApiUrl;
   }
   
-  // Try to detect local backend
-  const localUrl = 'http://localhost:10000/api';
-  const renderUrl = 'https://sindh-backend.onrender.com/api';
+  // Try to detect local backend - check multiple ports
+  const possibleUrls = [
+    'http://localhost:10000/api',  // Primary backend port
+    'http://localhost:3001/api',   // Alternative frontend port
+    'http://localhost:3000/api'    // Common React dev port
+  ];
   
-  try {
-    // Quick health check to local backend
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-    
-    const response = await fetch(`${localUrl}/health`, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json'
+  // Try each URL to find working backend
+  for (const testUrl of possibleUrls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      
+      const response = await fetch(`${testUrl}/health`, {
+        signal: controller.signal,
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        console.log(`✅ Backend found at: ${testUrl}`);
+        cachedApiUrl = testUrl;
+        lastCheckTime = now;
+        return testUrl;
       }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (response.ok) {
-      console.log('🔗 Local backend detected - using localhost');
-      cachedApiUrl = localUrl;
-      lastCheckTime = now;
-      return localUrl;
+    } catch (error) {
+      console.log(`❌ Backend not available at: ${testUrl}`);
+      continue;
     }
-  } catch (error) {
-    // Local backend not available, use Render
-    console.log('🌐 Local backend not available - using Render backend');
   }
   
-  cachedApiUrl = renderUrl;
+  // If no local backend found, use default
+  const fallbackUrl = 'http://localhost:10000/api';
+  console.log(`⚠️ No backend detected, using fallback: ${fallbackUrl}`);
+  cachedApiUrl = fallbackUrl;
   lastCheckTime = now;
-  return renderUrl;
+  return fallbackUrl;
 };
 
-// Synchronous version for immediate use (uses cached or default)
+// Synchronous version for immediate use with detection
 const getApiUrlSync = () => {
+  // If API_URL is still default, try detection once more
+  if (API_URL === 'http://localhost:10000/api' && !isDetecting) {
+    detectBackendSync();
+  }
+  return API_URL;
+};
+
+// Initialize API URL with immediate detection
+let API_URL = 'http://localhost:10000/api'; // Default fallback
+let isDetecting = false;
+
+// Synchronous backend detection with immediate update
+const detectBackendSync = () => {
+  if (isDetecting) return API_URL;
+  
+  // Check if we're in a mobile app environment (can't access localhost)
   const isMobileApp = window.Capacitor || window.cordova;
-  
   if (isMobileApp) {
-    return 'https://sindh-backend.onrender.com/api';
+    API_URL = 'http://localhost:10000/api';
+    return API_URL;
   }
   
-  return cachedApiUrl || 'https://sindh-backend.onrender.com/api';
-};
-
-// Initialize API URL detection on startup
-let API_URL = 'https://sindh-backend.onrender.com/api'; // Default fallback
-
-// Initialize backend detection
-const initializeApiUrl = async () => {
-  try {
-    API_URL = await getApiUrl();
-    console.log('🌐 API Configuration Initialized:', {
-      environment: process.env.NODE_ENV,
-      apiUrl: API_URL,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.warn('⚠️ API URL detection failed, using default:', error.message);
+  isDetecting = true;
+  
+  // Try to detect local backend immediately - check multiple ports
+  const possibleUrls = [
+    'http://localhost:10000/api',  // Primary backend port
+    'http://localhost:3001/api',   // Alternative frontend port
+    'http://localhost:3000/api'    // Common React dev port
+  ];
+  
+  // Try each URL synchronously
+  let backendFound = false;
+  for (const testUrl of possibleUrls) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `${testUrl}/health`, false); // false = synchronous
+      xhr.timeout = 1000; // 1 second timeout
+      xhr.send();
+      
+      if (xhr.status === 200) {
+        API_URL = testUrl;
+        console.log('✅ Backend detected at:', testUrl);
+        cachedApiUrl = testUrl;
+        lastCheckTime = Date.now();
+        backendFound = true;
+        break;
+      }
+    } catch (error) {
+      console.log(`❌ Backend not available at: ${testUrl}`);
+      continue;
+    }
   }
+  
+  // If no backend found, use default
+  if (!backendFound) {
+    API_URL = 'http://localhost:10000/api';
+    console.log('⚠️ No backend detected, using default:', API_URL);
+    cachedApiUrl = API_URL;
+    lastCheckTime = Date.now();
+  }
+  
+  isDetecting = false;
+  return API_URL;
 };
 
-// Start detection immediately
-initializeApiUrl();
+// Detect backend immediately on load
+detectBackendSync();
 
-// Re-check periodically
+// Re-check periodically with async method
 setInterval(async () => {
   try {
     const newUrl = await getApiUrl();
@@ -152,7 +198,7 @@ const checkConnection = async () => {
       error: error.message,
       suggestion: process.env.NODE_ENV === 'production' 
         ? 'Check if backend is deployed on Render'
-        : 'Make sure backend server is running on https://sindh-backend.onrender.com'
+        : 'Make sure backend server is running on http://localhost:10000'
     });
     return false;
   }

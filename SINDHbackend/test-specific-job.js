@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://sindh-backend.onrender.com/api';
+const API_BASE = 'http://localhost:10000/api';
 
 async function testSpecificJob() {
   console.log('🧪 Testing Specific Job Retrieval\n');

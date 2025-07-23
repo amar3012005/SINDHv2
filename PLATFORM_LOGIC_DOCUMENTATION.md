@@ -563,12 +563,12 @@ const calculatePlatformMetrics = async () => {
 ```javascript
 // Development
 NODE_ENV=development
-API_URL=https://sindh-backend.onrender.com/api
+API_URL=http://localhost:10000/api
 MONGODB_URL=mongodb://localhost:27017/sindh
 
 // Production
 NODE_ENV=production
-API_URL=https://sindh-backend.onrender.com/api
+API_URL=http://localhost:10000/api
 MONGODB_URL=mongodb+srv://...
 ```
 

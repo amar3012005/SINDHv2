@@ -103,6 +103,21 @@ const Login = () => {
         return;
       }
 
+      // If user has incomplete profile, redirect to complete registration
+      if (data.incompleteProfile) {
+        console.log('Incomplete profile detected, redirecting to complete registration');
+        toast.warning(data.message || 'Please complete your profile');
+        navigate(`/${userType}/register`, { 
+          state: { 
+            phoneNumber,
+            incompleteProfile: true,
+            missingFields: data.missingFields || []
+          },
+          replace: true 
+        });
+        return;
+      }
+
       // Successful login - existing user
       if (response.ok && data.success) {
         const userData = {

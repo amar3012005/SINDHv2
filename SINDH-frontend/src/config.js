@@ -4,7 +4,7 @@ const detectBackend = async () => {
   const isMobileApp = window.Capacitor || window.cordova;
   
   if (isMobileApp) {
-    return 'https://sindh-backend.onrender.com';
+    return 'http://localhost:10000';
   }
   
   // Try to connect to local backend first
@@ -28,16 +28,16 @@ const detectBackend = async () => {
     console.log('🌐 Local backend not available, using Render backend');
   }
   
-  return 'https://sindh-backend.onrender.com';
+  return 'http://localhost:10000';
 };
 
 // Configuration for different environments with dynamic detection
 const config = {
   development: {
-    API_BASE_URL: "https://sindh-backend.onrender.com", // Default fallback
+    API_BASE_URL: "http://localhost:10000", // Default fallback
   },
   production: {
-    API_BASE_URL: "https://sindh-backend.onrender.com",
+    API_BASE_URL: "http://localhost:10000",
   }
 };
 

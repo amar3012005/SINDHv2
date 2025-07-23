@@ -50,7 +50,7 @@ import JobCategories from './components/jobs/JobCategories';
 import AvailableJobs from './components/jobs/AvailableJobs';
 
 // New import for MyApplications
-import MyApplications from './components/jobs/MyApplications';
+import MyApplications from './components/worker/MyApplications';
 import Login from './components/Login';
 import TranslationDemo from './components/TranslationDemo';
 import ChatMode from './components/ChatMode';
@@ -152,7 +152,7 @@ const AppContent = () => {
               <Route path="/job-categories" element={<Layout><JobCategories /></Layout>} />
 
               {/* New route for MyApplications */}
-              <Route path="/my-applications" element={<Layout><MyApplications /></Layout>} />
+              <Route path="/worker/applications" element={<Layout><MyApplications /></Layout>} />
 
               {/* Login route */}
               <Route path="/login" element={<Layout><Login /></Layout>} />

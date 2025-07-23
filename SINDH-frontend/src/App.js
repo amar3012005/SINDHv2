@@ -24,7 +24,7 @@ import WorkerProfile from './components/worker/WorkerProfile';
 import WorkerRegistration from './components/worker/WorkerRegistration';
 import ChatRegistration from './components/worker/ChatRegistration';
 import RegistrationChoice from './components/worker/RegistrationChoice';
-import MyApplications from './components/jobs/MyApplications';
+import MyApplications from './components/worker/MyApplications';
 
 // Employer Components
 import EmployerProfile from './components/employer/EmployerProfile';
@@ -122,7 +122,6 @@ function AppWrapper() {
         
         {/* Worker Routes */}
         <Route path="/worker/profile" element={<WorkerProfile />} />
-        <Route path="/my-applications" element={<MyApplications />} />
         <Route path="/worker/applications" element={<MyApplications />} />
         
         {/* Employer Routes */}

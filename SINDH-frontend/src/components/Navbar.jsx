@@ -191,7 +191,7 @@ const Navbar = () => {
     else if (path === '/news') setActiveSection('news');
     else if (path.includes('/profile')) setActiveSection('profile');
     else if (path.includes('/jobs') || path.includes('/worker/register')) setActiveSection('find-work');
-    else if (path.includes('/my-applications')) setActiveSection('applications');
+    else if (path.includes('/worker/applications')) setActiveSection('applications');
   }, [location]);
 
   useEffect(() => {
@@ -344,7 +344,7 @@ const Navbar = () => {
           {userType === 'worker' && (
             <>
               <Link
-                to="/my-applications"
+                to="/worker/applications"
                 className="nav-link group relative px-3 py-2 text-sm font-light tracking-wide text-gray-800 hover:text-black transition-all duration-300"
                 onClick={() => handleNavigation('applications')}
               >
@@ -527,7 +527,7 @@ const Navbar = () => {
           {userType === 'worker' && (
             <>
               <Link
-                to="/my-applications"
+                to="/worker/applications"
                 className="block py-3 px-4 text-gray-800 hover:text-black hover:bg-black/5 rounded-lg transition-all duration-300 font-light tracking-wide"
                 onClick={() => {
                   handleNavigation('applications');

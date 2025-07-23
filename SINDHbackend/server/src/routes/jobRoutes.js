@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Job = require('../models/Job');
 const JobMatchingService = require('../services/JobMatchingService');
 const NotificationService = require('../services/NotificationService');
@@ -27,6 +28,122 @@ router.post('/initiate-creation', async (req, res) => {
     message: 'Job creation initiated successfully!' 
   });
 });
+
+// Get jobs with dual status system information
+router.get('/dual-status', asyncHandler(async (req, res) => {
+  const { workerId, employerId, category, status } = req.query;
+  
+  logger.info('📊 Fetching jobs with dual status system', { workerId, employerId, category, status });
+  
+  let query = {};
+  
+  // Filter by category if provided
+  if (category) {
+    query.category = category;
+  }
+  
+  // Filter by status if provided (can be workerStatus, employerStatus, or legacy status)
+  if (status) {
+    if (['active', 'applied', 'accepted', 'got paid'].includes(status)) {
+      query.workerStatus = status;
+    } else if (['active', 'accepted', 'paid'].includes(status)) {
+      query.employerStatus = status;
+    } else {
+      query.status = status; // Legacy status
+    }
+  }
+  
+  // Filter by employer if provided
+  if (employerId) {
+    query.employer = employerId;
+  }
+  
+  const jobs = await Job.find(query)
+    .populate('employer', 'name companyName')
+    .sort({ createdAt: -1 })
+    .limit(50);
+  
+  // Enhance jobs with application information if workerId is provided
+  let enhancedJobs = jobs;
+  if (workerId) {
+    const jobIds = jobs.map(job => job._id);
+    const applications = await JobApplication.find({
+      job: { $in: jobIds },
+      worker: workerId
+    });
+    
+    const applicationMap = {};
+    applications.forEach(app => {
+      applicationMap[app.job.toString()] = app;
+    });
+    
+    enhancedJobs = jobs.map(job => {
+      const jobObj = job.toObject();
+      const application = applicationMap[job._id.toString()];
+      
+      // Map application status to dual status system
+      let workerStatus = jobObj.workerStatus || 'active';
+      let employerStatus = jobObj.employerStatus || 'active';
+      
+      if (application) {
+        // Worker has applied, so worker status is 'applied'
+        workerStatus = 'applied';
+        
+        // Map application status to employer status
+        switch (application.status) {
+          case 'pending':
+            employerStatus = 'active'; // Employer reviewing
+            break;
+          case 'accepted':
+          case 'in-progress':
+            employerStatus = 'accepted'; // Employer accepted worker
+            break;
+          case 'completed':
+            if (application.paymentStatus === 'paid') {
+              workerStatus = 'got paid'; // Worker got paid
+              employerStatus = 'paid'; // Employer paid
+            } else {
+              workerStatus = 'accepted'; // Work completed, waiting for payment
+              employerStatus = 'accepted';
+            }
+            break;
+          case 'rejected':
+          case 'cancelled':
+            workerStatus = 'applied'; // Keep as applied for history
+            employerStatus = 'active'; // Back to active for employer
+            break;
+        }
+      }
+      
+      return {
+        ...jobObj,
+        // Dual status information
+        workerStatus,
+        employerStatus,
+        // Legacy fields for backward compatibility
+        applicationStatus: application ? application.status : null,
+        applicationId: application ? application._id : null,
+        appliedAt: application ? application.createdAt : null,
+        hasApplied: !!application,
+        // Include job reference for progress tracking
+        job: jobObj
+      };
+    });
+  }
+  
+  logger.info(`📋 Found ${enhancedJobs.length} jobs with dual status`);
+  
+  res.json({
+    success: true,
+    jobs: enhancedJobs,
+    count: enhancedJobs.length,
+    statusInfo: {
+      workerStatuses: ['active', 'applied', 'accepted', 'got paid'],
+      employerStatuses: ['active', 'accepted', 'paid'],
+      legacyStatuses: ['active', 'in-progress', 'completed', 'cancelled']
+    }
+  });
+}));
 
 // Create a new job
 router.post('/', asyncHandler(async (req, res) => {

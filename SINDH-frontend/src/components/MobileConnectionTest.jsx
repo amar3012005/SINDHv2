@@ -132,7 +132,7 @@ const MobileConnectionTest = () => {
       <div className="mt-4 text-xs text-gray-600">
         <p><strong>Platform:</strong> {window.Capacitor?.getPlatform?.() || 'unknown'}</p>
         <p><strong>User Agent:</strong> {navigator.userAgent.substring(0, 50)}...</p>
-        <p><strong>API URL:</strong> https://sindh-backend.onrender.com/api</p>
+        <p><strong>API URL:</strong> http://localhost:10000/api</p>
       </div>
     </div>
   );

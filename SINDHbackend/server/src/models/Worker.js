@@ -33,11 +33,15 @@ const workerSchema = new mongoose.Schema({
     type: String,
     trim: true,
     lowercase: true,
+    default: '',
     validate: {
       validator: function(v) {
-        return !v || /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v);
+        // Allow empty string, null, or undefined (optional field)
+        if (!v || v === '' || v.trim() === '') return true;
+        // If value exists, validate email format
+        return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v);
       },
-      message: 'Please enter a valid email'
+      message: 'Please enter a valid email or leave empty'
     }
   },
   gender: {
@@ -50,12 +54,15 @@ const workerSchema = new mongoose.Schema({
   aadharNumber: {
     type: String,
     required: true,
-    unique: true,
+    default: 'not provided',
     validate: {
       validator: function(v) {
+        // Allow 'not provided' for deferred verification
+        if (v === 'not provided') return true;
+        // If value is provided, validate 12-digit format
         return /^\d{12}$/.test(v);
       },
-      message: props => `${props.value} is not a valid Aadhar number! Must be 12 digits.`
+      message: props => `${props.value} is not a valid Aadhar number! Must be 12 digits or 'not provided'.`
     }
   },
   
@@ -424,11 +431,17 @@ workerSchema.methods.generateAuthToken = async function() {
 // Validate phone and aadhar uniqueness
 workerSchema.pre('save', async function(next) {
   console.log('\nChecking phone and aadhar uniqueness...');
+  
+  // Build query conditions
+  const queryConditions = [{ phone: this.phone }];
+  
+  // Only check Aadhar uniqueness if it's not 'not provided'
+  if (this.aadharNumber && this.aadharNumber !== 'not provided') {
+    queryConditions.push({ aadharNumber: this.aadharNumber });
+  }
+  
   const existingWorker = await this.constructor.findOne({
-    $or: [
-      { phone: this.phone },
-      { aadharNumber: this.aadharNumber }
-    ],
+    $or: queryConditions,
     _id: { $ne: this._id }
   });
   
@@ -437,7 +450,7 @@ workerSchema.pre('save', async function(next) {
       console.error('Phone number already exists:', this.phone);
       throw new Error('Phone number already registered');
     }
-    if (existingWorker.aadharNumber === this.aadharNumber) {
+    if (existingWorker.aadharNumber === this.aadharNumber && this.aadharNumber !== 'not provided') {
       console.error('Aadhar number already exists:', this.aadharNumber);
       throw new Error('Aadhar number already registered');
     }
