@@ -1,195 +1,133 @@
-const Notification = require('../models/Notification');
-
 class NotificationService {
-  static async createNotification({
-    recipient,
-    recipientModel,
-    sender = null,
-    senderModel = 'System',
-    type,
-    title,
-    message,
-    data = {}
-  }) {
-    try {
-      const notification = new Notification({
-        recipient,
-        recipientModel,
-        sender,
-        senderModel,
-        type,
-        title,
-        message,
-        data,
-        isRead: false
-      });
-
-      await notification.save();
-      console.log('✓ Notification created:', { recipient, type, title });
-      return notification;
-    } catch (error) {
-      console.error('Error creating notification:', error);
-      throw error;
-    }
+  constructor() {
+    // Always use development mode for now
+    this.isDevelopment = true;
   }
 
-  static async getNotifications(userId, userType, limit = 20, page = 1) {
-    try {
-      const skip = (page - 1) * limit;
-      
-      const notifications = await Notification.find({
-        recipient: userId,
-        recipientModel: userType === 'worker' ? 'Worker' : 'Employer'
-      })
-      .populate('data.jobId', 'title companyName')
-      .populate('sender', 'name')
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .skip(skip);
-
-      const unreadCount = await Notification.countDocuments({
-        recipient: userId,
-        recipientModel: userType === 'worker' ? 'Worker' : 'Employer',
-        isRead: false
-      });
-
-      return {
-        notifications,
-        unreadCount,
-        totalCount: await Notification.countDocuments({
-          recipient: userId,
-          recipientModel: userType === 'worker' ? 'Worker' : 'Employer'
-        })
-      };
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      throw error;
+  // Send SMS notification
+  async sendSMS(to, message) {
+    if (!to || !message) {
+      throw new Error('Phone number and message are required for SMS notification');
     }
+
+    console.log('\n=== SMS Notification ===');
+    console.log(`To: ${to}`);
+    console.log(`Message: ${message}`);
+    console.log('========================');
+    return { status: 'success', development: true };
   }
 
-  static async markAsRead(notificationId, userId) {
-    try {
-      const notification = await Notification.findOneAndUpdate(
-        { _id: notificationId, recipient: userId },
-        { isRead: true, readAt: new Date() },
-        { new: true }
-      );
-
-      return notification;
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      throw error;
+  // Make a missed call
+  async makeMissedCall(to) {
+    if (!to) {
+      throw new Error('Phone number is required for missed call notification');
     }
+
+    console.log('\n=== Missed Call Notification ===');
+    console.log(`To: ${to}`);
+    console.log('==============================');
+    return { status: 'success', development: true };
   }
 
-  static async markAllAsRead(userId, userType) {
-    try {
-      await Notification.updateMany(
-        { 
-          recipient: userId, 
-          recipientModel: userType === 'worker' ? 'Worker' : 'Employer',
-          isRead: false 
-        },
-        { isRead: true, readAt: new Date() }
-      );
-
-      return true;
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-      throw error;
+  // Notify worker about new job
+  async notifyWorkerAboutJob(worker, job) {
+    if (!worker || !job) {
+      throw new Error('Worker and job details are required for job notification');
     }
-  }
 
-  // Specific notification creators
-  static async notifyApplicationAccepted(application, job, employer) {
-    if (!employer) {
-      console.warn('⚠️ Cannot send notification: employer is null');
-      return null;
-    }
+    console.log('\n=== Job Alert Notification ===');
+    console.log(`To: ${worker.name} (${worker.phone})`);
+    console.log(`Type: New Job Opportunity`);
+    console.log(`Job: ${job.title}`);
+    console.log(`Location: ${job.location.city}, ${job.location.state}`);
+    console.log(`Salary: ₹${job.salary} per day`);
+    console.log(`Duration: ${job.duration}`);
+    console.log('============================');
     
-    return this.createNotification({
-      recipient: application.worker,
-      recipientModel: 'Worker',
-      sender: employer._id,
-      senderModel: 'Employer',
-      type: 'application_accepted',
-      title: 'Application Accepted! 🎉',
-      message: `Great news! Your application for "${job.title}" at ${employer.company?.name || employer.name} has been accepted. You can now start working on this job.`,
-      data: {
-        jobId: job._id,
-        applicationId: application._id,
-        employerId: employer._id
-      }
-    });
+    // Send SMS
+    await this.sendSMS(
+      worker.phone, 
+      `New job alert! ${job.title} in ${job.location.city}. Salary: ₹${job.salary} per day. Duration: ${job.duration}. Reply YES to apply.`
+    );
+    
+    // In development mode, send missed call immediately
+    if (this.isDevelopment) {
+      await this.makeMissedCall(worker.phone);
+    } else {
+      // In production, we would handle this differently
+      setTimeout(async () => {
+        await this.makeMissedCall(worker.phone);
+      }, 1000);
+    }
+
+    return { status: 'success', notifications: ['sms', 'missed-call'] };
   }
 
-  static async notifyApplicationRejected(application, job, employer) {
-    return this.createNotification({
-      recipient: application.worker,
-      recipientModel: 'Worker',
-      sender: employer._id,
-      senderModel: 'Employer',
-      type: 'application_rejected',
-      title: 'Application Update',
-      message: `Thank you for your interest in "${job.title}" at ${employer.company?.name || employer.name}. Unfortunately, your application was not selected this time. Keep applying for other opportunities!`,
-      data: {
-        jobId: job._id,
-        applicationId: application._id,
-        employerId: employer._id
-      }
-    });
+  // Notify employer about worker application
+  async notifyEmployerAboutApplication(employer, worker, job) {
+    if (!employer || !worker || !job) {
+      throw new Error('Employer, worker, and job details are required for application notification');
+    }
+
+    console.log('\n=== Application Alert Notification ===');
+    console.log(`To: ${employer.name} (${employer.phone})`);
+    console.log(`Type: New Job Application`);
+    console.log(`Job: ${job.title}`);
+    console.log(`Applicant: ${worker.name}`);
+    console.log(`Skills: ${worker.skills.join(', ')}`);
+    console.log(`Experience: ${worker.experience_years} years`);
+    console.log('====================================');
+    
+    await this.sendSMS(
+      employer.phone,
+      `New application! ${worker.name} has applied for your job: ${job.title}. Check your dashboard for details.`
+    );
+
+    return { status: 'success', notifications: ['sms'] };
   }
 
-  static async notifyJobStarted(application, job, employer) {
-    return this.createNotification({
-      recipient: application.worker,
-      recipientModel: 'Worker',
-      sender: employer._id,
-      senderModel: 'Employer',
-      type: 'job_started',
-      title: 'Job Started! 🚀',
-      message: `Your work on "${job.title}" has been marked as started by ${employer.company?.name || employer.name}. Good luck with your new assignment!`,
-      data: {
-        jobId: job._id,
-        applicationId: application._id,
-        employerId: employer._id
-      }
-    });
+  // Notify worker about application status
+  async notifyWorkerAboutStatus(worker, job, status) {
+    if (!worker || !job || !status) {
+      throw new Error('Worker, job, and status details are required for status notification');
+    }
+
+    console.log('\n=== Application Status Notification ===');
+    console.log(`To: ${worker.name} (${worker.phone})`);
+    console.log(`Type: Application Status Update`);
+    console.log(`Job: ${job.title}`);
+    console.log(`Status: ${status}`);
+    console.log('=====================================');
+
+    const message = status === 'accepted'
+      ? `Congratulations! You've been selected for the job: ${job.title}. Please check your dashboard for details.`
+      : `Update on your application for ${job.title}: Your application was not selected this time. Keep applying!`;
+
+    await this.sendSMS(worker.phone, message);
+    return { status: 'success', notifications: ['sms'] };
   }
 
-  static async notifyJobCompleted(application, job, employer) {
-    return this.createNotification({
-      recipient: application.worker,
-      recipientModel: 'Worker',
-      sender: employer._id,
-      senderModel: 'Employer',
-      type: 'job_completed',
-      title: 'Job Completed! ✅',
-      message: `Congratulations! Your work on "${job.title}" has been marked as completed by ${employer.company?.name || employer.name}. Great job!`,
-      data: {
-        jobId: job._id,
-        applicationId: application._id,
-        employerId: employer._id
-      }
-    });
-  }
+  // Remind worker about upcoming job
+  async sendJobReminder(worker, job) {
+    if (!worker || !job) {
+      throw new Error('Worker and job details are required for job reminder');
+    }
 
-  static async notifyNewApplication(application, job, worker, employer) {
-    return this.createNotification({
-      recipient: employer._id,
-      recipientModel: 'Employer',
-      sender: worker._id,
-      senderModel: 'Worker',
-      type: 'new_application',
-      title: 'New Job Application 📋',
-      message: `${worker.name} has applied for your job "${job.title}". Review their application and decide whether to accept or reject.`,
-      data: {
-        jobId: job._id,
-        applicationId: application._id,
-        workerId: worker._id
-      }
-    });
+    console.log('\n=== Job Reminder Notification ===');
+    console.log(`To: ${worker.name} (${worker.phone})`);
+    console.log(`Type: Job Start Reminder`);
+    console.log(`Job: ${job.title}`);
+    console.log(`Location: ${job.location.city}, ${job.location.state}`);
+    console.log(`Duration: ${job.duration}`);
+    console.log('================================');
+
+    await this.sendSMS(
+      worker.phone,
+      `Reminder: Your job ${job.title} starts tomorrow at ${job.location.city}. Don't forget!`
+    );
+
+    return { status: 'success', notifications: ['sms'] };
   }
 }
 
-module.exports = NotificationService;
+module.exports = new NotificationService(); 
