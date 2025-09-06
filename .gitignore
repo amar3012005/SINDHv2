@@ -10,6 +10,11 @@ node_modules/
 /build
 /dist
 
+# Python virtual environment
+SINDH-Agentic/venv/
+**/venv/
+**/__pycache__/
+
 # Misc
 .DS_Store
 .env
@@ -21,6 +26,14 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Logs
+*.log
+combined.log
+
+# Audio files
+*.wav
+*.wav.json
 
 # IDE
 .idea/
