@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, User, Award, MapPin, FileText, Phone, Mail, Briefcase, Languages, Smile, Sparkles, Rocket, Handshake, Lightbulb, ShieldCheck, Wallet } from 'lucide-react';
+import { CheckCircle, User, Award, MapPin, FileText, Phone, Mail, Briefcase, Languages, Sparkles, ShieldCheck } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
@@ -133,6 +133,16 @@ const EnhancedWorkerRegistration = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [completedSteps, setCompletedSteps] = useState(new Set());
+
+  // Pre-fill phone number from login if available
+  useEffect(() => {
+    if (location.state?.phoneNumber) {
+      setFormData(prev => ({
+        ...prev,
+        phone: location.state.phoneNumber
+      }));
+    }
+  }, [location.state]);
 
   const skillOptions = [
     'Construction', 'Carpentry', 'Masonry', 'Plumbing', 'Electrical', 'Painting', 

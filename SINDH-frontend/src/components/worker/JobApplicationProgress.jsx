@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   Clock, 
   CheckCircle, 
@@ -9,8 +9,6 @@ import {
   MapPin,
   Calendar,
   AlertCircle,
-  Star,
-  TrendingUp,
   Award
 } from 'lucide-react';
 import { getApiUrl } from '../../utils/apiUtils.js';
@@ -19,6 +17,25 @@ const JobApplicationProgress = ({ applicationId, workerStatus, employerStatus, a
   const [application, setApplication] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
+
+  const fetchApplicationStatus = async () => {
+    try {
+      const response = await fetch(`${getApiUrl()}/job-applications/${applicationId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setApplication(data);
+        updateCurrentStep(data.workerStatus, data.employerStatus);
+        // Notify parent component of status change
+        if (onStatusChange) {
+          onStatusChange({ workerStatus: data.workerStatus, employerStatus: data.employerStatus });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching application status:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     console.log('🔄 JobApplicationProgress props:', { 
@@ -64,26 +81,7 @@ const JobApplicationProgress = ({ applicationId, workerStatus, employerStatus, a
       console.log('⚠️ No status props or applicationId provided');
       setLoading(false);
     }
-  }, [applicationId, workerStatus, employerStatus, applicationStatus, jobData]);
-
-  const fetchApplicationStatus = async () => {
-    try {
-      const response = await fetch(`${getApiUrl()}/job-applications/${applicationId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setApplication(data);
-        updateCurrentStep(data.workerStatus, data.employerStatus);
-        // Notify parent component of status change
-        if (onStatusChange) {
-          onStatusChange({ workerStatus: data.workerStatus, employerStatus: data.employerStatus });
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching application status:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [applicationId, workerStatus, employerStatus, applicationStatus, jobData, fetchApplicationStatus]);
 
   const mapLegacyStatusToDualStatus = (applicationStatus) => {
     console.log('🔄 Mapping legacy status:', applicationStatus);
@@ -237,7 +235,6 @@ const JobApplicationProgress = ({ applicationId, workerStatus, employerStatus, a
 
   const progressPercentage = getProgressPercentage();
   const currentStepConfig = getStepConfig(currentStep);
-  const statusText = getDualStatusText();
 
   return (
     <motion.div

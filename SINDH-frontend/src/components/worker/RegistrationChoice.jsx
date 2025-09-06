@@ -2,12 +2,10 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageCircle, FileText, Sparkles, Clock, Users, CheckCircle } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 const RegistrationChoice = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useTranslation();
   const phoneNumber = location.state?.phoneNumber;
 
   const handleChatRegistration = () => {

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { 
   User, Award, MapPin, FileText, Phone, Mail, Calendar, 
-  Edit, Settings, Briefcase, ChevronRight, TrendingUp,
+  Edit, Settings, Briefcase, TrendingUp,
   CheckCircle, AlertCircle, Eye, Clock, Star,
   Loader, RefreshCw, ArrowLeft, Languages, DollarSign
 } from 'lucide-react';
@@ -553,6 +553,8 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
     return Math.min(score, 100); // Cap at 100
   };
 
+  // Unused functions removed to fix linting warnings
+  /*
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -639,6 +641,7 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
       setIsLoading(false);
     }
   };
+  */
 
   // Helper functions
   const getInitials = (name) => {
@@ -646,6 +649,7 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
     return name.split(' ').map(word => word[0]).join('').toUpperCase();
   };
 
+  /*
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
@@ -658,6 +662,7 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
       return 'N/A';
     }
   };
+  */
 
   const formatLocation = (location) => {
     if (!location) return 'Location not specified';
