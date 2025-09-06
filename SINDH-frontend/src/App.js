@@ -9,7 +9,7 @@ import './styles/mobile.css';
 
 // Context Providers
 import { UserProvider } from './context/UserContext';
-import { LanguageProvider } from './context/LanguageContext';
+import { LanguageProvider } from './context/LanguageContext.jsx';
 
 // Components
 import Navbar from './components/Navbar';
