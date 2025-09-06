@@ -1,10 +1,28 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Menu } from 'lucide-react';
 
 function Login() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Language and menu controls
+  const [isHindi, setIsHindi] = useState(localStorage.getItem('language') === 'hi');
+  const [showPageMenu, setShowPageMenu] = useState(false);
+
+  const toggleLang = () => {
+    const newLang = isHindi ? 'en' : 'hi';
+    setIsHindi(!isHindi);
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('language', newLang);
+  };
+
+  const navigateToPage = (path) => {
+    navigate(path);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -12,7 +30,32 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-green-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-green-50 relative">
+      {/* Top navigation controls */}
+      <div className="absolute top-4 left-4 md:top-6 md:left-6 z-30">
+        <button 
+          onClick={() => navigateToPage('/')}
+          className="p-2 md:p-3 rounded-xl bg-white/20 border border-orange-200 hover:bg-white/30 transition-colors"
+        >
+          <ArrowLeft className="w-5 md:w-6 h-5 md:h-6 text-gray-700" />
+        </button>
+      </div>
+      
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-3 z-30">
+        <button 
+          onClick={toggleLang} 
+          className="px-2.5 py-1 rounded-full text-xs md:text-sm bg-white/20 border border-orange-200 text-gray-700 hover:bg-white/30"
+        >
+          {isHindi ? 'HI' : 'EN'}
+        </button>
+        <button 
+          onClick={() => setShowPageMenu(v=>!v)} 
+          className="p-2 md:p-3 rounded-xl bg-white/20 border border-orange-200 hover:bg-white/30 transition-colors"
+        >
+          <Menu className="w-5 md:w-6 h-5 md:h-6 text-gray-700" />
+        </button>
+      </div>
+
       <div className="w-full max-w-md p-8 bg-white/90 rounded-2xl shadow-xl border-2 border-orange-100">
         <h2 className="text-3xl font-bold text-center text-gray-900 mb-6">
           {t('auth.loginTitle')}

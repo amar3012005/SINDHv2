@@ -1,0 +1,1393 @@
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Plus, 
+  MapPin, 
+  DollarSign, 
+  Users, 
+  Calendar,
+  Eye,
+  Edit,
+  Trash2,
+  RefreshCw,
+  Briefcase,
+  AlertCircle,
+  Clock,
+  CheckCircle,
+  X,
+  Building,
+  Award,
+  PlayCircle,
+  Phone,
+  Filter,
+  Search,
+  BarChart3,
+  Target,
+  Star,
+  ArrowLeft,
+  Menu
+} from 'lucide-react';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { useTranslation } from 'react-i18next';
+import 'swiper/css';
+
+const PostedJobs = () => {
+  const { jobId } = useParams?.() || {};
+  const location = useLocation?.() || {};
+  const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+
+  // Memoized JobCard component for better performance
+  const JobCard = React.memo(({ job, applications, stats, isNewlyPosted, jobRefs, handleViewApplications, handleDeleteJob, formatDate, getStatusIcon }) => (
+    <motion.div
+      ref={el => jobRefs.current[job._id] = el}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className={`bg-white/5 border border-white/10 text-white rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 mx-1 backdrop-blur-md ${
+        isNewlyPosted ? 'ring-2 ring-green-400/60' : ''
+      }`}
+    >
+      {/* Status Banner */}
+      <div className="px-3 sm:px-4 py-2 bg-white/10 border-b border-white/10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            {getStatusIcon(job.status)}
+            <span className="ml-2 text-xs sm:text-sm font-medium text-white/90">
+              {job.status?.charAt(0).toUpperCase() + job.status?.slice(1)}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-white/70">
+              {formatDate(job.createdAt)}
+            </span>
+            {stats.unpaidApplications > 0 && (
+              <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                Payment Due
+              </span>
+            )}
+          </div>
+        </div>
+        
+        {/* Elemental Color Scheme Row */}
+        <div className="mt-3 flex items-center justify-center gap-4 px-2">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 shadow-sm"></div>
+            <span className="text-xs text-white/60">Pending</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-400 to-green-500 shadow-sm"></div>
+            <span className="text-xs text-white/60">Accepted</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-cyan-500 shadow-sm"></div>
+            <span className="text-xs text-white/60">Active</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-400 to-violet-500 shadow-sm"></div>
+            <span className="text-xs text-white/60">Done</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Job Details */}
+      <div className="p-4 sm:p-6">
+        {/* Salary Display */}
+        <div className="mb-4">
+          <div className="relative">
+            <div className="text-2xl sm:text-3xl font-bold mb-1 bg-gradient-to-r from-green-300 to-emerald-400 bg-clip-text text-transparent">
+              ₹{job.salary?.toLocaleString() || 0}
+            </div>
+            <div className="absolute -bottom-1 left-0 w-12 h-1 bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"></div>
+          </div>
+        </div>
+
+        {/* Job Title and Company */}
+        <div className="mb-4">
+          <h3 className="text-lg sm:text-xl font-semibold text-white mb-1">
+            {job.title}
+          </h3>
+          <div className="flex items-center text-white/70 mb-2">
+            <Building className="w-4 h-4 mr-1" />
+            <span className="text-sm">{job.category}</span>
+          </div>
+          <div className="flex items-center text-white/70">
+            <MapPin className="w-4 h-4 mr-1" />
+            <span className="text-sm">
+              {job.location?.city}, {job.location?.state}
+            </span>
+          </div>
+        </div>
+
+        {/* Applications Summary with Progress Bar */}
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-sm font-medium text-white/80">Job Progress</span>
+            <span className="text-sm font-bold text-white">{stats.totalApps} applicants</span>
+          </div>
+          
+          {/* Enhanced Progress Bar - Optimized */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-white font-medium">{stats.progressPercentage}%</span>
+            </div>
+            <div className="relative">
+              {/* Background track */}
+              <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden border border-white/5">
+                {/* Multi-segment progress bar */}
+                <div className="h-full flex">
+                  {/* Pending segment */}
+                  {stats.pendingCount > 0 && (
+                    <div 
+                      className="bg-gradient-to-r from-amber-400 to-yellow-500 transition-all duration-1000 ease-out"
+                      style={{ width: `${(stats.pendingCount / stats.totalApps) * 100}%` }}
+                    />
+                  )}
+                  {/* Accepted segment */}
+                  {stats.acceptedCount > 0 && (
+                    <div 
+                      className="bg-gradient-to-r from-emerald-400 to-green-500 transition-all duration-1000 ease-out"
+                      style={{ width: `${(stats.acceptedCount / stats.totalApps) * 100}%` }}
+                    />
+                  )}
+                  {/* In Progress segment */}
+                  {stats.inProgressCount > 0 && (
+                    <div 
+                      className="bg-gradient-to-r from-blue-400 to-cyan-500 transition-all duration-1000 ease-out relative"
+                      style={{ width: `${(stats.inProgressCount / stats.totalApps) * 100}%` }}
+                    >
+                      {/* Active pulse for in-progress */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-300/50 to-cyan-300/50 animate-pulse" />
+                    </div>
+                  )}
+                  {/* Completed segment */}
+                  {stats.completedCount > 0 && (
+                    <div 
+                      className="bg-gradient-to-r from-purple-400 to-violet-500 transition-all duration-1000 ease-out relative"
+                      style={{ width: `${(stats.completedCount / stats.totalApps) * 100}%` }}
+                    >
+                      {/* Shimmer effect for completed section */}
+                      <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Stage-based glow effect */}
+              {stats.totalApps > 0 && stats.progressPercentage > 0 && (
+                <div 
+                  className={`absolute top-0 h-2.5 rounded-full blur-sm transition-all duration-1000 ${
+                    stats.progressPercentage === 25 ? 'bg-gradient-to-r from-amber-400/30 to-yellow-400/30' :
+                    stats.progressPercentage === 50 ? 'bg-gradient-to-r from-emerald-400/30 to-green-400/30' :
+                    stats.progressPercentage === 75 ? 'bg-gradient-to-r from-blue-400/30 to-cyan-400/30' :
+                    stats.progressPercentage === 100 ? 'bg-gradient-to-r from-purple-400/30 to-violet-400/30' :
+                    'bg-gradient-to-r from-gray-400/30 to-gray-400/30'
+                  }`}
+                  style={{ width: `${stats.progressPercentage}%` }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Simplified Stats - Only show non-zero values - Optimized */}
+          {stats.nonZeroStats.length > 0 && (
+            <div className="flex gap-3 text-xs justify-center">
+              {stats.nonZeroStats.map(stat => (
+                <div key={stat.status} className="flex items-center">
+                  <div className={`w-2 h-2 bg-${stat.color} rounded-full mr-1.5`}></div>
+                  <span className="text-white/70">{stat.count} {stat.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Payment Status - Optimized */}
+        {stats.completedCount > 0 && (
+          <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center text-white/90">
+                <DollarSign className="w-4 h-4 mr-2" />
+                <span className="text-sm font-medium">Payment Status</span>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-white/70">
+                  {stats.unpaidApplications > 0 ? 'Payments Pending' : 'All Paid'}
+                </div>
+                <div className="text-sm font-bold text-white">
+                  {stats.unpaidApplications} pending
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 mt-4">
+          <button 
+            onClick={() => handleViewApplications(job)}
+            className="flex-1 flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all text-sm font-medium shadow-lg hover:shadow-xl"
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">View Applications</span>
+            <span className="sm:hidden">View</span>
+          </button>
+          <button 
+            onClick={() => handleDeleteJob(job._id)}
+            className="px-4 py-2.5 bg-white/10 border border-white/15 text-white/80 hover:text-white hover:bg-red-600/80 hover:border-red-500/50 rounded-lg transition-all text-sm font-medium"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  ), (prevProps, nextProps) => {
+    // Custom comparison function for React.memo
+    return (
+      prevProps.job._id === nextProps.job._id &&
+      prevProps.applications.length === nextProps.applications.length &&
+      JSON.stringify(prevProps.stats) === JSON.stringify(nextProps.stats) &&
+      prevProps.isNewlyPosted === nextProps.isNewlyPosted
+    );
+  });
+  const [showSuccess, setShowSuccess] = useState(false);
+  const jobRefs = useRef({});
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedJobForPayment, setSelectedJobForPayment] = useState(null);
+  const [jobApplications, setJobApplications] = useState({});
+  const [showApplicationsModal, setShowApplicationsModal] = useState(false);
+  const [selectedJobApplications, setSelectedJobApplications] = useState(null);
+  const [selectedApplicationStatus, setSelectedApplicationStatus] = useState('all');
+
+  // Language and menu controls
+  const [lang, setLang] = useState(() => {
+    const stored = localStorage.getItem('homeLang');
+    if (stored === 'HI' || stored === 'EN') return stored;
+    return (i18n.language && i18n.language.toLowerCase() === 'hi') ? 'HI' : 'EN';
+  });
+  const [showPageMenu, setShowPageMenu] = useState(false);
+  const isHindi = lang === 'HI';
+  
+  const toggleLang = () => {
+    const next = isHindi ? 'EN' : 'HI';
+    setLang(next);
+    localStorage.setItem('homeLang', next);
+    i18n.changeLanguage(next.toLowerCase());
+  };
+
+  // Memoize filtered jobs to prevent unnecessary recalculations
+  const filteredJobs = useMemo(() => {
+    if (filterStatus === 'all') return jobs;
+    return jobs.filter(job => job.status === filterStatus);
+  }, [jobs, filterStatus]);
+
+  // Memoize expensive calculations
+  const jobStats = useMemo(() => {
+    return jobs.reduce((acc, job) => {
+      acc.total++;
+      acc[job.status] = (acc[job.status] || 0) + 1;
+      return acc;
+    }, { total: 0 });
+  }, [jobs]);
+
+  // Memoize application statistics for each job to prevent recalculation on every render
+  const jobApplicationStats = useMemo(() => {
+    const stats = {};
+    Object.entries(jobApplications).forEach(([jobId, applications]) => {
+      const totalApps = applications.length;
+      const pendingCount = applications.filter(app => app.status === 'pending').length;
+      const acceptedCount = applications.filter(app => app.status === 'accepted').length;
+      const inProgressCount = applications.filter(app => app.status === 'in-progress').length;
+      const completedCount = applications.filter(app => app.status === 'completed').length;
+      const unpaidApplications = applications.filter(app => app.status === 'completed' && app.paymentStatus !== 'paid');
+      
+      // Stage-based progress calculation: 0% -> 25% -> 50% -> 75% -> 100%
+      let progressPercentage = 0;
+      if (totalApps === 0) {
+        progressPercentage = 0; // No applications
+      } else if (completedCount > 0) {
+        progressPercentage = 100; // Work completed
+      } else if (inProgressCount > 0) {
+        progressPercentage = 75; // Work in progress
+      } else if (acceptedCount > 0) {
+        progressPercentage = 50; // Applications accepted
+      } else if (pendingCount > 0) {
+        progressPercentage = 25; // Applications received
+      }
+
+      stats[jobId] = {
+        totalApps,
+        pendingCount,
+        acceptedCount,
+        inProgressCount,
+        completedCount,
+        unpaidApplications: unpaidApplications.length,
+        progressPercentage,
+        // Pre-calculate non-zero stats for simplified display
+        nonZeroStats: [
+          { status: 'pending', count: pendingCount, color: 'yellow-400', label: 'Pending' },
+          { status: 'accepted', count: acceptedCount, color: 'green-400', label: 'Accepted' },
+          { status: 'in-progress', count: inProgressCount, color: 'blue-400', label: 'Active' },
+          { status: 'completed', count: completedCount, color: 'purple-400', label: 'Done' }
+        ].filter(stat => stat.count > 0)
+      };
+    });
+    return stats;
+  }, [jobApplications]);
+
+  // Optimize API calls with useCallback
+  const fetchJobs = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      
+      if (!user.id || user.type !== 'employer') {
+        setError('You must be logged in as an employer to view posted jobs');
+        return;
+      }
+
+      const response = await fetch(`https://sindh-backend.onrender.com/api/jobs/employer/${user.id}`);
+      
+      if (response.ok) {
+        let jobsData = await response.json();
+        jobsData = Array.isArray(jobsData) ? jobsData : [];
+        // Sort jobs by createdAt descending (latest first)
+        jobsData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setJobs(jobsData);
+        
+        // Fetch applications for each job in parallel (optimized)
+        if (jobsData.length > 0) {
+          // Don't wait for applications to load before showing jobs
+          fetchJobApplications(jobsData);
+        }
+        
+        // If jobId is present, scroll to or highlight it after jobs load
+        setTimeout(() => {
+          if (jobId && jobRefs.current[jobId]) {
+            jobRefs.current[jobId].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 500);
+      } else {
+        throw new Error('Failed to fetch jobs');
+      }
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      setError(error.message);
+      setJobs([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [jobId]);
+
+  const fetchJobApplications = useCallback(async (jobs) => {
+    try {
+      // Batch API calls with limited concurrency to prevent overwhelming the server
+      const BATCH_SIZE = 5;
+      const batches = [];
+      
+      for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
+        batches.push(jobs.slice(i, i + BATCH_SIZE));
+      }
+
+      const applicationsMap = {};
+      
+      // Process batches sequentially to prevent server overload
+      for (const batch of batches) {
+        const batchPromises = batch.map(async (job) => {
+          try {
+            const response = await fetch(`https://sindh-backend.onrender.com/api/job-applications/job/${job._id}`);
+            if (response.ok) {
+              const data = await response.json();
+              return { jobId: job._id, applications: data.data || [] };
+            }
+            return { jobId: job._id, applications: [] };
+          } catch (error) {
+            console.error(`Error fetching applications for job ${job._id}:`, error);
+            return { jobId: job._id, applications: [] };
+          }
+        });
+
+        // Wait for current batch to complete
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Update map with batch results
+        batchResults.forEach(({ jobId, applications }) => {
+          applicationsMap[jobId] = applications;
+        });
+        
+        // Update state after each batch for progressive loading
+        setJobApplications(prev => ({ ...prev, ...applicationsMap }));
+      }
+    } catch (error) {
+      console.error('Error fetching job applications:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchJobs();
+    // Show success message if redirected from chat-based posting
+    if (location?.state?.jobPosted || location?.search?.includes('success=1')) {
+      setShowSuccess(true);
+      // Optionally clear the state after showing
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+  }, [fetchJobs, location?.state?.jobPosted, location?.search]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchJobs();
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm('Are you sure you want to delete this job?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://sindh-backend.onrender.com/api/jobs/${jobId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setJobs(jobs.filter(job => job._id !== jobId));
+        alert('Job deleted successfully');
+      } else {
+        throw new Error('Failed to delete job');
+      }
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      alert('Failed to delete job: ' + error.message);
+    }
+  };
+
+  const handlePayWorker = (job, application) => {
+    // Set the selected job and application for payment
+    setSelectedJobForPayment({ job, application });
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentComplete = () => {
+    setShowPaymentModal(false);
+    setSelectedJobForPayment(null);
+    fetchJobs(); // Refresh to show updated payment status
+  };
+
+  const handleViewApplications = (job) => {
+    const applications = jobApplications[job._id] || [];
+    console.log('Opening applications modal for job:', job.title, 'Applications:', applications.length);
+    setSelectedJobApplications({ job, applications });
+    setShowApplicationsModal(true);
+  };
+
+  const updateApplicationStatus = async (applicationId, newStatus) => {
+    try {
+      console.log('Updating application status:', applicationId, 'to:', newStatus);
+      
+      const response = await fetch(`https://sindh-backend.onrender.com/api/job-applications/${applicationId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Application status updated successfully:', result);
+        
+        // Refresh jobs data to show updated status
+        fetchJobs();
+        
+        // Show success message
+        alert(`Application ${newStatus} successfully!`);
+        
+        // If modal is open, close and reopen to refresh data
+        if (showApplicationsModal && selectedJobApplications) {
+          setShowApplicationsModal(false);
+          setTimeout(() => {
+            handleViewApplications(selectedJobApplications.job);
+          }, 500);
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update application status');
+      }
+    } catch (error) {
+      console.error('Error updating application status:', error);
+      alert('Failed to update application status: ' + error.message);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'in-progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
+      case 'paused':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'active':
+        return <Eye className="w-4 h-4" />;
+      case 'in-progress':
+        return <Clock className="w-4 h-4" />;
+      case 'completed':
+        return <CheckCircle className="w-4 h-4" />;
+      default:
+        return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden flex items-center justify-center">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)' }} />
+          <div className="startrails absolute inset-0" />
+        </div>
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin text-white mx-auto mb-4" />
+          <p className="text-white/70">Loading your posted jobs...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden devanagari">
+      {/* Background aesthetics (mirror homepage) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)' }} />
+        <div className="startrails absolute inset-0" />
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        <div className="absolute inset-0 opacity-10 noise-bg mix-blend-overlay" />
+        <div className="aurora absolute inset-0">
+          <span className="aurora-blob aurora-a" />
+          <span className="aurora-blob aurora-b" />
+          <span className="aurora-blob aurora-c" />
+        </div>
+      </div>
+
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-3 z-30">
+        <button 
+          onClick={toggleLang} 
+          className="px-2.5 py-1 rounded-full text-xs md:text-sm bg-white/10 border border-white/15 text-white/90 hover:bg-white/15"
+        >
+          {isHindi ? 'HI' : 'EN'}
+        </button>
+        <button 
+          onClick={() => setShowPageMenu(v=>!v)} 
+          className="p-2 md:p-3 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition-colors"
+        >
+          <Menu className="w-5 md:w-6 h-5 md:h-6 text-white" />
+        </button>
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 md:pt-12 pb-4 md:pb-8">
+        {/* Success Message for new job posting */}
+        {showSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/5 border border-green-400/30 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-green-200"
+          >
+            <div className="flex items-center">
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+              <p className="text-sm sm:text-base">Job posted successfully! Your job is now live and visible to workers.</p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-2">
+              My Posted Jobs
+            </h1>
+            <p className="mt-2 sm:mt-3 max-w-2xl text-base sm:text-xl text-white/70">
+              Manage your job postings and track applications
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3 mt-4 sm:mt-0">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className={`group w-10 h-10 sm:w-11 sm:h-11 rounded-full transition-all duration-300 flex items-center justify-center overflow-hidden ${
+                refreshing 
+                  ? 'bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 cursor-not-allowed shadow-lg shadow-blue-300/30' 
+                  : 'bg-gradient-to-br from-slate-600 via-slate-700 to-gray-800 hover:from-blue-600 hover:via-indigo-700 hover:to-purple-700 shadow-md hover:shadow-lg hover:shadow-blue-200/40 hover:scale-105 active:scale-95'
+              }`}
+              title={refreshing ? 'Refreshing...' : 'Refresh Jobs'}
+            >
+              <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 text-white transition-all duration-300 ${
+                refreshing 
+                  ? 'animate-spin' 
+                  : 'group-hover:rotate-180 group-hover:scale-105'
+              }`} />
+            </button>
+            
+            <button
+              onClick={() => window.location.href = '/employer/post-job'}
+              className="flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-blue-200/40 hover:scale-105"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Post New Job
+            </button>
+          </div>
+        </div>
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-white/5 border border-red-400/30 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-red-200">
+            <div className="flex items-center">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+              <p className="text-sm sm:text-base">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Card */}
+        <div className="relative rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 text-white bg-white/5 border border-white/10 backdrop-blur-md overflow-hidden">
+          <div className="absolute -inset-10 opacity-20 blur-3xl bg-gradient-to-br from-blue-300/30 to-purple-300/20 pointer-events-none" />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-white/70">Total Jobs Posted</div>
+                <div className="mt-1 text-3xl font-extrabold tracking-tight">{jobStats.total}</div>
+              </div>
+              <div className="px-2 py-1 text-[10px] rounded-full bg-white/10 border border-white/15 text-white/80">ACTIVE</div>
+            </div>
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] text-white/80">
+                <CheckCircle className="w-3.5 h-3.5" />
+                <span>Active · </span>
+                <span className="text-white">{jobStats.active + jobStats['in-progress'] || 0}</span>
+              </div>
+            
+              <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] text-white/80">
+                <Award className="w-3.5 h-3.5" />
+                <span>Completed · </span>
+                <span className="text-white">{jobStats.completed || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Jobs Grid */}
+        {filteredJobs.length === 0 ? (
+          <div className="text-center py-8 sm:py-12">
+            <Briefcase className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-300" />
+            <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
+              {filterStatus === 'all' ? 'No Jobs Posted Yet' : `No ${filterStatus} Jobs`}
+            </h3>
+            <p className="text-white/70 mb-4 sm:mb-6 text-sm sm:text-base px-4">
+              {filterStatus === 'all' 
+                ? 'Start by posting your first job to find workers' 
+                : `You don't have any ${filterStatus} jobs at the moment`}
+            </p>
+            {filterStatus === 'all' && (
+              <button
+                onClick={() => window.location.href = '/employer/post-job'}
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-blue-200/40"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Post Your First Job
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="w-full">
+            <Swiper
+              spaceBetween={16}
+              slidesPerView={1.1}
+              breakpoints={{
+                640: { slidesPerView: 1.5 },
+                768: { slidesPerView: 2.2 },
+                1024: { slidesPerView: 3.2 },
+              }}
+              style={{ paddingBottom: '2rem' }}
+            >
+              {filteredJobs.map((job) => {
+                const applications = jobApplications[job._id] || [];
+                const stats = jobApplicationStats[job._id] || {
+                  totalApps: 0,
+                  pendingCount: 0,
+                  acceptedCount: 0,
+                  inProgressCount: 0,
+                  completedCount: 0,
+                  unpaidApplications: 0,
+                  progressPercentage: 0,
+                  nonZeroStats: []
+                };
+                const isNewlyPosted = jobId && job._id === jobId;
+
+                return (
+                  <SwiperSlide key={job._id}>
+                    <JobCard 
+                      job={job}
+                      applications={applications}
+                      stats={stats}
+                      isNewlyPosted={isNewlyPosted}
+                      jobRefs={jobRefs}
+                      handleViewApplications={handleViewApplications}
+                      handleDeleteJob={handleDeleteJob}
+                      formatDate={formatDate}
+                      getStatusIcon={getStatusIcon}
+                    />
+                  </SwiperSlide>
+                );
+                      {/* Status Banner */}
+                      <div className="px-3 sm:px-4 py-2 bg-white/10 border-b border-white/10">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            {getStatusIcon(job.status)}
+                            <span className="ml-2 text-xs sm:text-sm font-medium text-white/90">
+                              {job.status?.charAt(0).toUpperCase() + job.status?.slice(1)}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-xs text-white/70">
+                              {formatDate(job.createdAt)}
+                            </span>
+                            {stats.unpaidApplications > 0 && (
+                              <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                                Payment Due
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Elemental Color Scheme Row */}
+                        <div className="mt-3 flex items-center justify-center gap-4 px-2">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 shadow-sm"></div>
+                            <span className="text-xs text-white/60">Pending</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-400 to-green-500 shadow-sm"></div>
+                            <span className="text-xs text-white/60">Accepted</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-cyan-500 shadow-sm"></div>
+                            <span className="text-xs text-white/60">Active</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-400 to-violet-500 shadow-sm"></div>
+                            <span className="text-xs text-white/60">Done</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Job Details */}
+                      <div className="p-4 sm:p-6">
+                        {/* Salary Display */}
+                        <div className="mb-4">
+                          <div className="relative">
+                            <div className="text-2xl sm:text-3xl font-bold mb-1 bg-gradient-to-r from-green-300 to-emerald-400 bg-clip-text text-transparent">
+                              ₹{job.salary?.toLocaleString() || 0}
+                            </div>
+                            <div className="absolute -bottom-1 left-0 w-12 h-1 bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"></div>
+                          </div>
+                          
+                        </div>
+
+                        {/* Job Title and Company */}
+                        <div className="mb-4">
+                          <h3 className="text-lg sm:text-xl font-semibold text-white mb-1">
+                            {job.title}
+                          </h3>
+                          <div className="flex items-center text-white/70 mb-2">
+                            <Building className="w-4 h-4 mr-1" />
+                            <span className="text-sm">{job.category}</span>
+                          </div>
+                          <div className="flex items-center text-white/70">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            <span className="text-sm">
+                              {job.location?.city}, {job.location?.state}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Applications Summary with Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-sm font-medium text-white/80">Job Progress</span>
+                            <span className="text-sm font-bold text-white">{stats.totalApps} applicants</span>
+                          </div>
+                          
+                          {/* Enhanced Progress Bar - Optimized */}
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-white font-medium">{stats.progressPercentage}%</span>
+                            </div>
+                            <div className="relative">
+                              {/* Background track */}
+                              <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden border border-white/5">
+                                {/* Multi-segment progress bar */}
+                                <div className="h-full flex">
+                                  {/* Pending segment */}
+                                  {stats.pendingCount > 0 && (
+                                    <div 
+                                      className="bg-gradient-to-r from-amber-400 to-yellow-500 transition-all duration-1000 ease-out"
+                                      style={{ width: `${(stats.pendingCount / stats.totalApps) * 100}%` }}
+                                    />
+                                  )}
+                                  {/* Accepted segment */}
+                                  {stats.acceptedCount > 0 && (
+                                    <div 
+                                      className="bg-gradient-to-r from-emerald-400 to-green-500 transition-all duration-1000 ease-out"
+                                      style={{ width: `${(stats.acceptedCount / stats.totalApps) * 100}%` }}
+                                    />
+                                  )}
+                                  {/* In Progress segment */}
+                                  {stats.inProgressCount > 0 && (
+                                    <div 
+                                      className="bg-gradient-to-r from-blue-400 to-cyan-500 transition-all duration-1000 ease-out relative"
+                                      style={{ width: `${(stats.inProgressCount / stats.totalApps) * 100}%` }}
+                                    >
+                                      {/* Active pulse for in-progress */}
+                                      <div className="absolute inset-0 bg-gradient-to-r from-blue-300/50 to-cyan-300/50 animate-pulse" />
+                                    </div>
+                                  )}
+                                  {/* Completed segment */}
+                                  {stats.completedCount > 0 && (
+                                    <div 
+                                      className="bg-gradient-to-r from-purple-400 to-violet-500 transition-all duration-1000 ease-out relative"
+                                      style={{ width: `${(stats.completedCount / stats.totalApps) * 100}%` }}
+                                    >
+                                      {/* Shimmer effect for completed section */}
+                                      <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Stage-based glow effect */}
+                              {stats.totalApps > 0 && stats.progressPercentage > 0 && (
+                                <div 
+                                  className={`absolute top-0 h-2.5 rounded-full blur-sm transition-all duration-1000 ${
+                                    stats.progressPercentage === 25 ? 'bg-gradient-to-r from-amber-400/30 to-yellow-400/30' :
+                                    stats.progressPercentage === 50 ? 'bg-gradient-to-r from-emerald-400/30 to-green-400/30' :
+                                    stats.progressPercentage === 75 ? 'bg-gradient-to-r from-blue-400/30 to-cyan-400/30' :
+                                    stats.progressPercentage === 100 ? 'bg-gradient-to-r from-purple-400/30 to-violet-400/30' :
+                                    'bg-gradient-to-r from-gray-400/30 to-gray-400/30'
+                                  }`}
+                                  style={{ width: `${stats.progressPercentage}%` }}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Simplified Stats - Only show non-zero values - Optimized */}
+                          {stats.nonZeroStats.length > 0 && (
+                            <div className="flex gap-3 text-xs justify-center">
+                              {stats.nonZeroStats.map(stat => (
+                                <div key={stat.status} className="flex items-center">
+                                  <div className={`w-2 h-2 bg-${stat.color} rounded-full mr-1.5`}></div>
+                                  <span className="text-white/70">{stat.count} {stat.label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Payment Status - Optimized */}
+                        {stats.completedCount > 0 && (
+                          <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center text-white/90">
+                                <DollarSign className="w-4 h-4 mr-2" />
+                                <span className="text-sm font-medium">Payment Status</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xs text-white/70">
+                                  {stats.unpaidApplications > 0 ? 'Payments Pending' : 'All Paid'}
+                                </div>
+                                <div className="text-sm font-bold text-white">
+                                  {stats.unpaidApplications} pending
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 mt-4">
+                          <button 
+                            onClick={() => handleViewApplications(job)}
+                            className="flex-1 flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all text-sm font-medium shadow-lg hover:shadow-xl"
+                          >
+                            <Users className="w-4 h-4 mr-2" />
+                            Manage ({applications.length})
+                          </button>
+                          
+                          <button
+                            onClick={() => window.location.href = `/job/${job._id}`}
+                            className="flex items-center justify-center px-3 py-2.5 bg-white/10 text-white rounded-lg border border-white/20 hover:bg-white/15 transition-all text-sm"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </SwiperSlide>
+                );
+              })}
+            </Swiper>
+          </div>
+        )}
+
+        {/* Applications Modal - Enhanced with dark theme */}
+        <AnimatePresence>
+          {showApplicationsModal && selectedJobApplications && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden text-white"
+              >
+                <div className="p-6 border-b border-white/10">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">
+                        Manage Applications: {selectedJobApplications.job.title}
+                      </h3>
+                     
+                    </div>
+                    <button
+                      onClick={() => setShowApplicationsModal(false)}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  
+                  
+                  {/* Application Status Tabs */}
+                  <div className="flex space-x-1 mt-4 bg-white/10 p-1 rounded-lg">
+                    {['all', 'pending', 'accepted', 'in-progress', 'completed'].map((status) => {
+                      const count = status === 'all' 
+                        ? selectedJobApplications.applications.length
+                        : selectedJobApplications.applications.filter(app => app.status === status).length;
+                      
+                      return (
+                        <button
+                          key={status}
+                          onClick={() => setSelectedApplicationStatus(status)}
+                          className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            selectedApplicationStatus === status
+                              ? 'bg-white text-black shadow-sm'
+                              : 'text-white/70 hover:text-white'
+                          }`}
+                        >
+                          {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="p-6 max-h-[70vh] overflow-y-auto">
+                  {(() => {
+                    const filteredApplications = selectedApplicationStatus === 'all' 
+                      ? selectedJobApplications.applications
+                      : selectedJobApplications.applications.filter(app => app.status === selectedApplicationStatus);
+                    
+                    if (filteredApplications.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                          <h4 className="text-lg font-semibold text-white mb-2">
+                            No {selectedApplicationStatus === 'all' ? '' : selectedApplicationStatus} applications
+                          </h4>
+                          <p className="text-white/70">
+                            {selectedApplicationStatus === 'all' 
+                              ? 'Workers haven\'t applied for this job yet.'
+                              : `No applications in ${selectedApplicationStatus} status.`
+                            }
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {filteredApplications.map((application) => (
+                          <motion.div
+                            key={application._id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="border border-white/10 bg-white/5 rounded-lg p-4 hover:bg-white/10 transition-colors backdrop-blur-sm"
+                          >
+                            {/* Application Header */}
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                                  {(application.worker?.name || application.workerDetails?.name)?.charAt(0) || 'W'}
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-white">
+                                    {application.worker?.name || application.workerDetails?.name}
+                                  </h4>
+                                  <p className="text-sm text-white/70">
+                                    📞 {application.worker?.phone || application.workerDetails?.phone}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                application.status === 'pending' ? 'bg-yellow-500/20 text-yellow-300' :
+                                application.status === 'accepted' ? 'bg-green-500/20 text-green-300' :
+                                application.status === 'in-progress' ? 'bg-blue-500/20 text-blue-300' :
+                                application.status === 'completed' ? 'bg-purple-500/20 text-purple-300' :
+                                application.status === 'rejected' ? 'bg-red-500/20 text-red-300' :
+                                'bg-gray-500/20 text-gray-300'
+                              }`}>
+                                {application.status?.charAt(0).toUpperCase() + application.status?.slice(1)}
+                              </span>
+                            </div>
+
+                            {/* Worker Details Grid */}
+                            <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                              <div>
+                                <span className="text-white/70">Skills:</span>
+                                <p className="font-medium text-xs text-white/90">
+                                  {(application.worker?.skills || application.workerDetails?.skills || []).join(', ') || 'Not specified'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-white/70">Experience:</span>
+                                <p className="font-medium text-xs text-white/90">
+                                  {application.worker?.experience || 'Not specified'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-white/70">Applied:</span>
+                                <p className="font-medium text-xs text-white/90">
+                                  {new Date(application.applicationDetails?.appliedAt || application.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="text-white/70">Rating:</span>
+                                <p className="font-medium text-xs text-white/90">
+                                  ⭐ {application.worker?.rating?.average || application.workerDetails?.rating || 0}/5
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Payment Info for Completed Jobs */}
+                            {application.status === 'completed' && (
+                              <div className="bg-white/5 rounded-lg p-3 mb-4">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <span className="text-sm text-white/70">Payment Status:</span>
+                                    <p className={`font-medium ${
+                                      application.paymentStatus === 'paid' ? 'text-green-400' : 'text-yellow-400'
+                                    }`}>
+                                      {application.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Payment Pending'}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-sm text-white/70">Amount:</span>
+                                    <p className="font-bold text-lg text-white">₹{application.paymentAmount || selectedJobApplications.job.salary}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Quick Action Buttons */}
+                            <div className="flex space-x-2">
+                              {application.status === 'pending' && (
+                                <>
+                                  <button
+                                    onClick={() => updateApplicationStatus(application._id, 'accepted')}
+                                    className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                                  >
+                                    ✓ Accept
+                                  </button>
+                                  <button
+                                    onClick={() => updateApplicationStatus(application._id, 'rejected')}
+                                    className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                                  >
+                                    ✗ Reject
+                                  </button>
+                                </>
+                              )}
+
+                              {application.status === 'accepted' && (
+                                <button
+                                  onClick={() => updateApplicationStatus(application._id, 'in-progress')}
+                                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                                >
+                                  🚀 Start Work
+                                </button>
+                              )}
+
+                              {application.status === 'in-progress' && (
+                                <button
+                                  onClick={() => updateApplicationStatus(application._id, 'completed')}
+                                  className="flex-1 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                                >
+                                  ✅ Mark Complete
+                                </button>
+                              )}
+
+                              {application.status === 'completed' && application.paymentStatus !== 'paid' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedJobForPayment({ job: selectedJobApplications.job, application });
+                                    setShowPaymentModal(true);
+                                    setShowApplicationsModal(false);
+                                  }}
+                                  className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                                >
+                                  💰 Pay Worker
+                                </button>
+                              )}
+
+                              {application.status === 'completed' && application.paymentStatus === 'paid' && (
+                                <div className="flex-1 px-3 py-2 bg-green-500/20 text-green-300 rounded-lg text-center text-sm font-medium">
+                                  ✅ Payment Complete
+                                </div>
+                              )}
+
+                              {application.status === 'rejected' && (
+                                <div className="flex-1 px-3 py-2 bg-red-500/20 text-red-300 rounded-lg text-center text-sm font-medium">
+                                  ❌ Rejected
+                                </div>
+                              )}
+
+                              {/* Contact Worker Button */}
+                              <button
+                                onClick={() => window.open(`tel:${application.worker?.phone || application.workerDetails?.phone}`)}
+                                className="px-3 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors border border-white/10"
+                                title="Call Worker"
+                              >
+                                📞
+                              </button>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Simplified Payment Modal with dark theme */}
+        {showPaymentModal && selectedJobForPayment && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl max-w-md w-full p-6 text-white"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-semibold text-white">
+                  Process Payment
+                </h3>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-white/5 rounded-lg p-4 mb-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-white/70">Worker:</span>
+                    <span className="font-medium text-white">
+                      {selectedJobForPayment.application.worker?.name || 
+                       selectedJobForPayment.application.workerDetails?.name}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/70">Job:</span>
+                    <span className="font-medium text-white">{selectedJobForPayment.job.title}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/70">Amount:</span>
+                    <span className="font-bold text-green-400">
+                      ₹{selectedJobForPayment.application.paymentAmount || selectedJobForPayment.job.salary}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 px-4 py-2 border border-white/20 text-white/80 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      console.log('Processing payment for application:', selectedJobForPayment.application._id);
+                      
+                      const response = await fetch(`https://sindh-backend.onrender.com/api/job-applications/${selectedJobForPayment.application._id}/process-payment`, {
+                        method: 'PATCH',
+                        headers: {
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                          paymentAmount: selectedJobForPayment.application.paymentAmount || selectedJobForPayment.job.salary
+                        })
+                      });
+
+                      const result = await response.json();
+                      
+                      if (response.ok) {
+                        console.log('Payment processed successfully:', result);
+                        alert(`✅ Payment Processed Successfully!\n\nWorker: ${result.workerUpdated}\nAmount: ₹${selectedJobForPayment.application.paymentAmount || selectedJobForPayment.job.salary}\nNew Worker Balance: ₹${result.newWorkerBalance}\n\nThe worker's balance has been updated immediately.`);
+                        handlePaymentComplete();
+                      } else {
+                        console.error('Payment processing failed:', result);
+                        alert(`❌ Payment Failed: ${result.message}`);
+                      }
+                    } catch (error) {
+                      console.error('Payment error:', error);
+                      alert('❌ Payment processing failed: ' + error.message);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Process Payment
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </div>
+
+      {/* Background styles shared with homepage */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap');
+        .devanagari { 
+          font-family: 'Noto Sans Devanagari','Poppins',system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial; 
+        }
+        .noise-bg { 
+          background-image: url('data:image/svg+xml;utf8,\\
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">\\
+              <filter id="noise">\\
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>\\
+                <feColorMatrix type="saturate" values="0"/>\\
+                <feComponentTransfer>\\
+                  <feFuncA type="table" tableValues="0 0.2"/>\\
+                </feComponentTransfer>\\
+              </filter>\\
+              <rect width="100%" height="100%" filter="url(%23noise)" opacity="0.4"/>\\
+            </svg>'); 
+        }
+        .aurora-blob { 
+          position:absolute; 
+          width:60vmax; 
+          height:60vmax; 
+          filter:blur(60px); 
+          opacity:.2; 
+        }
+        .aurora-a { 
+          background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.6), transparent 60%); 
+          left:-20vmax; 
+          top:-10vmax; 
+          animation: drift 18s ease-in-out infinite; 
+        }
+        .aurora-b { 
+          background: radial-gradient(circle at 70% 40%, rgba(236,72,153,0.5), transparent 60%); 
+          right:-25vmax; 
+          top:-5vmax; 
+          animation: drift 22s ease-in-out infinite reverse; 
+        }
+        .aurora-c { 
+          background: radial-gradient(circle at 40% 70%, rgba(34,197,94,0.5), transparent 60%); 
+          left:10vmax; 
+          bottom:-20vmax; 
+          animation: drift 26s ease-in-out infinite; 
+        }
+        @keyframes drift { 
+          0%,100% { transform: translate3d(0,0,0) rotate(0deg);} 
+          50% { transform: translate3d(5vmax,-3vmax,0) rotate(20deg);} 
+        }
+        .startrails { 
+          position:absolute; 
+          inset:0; 
+          background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%); 
+          overflow:hidden; 
+        }
+        .startrails::before, .startrails::after { 
+          content:""; 
+          position:absolute; 
+          inset:-20%; 
+          background-repeat:repeat; 
+          background-size:300px 300px; 
+          mix-blend-mode:screen; 
+          opacity:.25; 
+          border-radius:50%; 
+          filter:blur(.2px); 
+        }
+        .startrails::before { 
+          background-image: radial-gradient(2px 120px at 50% 0%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 60%), 
+                            radial-gradient(1.5px 100px at 80% 10%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), 
+                            radial-gradient(1.2px 90px at 20% 30%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), 
+                            radial-gradient(1.8px 110px at 70% 60%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 60%); 
+          animation: trails-rotate 140s linear infinite; 
+        }
+        .startrails::after { 
+          background-image: radial-gradient(1px 60px at 30% 10%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 60%), 
+                            radial-gradient(1px 70px at 60% 40%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 60%), 
+                            radial-gradient(1px 50px at 10% 80%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%); 
+          animation: trails-rotate-rev 200s linear infinite; 
+          opacity:.18; 
+        }
+        @keyframes trails-rotate { 
+          from { transform: rotate(0deg);} 
+          to { transform: rotate(360deg);} 
+        }
+        @keyframes trails-rotate-rev { 
+          from { transform: rotate(360deg);} 
+          to { transform: rotate(0deg);} 
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default PostedJobs;

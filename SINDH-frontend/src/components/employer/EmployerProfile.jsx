@@ -1,18 +1,23 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Building, MapPin, FileText, Phone, Mail, Award, Calendar, 
   Edit, Settings, Briefcase, Star, ChevronRight, TrendingUp, Users,
   Clock, CheckCircle, AlertCircle, Plus, Eye, MoreHorizontal, Globe,
-  Loader, RefreshCw, ArrowLeft
+  Loader, ArrowLeft, Sparkles
 } from 'lucide-react';
 import { employerService } from '../../services/employerService';
 import { UserContext } from '../../context/UserContext';
 import toast from 'react-hot-toast';
 import Logo from '../../assets/logo.svg';
+import { useNavigate } from 'react-router-dom';
+import { logout as authLogout } from '../../utils/authUtils';
 
 const EmployerProfilePage = () => {
   const { user } = useContext(UserContext);
+  const { i18n } = useTranslation();
+  const navigate = useNavigate();
   const [employerData, setEmployerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,6 +45,43 @@ const EmployerProfilePage = () => {
     completedJobs: 0,
     totalApplications: 0
   });
+
+  // Language and menu state (shared behavior with homepage)
+  const [lang, setLang] = useState(() => (localStorage.getItem('homeLang') || 'EN'));
+  const isHindi = lang === 'HI';
+  const [showMenu, setShowMenu] = useState(false);
+  const loadCsvResources = async (langCode) => {
+    try {
+      const code = (langCode || lang).toLowerCase();
+      const res = await fetch(`/languages/${code}.csv`, { cache: 'no-cache' });
+      if (!res.ok) return;
+      const text = await res.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      const bundle = {};
+      for (const line of lines) {
+        const [key, ...rest] = line.split(',');
+        const value = rest.join(',').replace(/^"|"$/g, '');
+        if (key) bundle[key.trim()] = value.trim();
+      }
+      if (Object.keys(bundle).length) {
+        i18n.addResourceBundle(code, 'home', bundle, true, true);
+      }
+    } catch (_) {}
+  };
+  useEffect(() => {
+    (async () => {
+      await loadCsvResources(lang);
+      i18n.changeLanguage(lang.toLowerCase());
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const toggleLang = async () => {
+    const next = isHindi ? 'EN' : 'HI';
+    setLang(next);
+    localStorage.setItem('homeLang', next);
+    await loadCsvResources(next);
+    i18n.changeLanguage(next.toLowerCase());
+  };
 
   // API URL helper function
   const getApiUrl = (endpoint) => {
@@ -273,19 +315,7 @@ const EmployerProfilePage = () => {
     }
   };
 
-  // Handle manual refresh
-  const handleRefresh = async () => {
-    const employerId = getEmployerId();
-    if (!employerId) {
-      setError('No employer ID found. Please log in again.');
-      return;
-    }
-    
-    setRefreshing(true);
-    await fetchEmployerProfile(employerId);
-    setRefreshing(false);
-    toast.success('Profile refreshed!');
-  };
+  // Removed manual refresh feature
 
   // Initialize component
   useEffect(() => {
@@ -342,22 +372,47 @@ const EmployerProfilePage = () => {
     return parts.length > 0 ? parts.join(', ') : 'Location not specified';
   };
 
+  const handleName = (name) => {
+    if (!name) return '@employer';
+    return '@' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, '');
+  };
+
+  // Derived presentation data
+  const nameInitials = getInitials(employerData?.name);
+  const isVerified = employerData?.verificationStatus === 'verified';
+  const profileCompletion = (() => {
+    const checkpoints = [
+      employerData?.name,
+      employerData?.email,
+      employerData?.phone,
+      employerData?.company?.industry,
+      employerData?.location?.state,
+      employerData?.businessDescription,
+    ];
+    const score = checkpoints.filter(Boolean).length;
+    return Math.max(10, Math.min(100, Math.round((score / checkpoints.length) * 100)));
+  })();
+
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f6fa] flex items-center justify-center p-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden flex items-center justify-center">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)' }} />
+          <div className="absolute inset-0 startrails" />
+        </div>
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center max-w-sm sm:max-w-md w-full"
+          className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-8 text-center max-w-md"
         >
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-            className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-[#ff6b35] border-t-transparent rounded-full mx-auto mb-4"
+            className="w-12 h-12 border-4 border-white/30 border-t-transparent rounded-full mx-auto mb-4"
           />
-          <h3 className="text-lg sm:text-xl font-semibold text-[#222] mb-2">Loading Profile</h3>
-          <p className="text-sm sm:text-base text-[#666]">Fetching your employer profile data...</p>
+          <h3 className="text-lg font-semibold text-white mb-2">Loading Profile</h3>
+          <p className="text-white/70">Fetching your employer profile data...</p>
         </motion.div>
       </div>
     );
@@ -366,38 +421,25 @@ const EmployerProfilePage = () => {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f5f6fa] flex items-center justify-center p-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden flex items-center justify-center p-4">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0" style={{ background: 'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)' }} />
+          <div className="absolute inset-0 startrails" />
+        </div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center max-w-sm sm:max-w-md w-full"
+          className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-8 text-center max-w-md"
         >
-          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-red-500" />
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-400" />
           </div>
-          <h3 className="text-lg sm:text-xl font-semibold text-[#222] mb-2">Profile Error</h3>
-          <p className="text-sm sm:text-base text-[#666] mb-6">{error}</p>
+          <h3 className="text-lg font-semibold text-white mb-2">Profile Error</h3>
+          <p className="text-white/70 mb-6">{error}</p>
           <div className="space-y-3">
             <button 
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="w-full px-6 py-3 bg-[#ff6b35] text-white rounded-lg hover:bg-[#e55a2b] transition-colors font-medium disabled:opacity-50 text-sm sm:text-base touch-manipulation"
-            >
-              {refreshing ? (
-                <span className="flex items-center justify-center">
-                  <Loader className="w-4 h-4 mr-2 animate-spin" />
-                  Retrying...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Try Again
-                </span>
-              )}
-            </button>
-            <button 
               onClick={() => window.location.href = '/employer/register'}
-              className="w-full px-6 py-3 bg-[#222] text-white rounded-lg hover:bg-[#333] transition-colors font-medium text-sm sm:text-base touch-manipulation"
+              className="w-full px-6 py-3 bg-white/10 text-white rounded-lg hover:bg-white/20 border border-white/15 transition-colors font-medium"
             >
               Register New Account
             </button>
@@ -410,152 +452,179 @@ const EmployerProfilePage = () => {
   // Main profile render
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
-    { id: 'jobs', label: 'Job Posts', icon: Briefcase },
+    { id: 'jobs', label: 'Job', icon: Briefcase },
     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
   return (
-    <div className="min-h-screen bg-[#f5f6fa]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+    <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden devanagari">
+      {/* Background aesthetics (mirror homepage) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Soft radial vignette */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)' }} />
+        {/* Star trails effect */}
+        <div className="startrails absolute inset-0" />
+        {/* Grid lines */}
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        {/* Grain */}
+        <div className="absolute inset-0 opacity-10 noise-bg mix-blend-overlay" />
+        {/* Aurora animated background */}
+        <div className="aurora absolute inset-0">
+          <span className="aurora-blob aurora-a" />
+          <span className="aurora-blob aurora-b" />
+          <span className="aurora-blob aurora-c" />
+        </div>
+      </div>
+
+      {/* Top-right controls: language chip + menu */}
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-3 z-30">
+        <button onClick={toggleLang} className="px-2.5 py-1 rounded-full text-xs md:text-sm bg-white/10 border border-white/15 text-white/90 hover:bg-white/15">{isHindi ? 'HI' : 'EN'}</button>
+        <button onClick={() => setShowMenu(v=>!v)} className="p-2 md:p-3 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition-colors" aria-label="Open Menu">
+          <span className="block w-5 md:w-6 h-0.5 bg-white mb-1"></span>
+          <span className="block w-4 md:w-5 h-0.5 bg-white mb-1"></span>
+          <span className="block w-6 md:w-7 h-0.5 bg-white"></span>
+        </button>
+      </div>
+      <AnimatePresence>
+        {showMenu && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-16 right-4 md:right-6 w-56 bg-white/10 backdrop-blur-md border border-white/15 rounded-xl p-3 text-sm text-white z-40">
+            <button onClick={() => navigate('/employer/profile')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">Profile</button>
+            <button onClick={() => navigate('/employer/posted-jobs')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">Jobs</button>
+            <button onClick={() => { authLogout(); window.location.href = '/'; }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">Logout</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-10 md:pt-12 pb-6 lg:pb-8 relative z-10">
         {/* Header with Logo and refresh button - Mobile Optimized */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-6 sm:mb-8"
+          className="flex items-center justify-between mb-8 sm:mb-8"
         >
           <div className="flex items-center">
             <button 
               onClick={() => window.history.back()}
-              className="mr-2 sm:mr-4 p-2 hover:bg-white hover:shadow-md rounded-lg transition-all duration-200 touch-manipulation"
+              className="mr-2 sm:mr-4 p-2 hover:bg-white/10 border border-white/10 rounded-lg transition-all duration-200 touch-manipulation"
             >
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-[#666]" />
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white/70" />
             </button>
-            <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 relative">
               {Logo ? (
-                <img src={Logo} alt="Logo" className="h-6 sm:h-8 md:h-10" style={{ maxWidth: 80 }} />
+                <img src={Logo} alt="Logo" className="h-6 sm:h-8 md:h-10 invert brightness-0" style={{ maxWidth: 80 }} />
               ) : (
-                <span className="text-lg sm:text-xl font-bold tracking-wide text-[#222]">LOGO</span>
+                <span className="text-lg sm:text-xl font-bold tracking-wide text-white">LOGO</span>
               )}
-              <span className="text-sm sm:text-lg md:text-xl font-extrabold tracking-widest text-[#222]">I N D U S</span>
+              <span className="text-sm sm:text-lg md:text-xl font-extrabold tracking-widest text-white">S I N D H U</span>
+            <span className="absolute -left-6 -top-3 w-10 h-10 rounded-full bg-white/10 blur-2xl" />
             </div>
-            <span className="text-sm sm:text-lg font-semibold text-[#ff6b35] ml-2 sm:ml-4 hidden sm:inline">Employer Profile</span>
+            <span className="text-sm sm:text-lg font-semibold text-white/80 ml-2 sm:ml-4 hidden sm:inline">Employer Profile</span>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center px-3 sm:px-4 py-2 bg-white text-[#222] rounded-lg hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50 text-sm sm:text-base touch-manipulation"
-          >
-            <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+          <div className="flex items-center gap-2" />
         </motion.div>
 
         {/* Profile Header Card - Mobile Responsive */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl sm:rounded-2xl shadow-xl overflow-hidden mb-6 sm:mb-8"
+          className="rounded-xl sm:rounded-2xl overflow-hidden mb-6 sm:mb-8 bg-white/5 border border-white/10 backdrop-blur-md"
         >
-          {/* Cover Photo */}
-          <div className="h-20 sm:h-32 bg-gradient-to-r from-[#ff6b35] via-[#e55a2b] to-[#d4491f] relative">
-            <div className="absolute inset-0 bg-black bg-opacity-20"></div>
+          {/* Cover Photo with subtle blurred overlay like inspiration */}
+          <div className="h-28 sm:h-36 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-white/0 to-white/0" />
+            <div className="absolute -inset-16 opacity-30 blur-3xl"
+                 style={{ background: 'radial-gradient(600px 200px at 30% 30%, rgba(255,255,255,0.25), transparent 60%), radial-gradient(500px 180px at 70% 20%, rgba(255,255,255,0.18), transparent 70%)' }} />
           </div>
 
           {/* Profile Content */}
           <div className="relative px-4 sm:px-6 pb-4 sm:pb-6">
-            {/* Profile Picture - Responsive sizing */}
+            {/* Profile Picture - Responsive sizing with animated ring */}
             <div className="absolute -top-8 sm:-top-12 left-4 sm:left-6">
-              <div className="w-16 h-16 sm:w-24 sm:h-24 bg-white rounded-full p-1 shadow-lg">
-                <div className="w-full h-full bg-gradient-to-br from-[#ff6b35] to-[#e55a2b] rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-sm sm:text-xl">
-                    {getInitials(employerData?.name)}
-                  </span>
+              <div className="relative w-16 h-16 sm:w-24 sm:h-24">
+                <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, rgba(99,102,241,.8), rgba(236,72,153,.8), rgba(34,197,94,.8), rgba(99,102,241,.8))', filter: 'blur(6px)', opacity: .35 }} />
+                <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 90deg, rgba(255,255,255,.35), transparent 60%)', animation: 'spin 10s linear infinite' }} />
+                <div className="relative w-full h-full rounded-full p-1 shadow-lg bg-white/10 border border-white/20 backdrop-blur">
+                  <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-sm sm:text-xl">{getInitials(employerData?.name)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Verification Badge - Mobile friendly */}
-            <div className="absolute -top-4 sm:-top-6 right-4 sm:right-6 bg-[#ff6b35] text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium flex items-center shadow-lg">
+            {/* Status pill top-right */}
+            <div className={`absolute -top-4 sm:-top-6 right-4 sm:right-6 ${isVerified ? 'bg-green-500/90' : 'bg-yellow-500/90'} text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium flex items-center shadow-lg`}>
               <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-              {employerData?.verificationStatus === 'verified' ? 'Verified' : 'Pending'}
+              {isVerified ? 'Verified' : 'Pending'}
             </div>
+            
 
             {/* Profile Info - Mobile optimized layout */}
             <div className="pt-10 sm:pt-16">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4 sm:mb-6">
                 <div className="mb-4 sm:mb-0">
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#222] mb-1 sm:mb-2">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight mb-1 sm:mb-2">
                     {employerData?.name}
                   </h1>
-                  <p className="text-base sm:text-lg lg:text-xl text-[#ff6b35] font-medium mb-2 sm:mb-3">
-                    {employerData?.company?.name}
-                  </p>
+                  <div className="text-sm sm:text-base text-white/70 mb-2 sm:mb-3">{handleName(employerData?.name)}</div>
+                  <div className="inline-flex flex-wrap items-center gap-2 text-[10px] sm:text-xs mb-3">
+                    <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10 text-white/80">Employer</span>
+                    <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10 text-white/80">{employerData?.company?.industry || 'Agriculture'}</span>
+                    <span className="px-2 py-1 rounded-full bg-white/10 border border-white/10 text-white/80">QWERTY</span>
+                  </div>
+                  <p className="text-base sm:text-lg lg:text-xl text-white/80 font-medium mb-2 sm:mb-3">{employerData?.company?.name}</p>
                   
                   {/* Age display */}
                   {employerData?.age && (
-                    <p className="text-sm sm:text-base text-[#666] mb-2 flex items-center">
+                    <p className="text-sm sm:text-base text-white/70 mb-2 flex items-center">
                       <User className="w-4 h-4 mr-2" />
                       {employerData.age} years old
                     </p>
                   )}
                   
-                  <div className="flex flex-wrap gap-1 sm:gap-2 mb-3 sm:mb-4">
-                    <span className="px-2 sm:px-4 py-1 sm:py-2 bg-[#ff6b35]/10 text-[#ff6b35] rounded-lg text-xs sm:text-sm font-medium">
-                      {employerData?.company?.type}
-                    </span>
-                    <span className="px-2 sm:px-4 py-1 sm:py-2 bg-[#222]/10 text-[#222] rounded-lg text-xs sm:text-sm font-medium">
-                      {employerData?.company?.industry}
-                    </span>
-                    {employerData?.workerType && (
-                      <span className="px-2 sm:px-4 py-1 sm:py-2 bg-blue-100 text-blue-700 rounded-lg text-xs sm:text-sm font-medium flex items-center">
-                        <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        {employerData.workerType}
-                      </span>
-                    )}
-                    <span className="px-2 sm:px-4 py-1 sm:py-2 bg-[#ff6b35]/10 text-[#ff6b35] rounded-lg text-xs sm:text-sm font-medium flex items-center">
-                      <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                      Employer
-                    </span>
-                  </div>
+                  {/* Removed duplicate chip row for a cleaner header */}
                   
-                  <div className="flex items-center text-[#666] mb-3 sm:mb-4 text-sm sm:text-base">
+                  <div className="flex items-center text-white/70 mb-3 sm:mb-4 text-sm sm:text-base">
                     <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     <span className="truncate">{formatLocation(employerData?.location)}</span>
                   </div>
                   
-                  <div className="flex items-center text-[#666] text-xs sm:text-sm">
+                  <div className="flex items-center text-white/60 text-xs sm:text-sm">
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                     Member since {formatDate(employerData?.registrationDate)}
                   </div>
                 </div>
                 
-                <button className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-[#ff6b35] text-white rounded-lg hover:bg-[#e55a2b] transition-colors font-medium flex items-center justify-center text-sm sm:text-base touch-manipulation">
+                <button className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-white text-black rounded-lg hover:opacity-95 transition-colors font-medium flex items-center justify-center text-sm sm:text-base touch-manipulation">
                   <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                   Edit Profile
                 </button>
               </div>
 
-              {/* Stats Row - Mobile responsive grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 py-4 sm:py-6 border-t border-gray-200">
-                <div className="text-center">
-                  <div className="text-lg sm:text-2xl font-bold text-[#222]">{stats.totalJobs}</div>
-                  <div className="text-xs sm:text-sm text-[#666]">Total Jobs</div>
+              {/* Progress bar like gaming UI */}
+              <div className="mt-2">
+                <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400" style={{ width: `${profileCompletion}%` }} />
                 </div>
-                <div className="text-center">
-                  <div className="text-lg sm:text-2xl font-bold text-[#222]">{stats.activeJobs}</div>
-                  <div className="text-xs sm:text-sm text-[#666]">Active Jobs</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg sm:text-2xl font-bold text-[#222]">{stats.totalApplications}</div>
-                  <div className="text-xs sm:text-sm text-[#666]">Applications</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg sm:text-2xl font-bold text-[#222]">
-                    {employerData?.rating?.average ? `⭐ ${employerData.rating.average.toFixed(1)}` : '⭐ New'}
+                <div className="mt-2 text-[10px] sm:text-xs text-white/60">Profile {profileCompletion}% complete</div>
+              </div>
+
+              {/* Stats Row & tags like inspiration */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 py-4 sm:py-6 border-t border-white/10">
+                {[{label:'Posts', value: stats.totalJobs}, {label:'Active', value: stats.activeJobs}, {label:'Applicants', value: stats.totalApplications}, {label:'Rating', value: employerData?.rating?.average ? employerData.rating.average.toFixed(1) : '—'}].map((s) => (
+                  <div key={s.label} className="rounded-xl bg-white/5 border border-white/10 p-4 text-center">
+                    <div className="text-xl sm:text-2xl font-bold text-white">{s.value}</div>
+                    <div className="text-[10px] sm:text-xs uppercase tracking-widest text-white/60">{s.label}</div>
                   </div>
-                  <div className="text-xs sm:text-sm text-[#666]">Rating</div>
-                </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {['#localhiring','#community','#verified'].map((tag) => (
+                  <span key={tag} className="px-3 py-1 rounded-full text-xs bg-white/10 border border-white/10 text-white/80 inline-flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> {tag}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -566,20 +635,16 @@ const EmployerProfilePage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-6 mb-6 sm:mb-8"
+          className="rounded-xl sm:rounded-2xl p-3 sm:p-6 mb-6 sm:mb-8 bg-white/5 border border-white/10 backdrop-blur-md"
         >
-          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg overflow-x-auto">
+          <div className="flex space-x-1 bg-white/10 p-1 rounded-lg overflow-x-auto">
             {tabs.map(tab => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 min-w-0 flex items-center justify-center px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 touch-manipulation whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? 'bg-[#ff6b35] text-white shadow-sm'
-                      : 'text-[#666] hover:text-[#222] hover:bg-gray-50'
-                  }`}
+                  className={`flex-1 min-w-0 flex items-center justify-center px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 touch-manipulation whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-black shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
                 >
                   <Icon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -675,68 +740,12 @@ const EmployerProfilePage = () => {
                     </div>
                   </div>
 
-                  {/* Enhanced Location Details */}
-                  <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
-                    <h3 className="text-base sm:text-lg font-semibold text-[#222] mb-3 sm:mb-4 flex items-center">
-                      <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#ff6b35]" />
-                      Location Details
-                    </h3>
-                    <div className="space-y-3">
-                      {employerData?.location?.village && (
-                        <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                          <div className="w-8 h-8 bg-[#ff6b35]/10 rounded-lg flex items-center justify-center mr-3">
-                            <MapPin className="w-4 h-4 text-[#ff6b35]" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-[#222] text-sm">Village/Area</h4>
-                            <p className="text-[#666] text-xs">{employerData.location.village}</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="grid md:grid-cols-3 gap-3">
-                        {employerData?.location?.district && (
-                          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <h4 className="font-medium text-[#222] text-sm">District</h4>
-                              <p className="text-[#666] text-xs">{employerData.location.district}</p>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {employerData?.location?.state && (
-                          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <h4 className="font-medium text-[#222] text-sm">State</h4>
-                              <p className="text-[#666] text-xs">{employerData.location.state}</p>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {employerData?.location?.pincode && (
-                          <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                            <div>
-                              <h4 className="font-medium text-[#222] text-sm">Pincode</h4>
-                              <p className="text-[#666] text-xs">{employerData.location.pincode}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {employerData?.location?.address && (
-                        <div className="p-3 bg-[#ff6b35]/5 border border-[#ff6b35]/20 rounded-lg">
-                          <h4 className="font-medium text-[#222] text-sm mb-1">Complete Address</h4>
-                          <p className="text-[#666] text-xs leading-relaxed">{employerData.location.address}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
                   {/* Recent Activity */}
-                  <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
+                  <div className="rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 bg-white/5 border border-white/10 backdrop-blur-md">
                     <h3 className="text-base sm:text-lg font-semibold text-[#222] mb-3 sm:mb-4 flex items-center">
-                      <Clock className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#ff6b35]" />
-                      Recent Job Posts
+                      <Clock className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-white" />
+                      <span className="text-white">Recent Job Posts</span>
                     </h3>
                     {postedJobs.length > 0 ? (
                       <div className="space-y-3 sm:space-y-4">
@@ -746,24 +755,18 @@ const EmployerProfilePage = () => {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}
-                            className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-[#ff6b35] transition-colors"
+                            className="rounded-lg p-3 sm:p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
                           >
                             <div className="flex justify-between items-start">
                               <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-[#222] text-sm sm:text-base truncate">{job.title}</h4>
-                                <p className="text-xs sm:text-sm text-[#666] mt-1 line-clamp-2">{job.description?.substring(0, 100)}...</p>
-                                <div className="flex items-center mt-2 text-xs text-[#666]">
+                                <h4 className="font-medium text-white text-sm sm:text-base truncate">{job.title}</h4>
+                                <p className="text-xs sm:text-sm text-white/70 mt-1 line-clamp-2">{job.description?.substring(0, 100)}...</p>
+                                <div className="flex items-center mt-2 text-xs text-white/60">
                                   <Calendar className="w-3 h-3 mr-1" />
                                   {formatDate(job.createdAt)}
                                 </div>
                               </div>
-                              <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${
-                                job.status === 'active' 
-                                  ? 'bg-[#ff6b35]/10 text-[#ff6b35]'
-                                  : job.status === 'closed'
-                                  ? 'bg-gray-100 text-gray-700'
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
+                              <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${job.status === 'active' ? 'bg-green-500/20 text-green-300' : job.status === 'closed' ? 'bg-white/10 text-white/70' : 'bg-blue-500/20 text-blue-300'}`}>
                                 {job.status}
                               </span>
                             </div>
@@ -772,7 +775,7 @@ const EmployerProfilePage = () => {
                         {postedJobs.length > 3 && (
                           <button
                             onClick={() => setActiveTab('jobs')}
-                            className="w-full text-center py-3 text-[#ff6b35] hover:text-[#e55a2b] font-medium text-sm sm:text-base touch-manipulation"
+                            className="w-full text-center py-3 text-white/80 hover:text-white font-medium text-sm sm:text-base touch-manipulation"
                           >
                             View all {postedJobs.length} job posts
                           </button>
@@ -780,13 +783,10 @@ const EmployerProfilePage = () => {
                       </div>
                     ) : (
                       <div className="text-center py-8 sm:py-12">
-                        <Briefcase className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-300" />
-                        <h4 className="text-base sm:text-lg font-medium text-[#222] mb-2">No job posts yet</h4>
-                        <p className="text-[#666] mb-4 sm:mb-6 text-sm sm:text-base px-4">Start by posting your first job to attract skilled workers</p>
-                        <button 
-                          onClick={() => window.location.href = '/employer/post-job'}
-                          className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-[#ff6b35] text-white rounded-lg hover:bg-[#e55a2b] transition-colors font-medium text-sm sm:text-base touch-manipulation"
-                        >
+                        <Briefcase className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-white/30" />
+                        <h4 className="text-base sm:text-lg font-medium text-white mb-2">No job posts yet</h4>
+                        <p className="text-white/60 mb-4 sm:mb-6 text-sm sm:text-base px-4">Start by posting your first job to attract skilled workers</p>
+                        <button onClick={() => window.location.href = '/employer/post-job'} className="inline-flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-white text-black rounded-lg hover:opacity-95 transition-colors font-medium text-sm sm:text-base touch-manipulation">
                           <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                           Post Your First Job
                         </button>
@@ -798,71 +798,44 @@ const EmployerProfilePage = () => {
                 {/* Sidebar */}
                 <div className="space-y-4 sm:space-y-6">
                   {/* Contact Information */}
-                  <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
+                  <div className="rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 bg-white/5 border border-white/10 backdrop-blur-md">
                     <h3 className="text-base sm:text-lg font-semibold text-[#222] mb-3 sm:mb-4 flex items-center">
-                      <Mail className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[#ff6b35]" />
-                      Contact Information
+                      <Mail className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-white" />
+                      <span className="text-white">Contact Information</span>
                     </h3>
                     <div className="space-y-3 sm:space-y-4">
-                      <div className="flex items-center p-2 sm:p-3 bg-gray-50 rounded-lg">
-                        <Phone className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-[#666]" />
-                        <span className="text-[#222] text-sm sm:text-base truncate">{employerData?.phone}</span>
+                      <div className="flex items-center p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
+                        <Phone className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-white/70" />
+                        <span className="text-white text-sm sm:text-base truncate">{employerData?.phone}</span>
                       </div>
-                      <div className="flex items-center p-2 sm:p-3 bg-gray-50 rounded-lg">
-                        <Mail className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-[#666]" />
-                        <span className="text-[#222] text-sm sm:text-base truncate">{employerData?.email}</span>
+                      <div className="flex items-center p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
+                        <Mail className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-white/70" />
+                        <span className="text-white text-sm sm:text-base truncate">{employerData?.email}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Verification Status */}
-                  <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6">
-                    <h3 className="text-base sm:text-lg font-semibold text-[#222] mb-3 sm:mb-4">Verification Status</h3>
+                  <div className="rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 bg-white/5 border border-white/10 backdrop-blur-md">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">Verification Status</h3>
                     <div className="space-y-2 sm:space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[#666] text-sm sm:text-base">Email Verified</span>
-                        {employerData?.email && employerData.email.trim() !== '' ? (
-                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
-                        ) : (
-                          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-                        )}
+                        <span className="text-white/80 text-sm sm:text-base">Email Verified</span>
+                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[#666] text-sm sm:text-base">Phone Verified</span>
-                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
+                        <span className="text-white/80 text-sm sm:text-base">Phone Verified</span>
+                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[#666] text-sm sm:text-base">Aadhar Verified</span>
-                        {employerData?.verificationDocuments?.aadharNumber && 
-                         employerData.verificationDocuments.aadharNumber !== 'not provided' ? (
-                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
-                        ) : (
-                          <div className="flex items-center">
-                            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500 mr-2" />
-                            <span className="text-xs text-yellow-600">Verify Later</span>
-                          </div>
-                        )}
+                        <span className="text-white/80 text-sm sm:text-base">Aadhar Verified</span>
+                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[#666] text-sm sm:text-base">Profile Complete</span>
-                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-[#ff6b35]" />
+                        <span className="text-white/80 text-sm sm:text-base">Profile Complete</span>
+                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
                       </div>
                     </div>
-                    
-                    {/* Aadhar Verification Notice */}
-                    {employerData?.verificationDocuments?.aadharNumber === 'not provided' && (
-                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <div className="flex items-start">
-                          <AlertCircle className="w-4 h-4 text-yellow-500 mr-2 mt-0.5" />
-                          <div>
-                            <h4 className="text-sm font-medium text-yellow-800">Aadhar Verification Pending</h4>
-                            <p className="text-xs text-yellow-700 mt-1">
-                              You chose to verify later. Aadhar verification will be required when posting your first job.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Quick Actions */}
@@ -982,30 +955,25 @@ const EmployerProfilePage = () => {
             )}
 
             {activeTab === 'analytics' && (
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 lg:p-8">
-                <div className="text-center py-12 sm:py-16">
-                  <TrendingUp className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 text-gray-300" />
-                  <h3 className="text-xl sm:text-2xl font-semibold text-[#222] mb-3 sm:mb-4">Analytics Coming Soon</h3>
-                  <p className="text-[#666] mb-6 sm:mb-8 max-w-md mx-auto text-sm sm:text-base px-4">
+              <div className="rounded-xl sm:rounded-2xl shadow-sm p-4 sm:p-6 lg:p-8 bg-white/5 border border-white/10 backdrop-blur-md">
+                  <div className="text-center py-12 sm:py-16">
+                  <TrendingUp className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 text-white/30" />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-white mb-3 sm:mb-4">Analytics Coming Soon</h3>
+                  <p className="text-white/60 mb-6 sm:mb-8 max-w-md mx-auto text-sm sm:text-base px-4">
                     Get insights into your job posts, applications, and worker engagement.
                   </p>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 max-w-4xl mx-auto">
-                    <div className="bg-[#ff6b35]/10 p-3 sm:p-6 rounded-lg">
-                      <h4 className="text-lg sm:text-2xl font-bold text-[#ff6b35]">{stats.totalJobs}</h4>
-                      <p className="text-[#ff6b35] text-xs sm:text-base">Total Jobs</p>
-                    </div>
-                    <div className="bg-[#222]/10 p-3 sm:p-6 rounded-lg">
-                      <h4 className="text-lg sm:text-2xl font-bold text-[#222]">{stats.activeJobs}</h4>
-                      <p className="text-[#222] text-xs sm:text-base">Active Jobs</p>
-                    </div>
-                    <div className="bg-[#ff6b35]/10 p-3 sm:p-6 rounded-lg">
-                      <h4 className="text-lg sm:text-2xl font-bold text-[#ff6b35]">{stats.totalApplications}</h4>
-                      <p className="text-[#ff6b35] text-xs sm:text-base">Applications</p>
-                    </div>
-                    <div className="bg-[#222]/10 p-3 sm:p-6 rounded-lg">
-                      <h4 className="text-lg sm:text-2xl font-bold text-[#222]">{stats.completedJobs}</h4>
-                      <p className="text-[#222] text-xs sm:text-base">Completed</p>
-                    </div>
+                    {[{label:'Total Jobs', val: stats.totalJobs}, {label:'Active Jobs', val: stats.activeJobs}, {label:'Applications', val: stats.totalApplications}, {label:'Completed', val: stats.completedJobs}].map((b) => (
+                      <div key={b.label} className="p-3 sm:p-6 rounded-lg bg-white/5 border border-white/10">
+                        <h4 className="text-lg sm:text-2xl font-bold text-white">{b.val}</h4>
+                        <p className="text-white/70 text-xs sm:text-base">{b.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 flex items-center justify-center gap-4">
+                    {[1,2,3,4].map((i) => (
+                      <span key={i} className="w-2 h-2 rounded-full bg-white/20"></span>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1087,6 +1055,34 @@ const EmployerProfilePage = () => {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Background styles shared with homepage */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap');
+        .devanagari { font-family: 'Noto Sans Devanagari','Poppins',system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial; }
+        .noise-bg { background-image: url('data:image/svg+xml;utf8,\
+          <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">\
+            <filter id="noise">\
+              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>\
+              <feColorMatrix type="saturate" values="0"/>\
+              <feComponentTransfer>\
+                <feFuncA type="table" tableValues="0 0.2"/>\
+              </feComponentTransfer>\
+            </filter>\
+            <rect width="100%" height="100%" filter="url(%23noise)" opacity="0.4"/>\
+          </svg>'); }
+        .aurora-blob { position:absolute; width:60vmax; height:60vmax; filter:blur(60px); opacity:.2; }
+        .aurora-a { background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.6), transparent 60%); left:-20vmax; top:-10vmax; animation: drift 18s ease-in-out infinite; }
+        .aurora-b { background: radial-gradient(circle at 70% 40%, rgba(236,72,153,0.5), transparent 60%); right:-25vmax; top:-5vmax; animation: drift 22s ease-in-out infinite reverse; }
+        .aurora-c { background: radial-gradient(circle at 40% 70%, rgba(34,197,94,0.5), transparent 60%); left:10vmax; bottom:-20vmax; animation: drift 26s ease-in-out infinite; }
+        @keyframes drift { 0%,100% { transform: translate3d(0,0,0) rotate(0deg);} 50% { transform: translate3d(5vmax,-3vmax,0) rotate(20deg);} }
+        .startrails { position:absolute; inset:0; background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%); overflow:hidden; }
+        .startrails::before, .startrails::after { content:""; position:absolute; inset:-20%; background-repeat:repeat; background-size:300px 300px; mix-blend-mode:screen; opacity:.25; border-radius:50%; filter:blur(.2px); }
+        .startrails::before { background-image: radial-gradient(2px 120px at 50% 0%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.5px 100px at 80% 10%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.2px 90px at 20% 30%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.8px 110px at 70% 60%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 60%); animation: trails-rotate 140s linear infinite; }
+        .startrails::after { background-image: radial-gradient(1px 60px at 30% 10%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 60%), radial-gradient(1px 70px at 60% 40%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 60%), radial-gradient(1px 50px at 10% 80%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%), radial-gradient(1px 65px at 90% 50%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%); animation: trails-rotate-rev 200s linear infinite; opacity:.18; }
+        @keyframes trails-rotate { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+        @keyframes trails-rotate-rev { from { transform: rotate(360deg);} to { transform: rotate(0deg);} }
+      `}</style>
     </div>
   );
 };

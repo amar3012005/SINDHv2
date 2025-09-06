@@ -53,16 +53,15 @@ const workerSchema = new mongoose.Schema({
   // Identity Verification (Step 2)
   aadharNumber: {
     type: String,
-    required: true,
-    default: 'not provided',
+    required: false, // Changed to false since we now use null for "not provided"
     validate: {
       validator: function(v) {
-        // Allow 'not provided' for deferred verification
-        if (v === 'not provided') return true;
+        // Allow null for deferred verification
+        if (v === null) return true;
         // If value is provided, validate 12-digit format
         return /^\d{12}$/.test(v);
       },
-      message: props => `${props.value} is not a valid Aadhar number! Must be 12 digits or 'not provided'.`
+      message: props => `${props.value} is not a valid Aadhar number! Must be 12 digits or null.`
     }
   },
   
@@ -343,7 +342,15 @@ const workerSchema = new mongoose.Schema({
 
 // Indexes for better performance
 workerSchema.index({ phone: 1 });
-workerSchema.index({ aadharNumber: 1 });
+// Create a simple non-unique index for aadharNumber for query performance
+// We will handle uniqueness in code during the pre-save hook
+workerSchema.index(
+  { aadharNumber: 1 },
+  {
+    name: 'aadharNumber_index',
+    unique: false // Not enforcing uniqueness at the database level
+  }
+);
 workerSchema.index({ 'location.state': 1, 'location.district': 1 });
 workerSchema.index({ skills: 1 });
 workerSchema.index({ preferredCategory: 1 });
@@ -435,8 +442,8 @@ workerSchema.pre('save', async function(next) {
   // Build query conditions
   const queryConditions = [{ phone: this.phone }];
   
-  // Only check Aadhar uniqueness if it's not 'not provided'
-  if (this.aadharNumber && this.aadharNumber !== 'not provided') {
+  // Only check Aadhar uniqueness if it exists and is not null
+  if (this.aadharNumber && this.aadharNumber !== null) {
     queryConditions.push({ aadharNumber: this.aadharNumber });
   }
   
@@ -450,7 +457,7 @@ workerSchema.pre('save', async function(next) {
       console.error('Phone number already exists:', this.phone);
       throw new Error('Phone number already registered');
     }
-    if (existingWorker.aadharNumber === this.aadharNumber && this.aadharNumber !== 'not provided') {
+    if (existingWorker.aadharNumber === this.aadharNumber && this.aadharNumber !== null) {
       console.error('Aadhar number already exists:', this.aadharNumber);
       throw new Error('Aadhar number already registered');
     }
@@ -509,5 +516,52 @@ workerSchema.methods.toJSON = function() {
 };
 
 const Worker = mongoose.model('Worker', workerSchema);
+
+// Utility to clean up all legacy aadharNumber indexes and create a non-unique index
+async function ensureAadharIndexIntegrity() {
+  try {
+    const collection = mongoose.connection.collection('workers');
+    const existing = await collection.indexes();
+    
+    // List of legacy index names to drop
+    const legacyIndexNames = [
+      'aadharNumber_1', 
+      'aadharNumber_unique_partial', 
+      'aadharNumber_unique_sparse'
+    ];
+    
+    // Check if our desired non-unique index exists
+    const hasDesired = existing.some(idx => idx.name === 'aadharNumber_index');
+    
+    // Drop ALL existing aadharNumber indexes
+    for (const index of existing) {
+      if (legacyIndexNames.includes(index.name) || 
+          (index.key && index.key.aadharNumber !== undefined && index.name !== 'aadharNumber_index')) {
+        try { 
+          console.log(`Dropping index: ${index.name}`);
+          await collection.dropIndex(index.name); 
+        } catch (err) {
+          console.log(`Error dropping index ${index.name}: ${err.message}`);
+        }
+      }
+    }
+    
+    // Create simple non-unique index if it doesn't exist
+    if (!hasDesired) {
+      console.log('Creating non-unique index for aadharNumber');
+      await collection.createIndex(
+        { aadharNumber: 1 },
+        { name: 'aadharNumber_index', unique: false }
+      );
+    }
+    
+    console.log('Aadhar index updated to non-unique');
+  } catch (e) {
+    console.error('Error handling aadharNumber index:', e.message);
+  }
+}
+
+// Expose helper for startup
+Worker.ensureIndexes = ensureAadharIndexIntegrity;
 
 module.exports = Worker;

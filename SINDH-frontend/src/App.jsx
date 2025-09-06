@@ -15,7 +15,6 @@ import './i18n';
 
 // Components
 import Homepage from './components/Homepage';
-import Navbar from './components/Navbar';
 import Registration from './components/Registration';
 import UnifiedRegistration from './components/UnifiedRegistration';
 import PrivateRoute from './components/PrivateRoute';
@@ -102,8 +101,7 @@ const AppContent = () => {
   
   return (
     <div className="min-h-screen bg-gray-50">
-      {!isChatModePage && !isGreetingPage && <Navbar />}
-      <main className={isChatModePage || isGreetingPage ? "" : "pt-16"}>
+      <main>
         <AnimatePresence mode="wait">
           <ErrorBoundary fallback={ErrorFallback}>
             <Routes>
@@ -154,8 +152,8 @@ const AppContent = () => {
               {/* New route for MyApplications */}
               <Route path="/worker/applications" element={<Layout><MyApplications /></Layout>} />
 
-              {/* Login route */}
-              <Route path="/login" element={<Layout><Login /></Layout>} />
+              {/* Login route (no Layout, no Navbar) */}
+              <Route path="/login" element={<Login />} />
 
               {/* Translation Demo route */}
               <Route path="/translation-demo" element={<Layout><TranslationDemo /></Layout>} />

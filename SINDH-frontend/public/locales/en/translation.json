@@ -223,6 +223,8 @@
     "cancel": "Cancel",
     "cancelling": "Cancelling...",
     "recently": "Recently",
+    "perMonth": "per month",
+    "details": "View Details",
     "filters": {
       "location": "Filter by Location",
       "category": "Filter by Category",
@@ -258,6 +260,36 @@
       "nearbyJobs": "Jobs Near You",
       "otherJobs": "Other Available Jobs",
       "allJobs": "All Available Jobs"
+    }
+  },
+  "applications": {
+    "title": "My Applications",
+    "subtitle": "Track your job applications and progress",
+    "loading": "Loading your applications...",
+    "emptyTitle": "No Applications Yet",
+    "emptySubtitle": "Start applying to jobs to see your applications here",
+    "totalEarned": "Total earned",
+    "currentBalance": "Current balance",
+    "jobsCompleted": "Jobs completed",
+    "progress": "Application Progress",
+    "refreshTitle": "Refresh Applications",
+    "refreshing": "Refreshing Applications...",
+    "steps": {
+      "applied": "Applied",
+      "accepted": "Accepted",
+      "working": "Working",
+      "paid": "Paid",
+      "completed": "Completed"
+    },
+    "status": {
+      "workInProgress": "Work in Progress",
+      "paymentPending": "Payment Pending",
+      "paymentReceived": "Payment Received!",
+      "jobCompleted": "Job Completed!",
+      "paymentCredited": "Credited to Wallet",
+      "keepWorking": "Keep up the good work! Payment will be processed once employer approves.",
+      "afterPaid": "Great! Payment received. Waiting for employer to mark job as complete.",
+      "congrats": "Congratulations! Job completed successfully and payment received."
     }
   },
   "home": {

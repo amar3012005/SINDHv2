@@ -60,6 +60,49 @@ const EmployerApplicationProgress = ({ jobId, onStatusChange }) => {
         if (onStatusChange) {
           onStatusChange(applicationId, status);
         }
+        
+        // Trigger real-time update for worker's MyApplications
+        localStorage.setItem('applicationStatusUpdate', Date.now().toString());
+        window.dispatchEvent(new CustomEvent('applicationUpdated', { 
+          detail: { applicationId, status } 
+        }));
+        
+        // Create homepage reminders when work starts
+        if (status === 'in-progress') {
+          const workReminder = {
+            id: `work_${applicationId}_${Date.now()}`,
+            type: 'work_started',
+            applicationId: applicationId,
+            jobTitle: applications.find(app => app._id === applicationId)?.job?.title || 'Job',
+            workerName: applications.find(app => app._id === applicationId)?.worker?.name || 'Worker',
+            workerPhone: applications.find(app => app._id === applicationId)?.worker?.phone || '',
+            startedAt: new Date().toISOString(),
+            status: 'active'
+          };
+          
+          // Store reminder for employer homepage
+          const employerReminders = JSON.parse(localStorage.getItem('employerWorkReminders') || '[]');
+          employerReminders.push(workReminder);
+          localStorage.setItem('employerWorkReminders', JSON.stringify(employerReminders));
+          
+          // Store reminder for worker homepage
+          const workerReminders = JSON.parse(localStorage.getItem('workerWorkReminders') || '[]');
+          workerReminders.push({
+            ...workReminder,
+            type: 'work_assigned',
+            message: `Work started for ${workReminder.jobTitle}`
+          });
+          localStorage.setItem('workerWorkReminders', JSON.stringify(workerReminders));
+          
+          // Trigger homepage refresh events
+          window.dispatchEvent(new CustomEvent('workReminderAdded', { 
+            detail: workReminder 
+          }));
+          
+          console.log('🏠 Homepage work reminders created for both employer and worker');
+        }
+        
+        console.log('✅ Application status updated and real-time event triggered');
       }
     } catch (error) {
       console.error('Error updating application status:', error);

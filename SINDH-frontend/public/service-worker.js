@@ -45,19 +45,21 @@ self.addEventListener('activate', event => {
 
 // Fetch event strategy (Network first, falling back to cache)
 self.addEventListener('fetch', event => {
+  const { request } = event;
+  // Skip non-GET requests and unsupported schemes (e.g., chrome-extension)
+  if (request.method !== 'GET' || !/^https?:/i.test(request.url)) {
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then(response => {
-        // Clone the response
         const responseClone = response.clone();
-        
-        // Open cache
-        caches.open(CACHE_NAME)
-          .then(cache => {
-            // Add response to cache
-            cache.put(event.request, responseClone);
-          });
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(request, responseClone).catch(() => {});
+        });
         return response;
-      }).catch(() => caches.match(event.request))
+      })
+      .catch(() => caches.match(request))
   );
 });

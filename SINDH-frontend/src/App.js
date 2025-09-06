@@ -44,6 +44,7 @@ import Walkthrough from './components/Walkthrough';
 function AppWrapper() {
   const location = useLocation();
   const isGreetingPage = location.pathname === '/greeting';
+  const isPostJobPage = location.pathname.startsWith('/employer/post-job');
   // Use a single login_status state for all routing logic
   // 1 = logged in, 0 = not logged in (default)
   // Initialize login_status to 0 if not set
@@ -66,7 +67,7 @@ function AppWrapper() {
 
   return (
     <div className="App">
-      {!isGreetingPage && <Navbar />}
+      {!isGreetingPage && !isPostJobPage && <Navbar />}
       <Routes>
         {/* Root route - If user is logged in, go to homepage. If not, check greeting/walkthrough */}
         <Route 
@@ -148,13 +149,7 @@ function AppWrapper() {
         />
       </Routes>
       
-      {/* Chat Bot Popup - Appears on all pages except chat mode and greeting page */}
-      {!isGreetingPage && (
-        <>
-          <ChatBotPopup />
-          <ToastContainer />
-        </>
-      )}
+      
     </div>
   );
 }

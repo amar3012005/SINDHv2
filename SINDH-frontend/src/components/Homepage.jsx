@@ -5,25 +5,18 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { getCurrentUser, logout } from '../utils/authUtils';
-import { Star, Users, Briefcase, TrendingUp, Wallet, MessageCircle, ArrowRight, MapPin, LogOut } from 'lucide-react';
+import { Briefcase, Wallet, ArrowRight, LogOut, X, Phone, MapPin, ClipboardList } from 'lucide-react';
 import { buildApiUrl, getApiUrl } from '../utils/apiUtils';
 import axios from 'axios';
+import LogoSVG from '../assets/logo.svg';
 
 
 
 function Homepage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const [recentJobs, setRecentJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [shaktiScore, setShaktiScore] = useState(null);
-  const [stats, setStats] = useState({
-    totalJobs: 1250,
-    activeWorkers: 3400,
-    successfulMatches: 890,
-    averageRating: 4.6
-  });
 
   // Job notification states
   const [jobCount, setJobCount] = useState(0);
@@ -37,10 +30,55 @@ function Homepage() {
   // Worker financial states
   const [workerBalance, setWorkerBalance] = useState(0);
   const [recentEarnings, setRecentEarnings] = useState([]);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showHomeMenu, setShowHomeMenu] = useState(false);
+  const [homeLang, setHomeLang] = useState(localStorage.getItem('homeLang') || 'EN');
+  const isHindi = homeLang === 'HI';
+  const loadCsvResources = async (langCode) => {
+    try {
+      const code = langCode.toLowerCase();
+      const res = await fetch(`/languages/${code}.csv`, { cache: 'no-cache' });
+      if (!res.ok) return;
+      const text = await res.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      const bundle = {};
+      for (const line of lines) {
+        const [key, ...rest] = line.split(',');
+        const value = rest.join(',').replace(/^"|"$/g, '');
+        if (key) bundle[key.trim()] = value.trim();
+      }
+      if (Object.keys(bundle).length) {
+        i18n.addResourceBundle(code, 'home', bundle, true, true);
+      }
+    } catch (_) {
+      // fail silently
+    }
+  };
+  const toggleHomeLang = async () => {
+    const next = isHindi ? 'EN' : 'HI';
+    setHomeLang(next);
+    localStorage.setItem('homeLang', next);
+    const code = next.toLowerCase();
+    await loadCsvResources(next);
+    i18n.changeLanguage(code);
+  };
+
+  useEffect(() => {
+    // Initial load
+    (async () => {
+      await loadCsvResources(homeLang);
+      i18n.changeLanguage(homeLang.toLowerCase());
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Backend connection status
   const [backendStatus, setBackendStatus] = useState(null);
   const [hasShownConnectionStatus, setHasShownConnectionStatus] = useState(false);
+
+  // Work reminder states
+  const [workReminders, setWorkReminders] = useState([]);
+  const [showWorkReminders, setShowWorkReminders] = useState(false);
 
   // Get user from context and fallback to localStorage if needed
   const { user: contextUser, isLoadingUser, logoutUser, fetchUserProfile } = useUser();
@@ -48,39 +86,51 @@ function Homepage() {
 
   // Backend connection detection function
   const detectAndShowBackendConnection = useCallback(async () => {
-    if (hasShownConnectionStatus) return;
-    
     try {
-      const currentApiUrl = getApiUrl();
-      const isLocalBackend = currentApiUrl.includes('localhost');
-      const backendType = isLocalBackend ? 'Local' : 'Render';
-      
-      setBackendStatus(backendType);
-      
-      // Show connection status toast
-      const toastMessage = isLocalBackend 
-        ? '🔗 Connected to Local Backend'
-        : '🌐 Connected to Render Backend';
-      
-      toast.success(toastMessage, {
-        position: 'top-right',
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        style: {
-          backgroundColor: isLocalBackend ? '#10B981' : '#3B82F6',
-          color: 'white',
-          fontWeight: '500'
+      if (hasShownConnectionStatus || sessionStorage.getItem('connectionToastShown') === '1') return;
+      const apiBase = (getApiUrl() || '').replace(/\/$/, '');
+      const healthUrl = `${apiBase}/health`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      let response;
+      try {
+        response = await fetch(healthUrl, { method: 'GET', signal: controller.signal });
+      } catch (e) {
+        // fallback to base URL if /health not available
+        try {
+          response = await fetch(apiBase || '/', { method: 'HEAD', signal: controller.signal });
+        } catch (e2) {
+          response = null;
         }
-      });
-      
-      setHasShownConnectionStatus(true);
-      console.log(`📡 Backend Connection Status: ${backendType} (${currentApiUrl})`);
-      
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (response && response.ok) {
+        const isLocalBackend = apiBase.includes('localhost');
+        const backendType = isLocalBackend ? 'Local' : 'Remote';
+        setBackendStatus(backendType);
+        const toastMessage = isLocalBackend ? '🔗 Connected to Local Backend' : '🔗 Connected to Backend';
+        toast.success(toastMessage, {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          style: {
+            backgroundColor: '#111',
+            color: '#fff',
+            fontWeight: 600
+          }
+        });
+        setHasShownConnectionStatus(true);
+        sessionStorage.setItem('connectionToastShown', '1');
+        console.log(`📡 Backend reachable at: ${apiBase}`);
+      } else {
+        console.log('⚠️ Backend not reachable; suppressing connection toast');
+      }
     } catch (error) {
-      console.error('Error detecting backend connection:', error);
+      console.log('⚠️ Backend ping failed; suppressing connection toast');
     }
   }, [hasShownConnectionStatus]);
 
@@ -109,14 +159,7 @@ function Homepage() {
           console.log('Updated worker profile:', response.data);
           setWorkerProfile(response.data);
           
-          // Update location stats if available
-          if (response.data.location) {
-            setStats(prev => ({
-              ...prev,
-              location: response.data.location.state || 'Unknown',
-              city: response.data.location.city || ''
-            }));
-          }
+          // Location is part of worker profile; no homepage stats update needed
         }
       } catch (error) {
         console.error('Error updating worker profile:', error);
@@ -136,6 +179,70 @@ function Homepage() {
       }
     };
   }, [user?.id, user?.type]);
+
+  // Work reminders functionality
+  useEffect(() => {
+    const loadWorkReminders = () => {
+      if (!user?.id) return;
+      
+      const storageKey = user.type === 'employer' ? 'employerWorkReminders' : 'workerWorkReminders';
+      const reminders = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      
+      // Filter active reminders (not dismissed and within last 7 days)
+      const activeReminders = reminders.filter(reminder => {
+        const reminderDate = new Date(reminder.startedAt);
+        const daysDiff = (new Date() - reminderDate) / (1000 * 60 * 60 * 24);
+        return reminder.status === 'active' && daysDiff <= 7;
+      });
+      
+      setWorkReminders(activeReminders);
+      setShowWorkReminders(activeReminders.length > 0);
+      
+      console.log(`📋 Loaded ${activeReminders.length} work reminders for ${user.type}`);
+    };
+    
+    // Load reminders on component mount
+    loadWorkReminders();
+    
+    // Listen for new work reminders
+    const handleWorkReminderAdded = (event) => {
+      console.log('🔔 New work reminder added:', event.detail);
+      loadWorkReminders();
+    };
+    
+    window.addEventListener('workReminderAdded', handleWorkReminderAdded);
+    
+    // Refresh reminders every 30 seconds
+    const reminderInterval = setInterval(loadWorkReminders, 30000);
+    
+    return () => {
+      window.removeEventListener('workReminderAdded', handleWorkReminderAdded);
+      clearInterval(reminderInterval);
+    };
+  }, [user?.id, user?.type]);
+  
+  // Dismiss work reminder
+  const dismissWorkReminder = (reminderId) => {
+    const storageKey = user.type === 'employer' ? 'employerWorkReminders' : 'workerWorkReminders';
+    const reminders = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    
+    const updatedReminders = reminders.map(reminder => 
+      reminder.id === reminderId 
+        ? { ...reminder, status: 'dismissed', dismissedAt: new Date().toISOString() }
+        : reminder
+    );
+    
+    localStorage.setItem(storageKey, JSON.stringify(updatedReminders));
+    
+    // Update local state
+    setWorkReminders(prev => prev.filter(r => r.id !== reminderId));
+    
+    if (workReminders.length <= 1) {
+      setShowWorkReminders(false);
+    }
+    
+    console.log(`✅ Work reminder ${reminderId} dismissed`);
+  };
 
   // Logout function
   const handleLogout = () => {
@@ -211,7 +318,6 @@ function Homepage() {
         const count = activeJobs.length;
         console.log('🎯 Setting active job count to:', count, '(filtered from', data.jobs?.length || 0, 'total jobs)');
         setJobCount(count);
-        setStats(prev => ({ ...prev, totalJobs: count }));
         
         // If no active jobs, check for in-progress jobs
         if (count === 0 && user?.type === 'worker') {
@@ -272,114 +378,7 @@ function Homepage() {
     }
   }, [user]);
 
-  // Fetch job statistics with same filtering as AvailableJobs
-  const fetchJobStats = useCallback(async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const queryParams = new URLSearchParams();
-      
-      // Add user-specific parameter for application status (same as AvailableJobs)
-      if (user.id && user.type === 'worker') {
-        queryParams.append('workerId', user.id);
-      }
-      
-      // Use dual status system - only count jobs where both worker and employer status are 'active'
-      
-      console.log('Fetching job stats with dual status params:', queryParams.toString());
-      
-      const response = await fetch(buildApiUrl(`/jobs/dual-status?${queryParams.toString()}`));
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📊 Dual status stats response:', data);
-        
-        // Filter jobs where both worker and employer status are 'active'
-        const activeJobs = data.jobs?.filter(job => 
-          job.workerStatus === 'active' && job.employerStatus === 'active'
-        ) || [];
-        
-        const count = activeJobs.length;
-        console.log('📊 Setting stats totalJobs to:', count, '(filtered from', data.jobs?.length || 0, 'total jobs)');
-        setStats(prev => ({
-          ...prev,
-          totalJobs: count
-        }));
-      } else {
-        console.warn('Failed to fetch job count:', response.status);
-      }
-    } catch (error) {
-      console.error('Error fetching job stats:', error);
-    }
-  }, []);
-
-  // Fetch category-wise job counts (excluding completed jobs for workers)
-  const fetchCategoryStats = useCallback(async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const categories = ['Construction', 'Agriculture', 'Household', 'Transportation', 'Manufacturing'];
-      const categoryPromises = categories.map(async (category) => {
-        const queryParams = new URLSearchParams();
-        queryParams.append('category', category);
-        queryParams.append('status', 'active'); // Same filtering as AvailableJobs
-        
-        // Add worker-specific filtering
-        if (user.id && user.type === 'worker') {
-          queryParams.append('workerId', user.id);
-        }
-        
-        const response = await fetch(buildApiUrl(`/jobs/count?${queryParams.toString()}`));
-        if (response.ok) {
-          const data = await response.json();
-          return { category, count: data.count || 0 };
-        }
-        return { category, count: 0 };
-      });
-      
-      const categoryResults = await Promise.all(categoryPromises);
-      const categoryData = {};
-      categoryResults.forEach(({ category, count }) => {
-        categoryData[category] = count;
-      });
-      
-      setStats(prev => ({
-        ...prev,
-        categories: categoryData
-      }));
-    } catch (error) {
-      console.error('Error fetching category stats:', error);
-    }
-  }, []);
-
-  // Fetch latest jobs with same filtering as AvailableJobs
-  const fetchLatestJobs = useCallback(async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const queryParams = new URLSearchParams();
-      
-      // Add user-specific parameter (same as AvailableJobs)
-      if (user.id && user.type === 'worker') {
-        queryParams.append('workerId', user.id);
-      }
-      
-      // Only show active and in-progress jobs (same as AvailableJobs)
-      queryParams.append('status', 'active,in-progres');
-      
-      const response = await fetch(buildApiUrl(`/api/jobs?${queryParams.toString()}`));
-      
-      if (response.ok) {
-        const jobsData = await response.json();
-        const jobsArray = Array.isArray(jobsData) ? jobsData : [];
-        
-        // Show only the latest 6 jobs for homepage
-        setRecentJobs(jobsArray.slice(0, 6));
-        
-        console.log(`Homepage: Showing ${jobsArray.slice(0, 6).length} latest jobs (filtered same as AvailableJobs)`);
-      }
-    } catch (error) {
-      console.error('Error fetching latest jobs:', error);
-      setRecentJobs([]);
-    }
-  }, []);
+  // Removed stats/category/latest jobs fetching for simplified homepage
 
   useEffect(() => {
     console.log('Homepage useEffect - user changed:', user);
@@ -395,19 +394,10 @@ function Homepage() {
     
     if (user?.type === 'worker') {
       console.log('User is worker, fetching worker-specific data');
-      fetchLatestJobs(); // This includes workerId for filtering
       fetchJobCount();
       fetchWorkerFinancials();
-      fetchJobStats();
-      fetchCategoryStats();
-    } else if (user?.type === 'employer') {
-      console.log('User is employer, fetching general job data');
-      fetchRecentJobs(); // General public job display
-    } else {
-      console.log('No user or guest user, fetching minimal public data');
-      fetchRecentJobs(); // Just public job display for homepage
     }
-  }, [user, fetchJobCount, fetchWorkerFinancials, fetchJobStats, fetchCategoryStats, fetchLatestJobs]);
+  }, [user, fetchJobCount, fetchWorkerFinancials]);
 
   const fetchShaktiScore = async (workerId) => {
     try {
@@ -423,21 +413,7 @@ function Homepage() {
     }
   };
 
-  const fetchRecentJobs = async () => {
-    try {
-              const response = await fetch(buildApiUrl('/jobs/recent'));
-      if (!response.ok) {
-        throw new Error('Failed to fetch recent jobs');
-      }
-      const data = await response.json();
-      setRecentJobs(data.slice(0, 3));
-    } catch (error) {
-      console.error('Error fetching recent jobs:', error);
-      setRecentJobs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Removed public recent jobs fetch for simplified homepage
 
   useEffect(() => {
     if (!isLoadingUser && user && user.type === 'worker') {
@@ -473,6 +449,15 @@ function Homepage() {
     navigate('/employer/post-job');
   };
 
+  const handleMyJobs = () => {
+    if (!isAuthenticated) {
+      toast.info(t('home.loginFirst'));
+      navigate('/login?type=worker');
+      return;
+    }
+    navigate('/worker/applications');
+  };
+
   const handleViewJobs = () => {
     navigate('/jobs');
     setShowJobNotification(false);
@@ -482,202 +467,71 @@ function Homepage() {
     setShowJobNotification(false);
   };
 
-  const renderUserProfile = () => {
-    if (!isAuthenticated) return null;
-
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl md:max-w-5xl mx-auto my-12 md:my-16 px-3 md:px-4"
-      >
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl md:rounded-3xl shadow-md overflow-hidden border border-gray-200/50">
-          <div className="relative p-4 md:p-8">
-            {/* Geometric Background Pattern - Enhanced for Mobile */}
-            <div className="absolute top-0 right-0 w-24 h-24 md:w-64 md:h-64 opacity-5">
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                <polygon points="50,0 100,50 50,100 0,50" fill="currentColor"/>
-              </svg>
-            </div>
-            
-            <div className="relative flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-              <div className="flex items-center space-x-4 md:space-x-6">
-                <div className="relative">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-black to-gray-800 rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-xl md:text-2xl font-bold text-white">
-                    {user?.name?.charAt(0)}
-                  </span>
-                </div>
-                  <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
-                </div>
-                
-                <div className="flex-1">
-                  <h3 className="text-lg md:text-2xl font-light text-gray-900 tracking-wide">{user?.name}</h3>
-                  <p className="text-xs md:text-sm text-gray-500 uppercase tracking-wide md:tracking-widest font-medium">{user?.type}</p>
-                  
-                  {user?.type === 'worker' && (
-                    <div className="mt-3 md:mt-4 flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 md:space-x-6">
-                      <div className="flex items-center">
-                        <Wallet className="w-4 h-4 mr-2 text-gray-400" />
-                        <span className="text-sm text-gray-700 font-medium">₹{workerBalance.toLocaleString()}</span>
-                      </div>
-                      
-                      {jobCountLoading ? (
-                        <div className="flex items-center">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full mr-2 animate-pulse"></div>
-                          <span className="text-sm text-gray-500">Loading jobs...</span>
-                        </div>
-                      ) : jobCount > 0 ? (
-                        <div className="flex items-center">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                          <span className="text-sm text-gray-700">
-                            {jobCount} jobs
-                          {user.location?.state && ` in ${user.location.state}`}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center">
-                          <div className="w-2 h-2 bg-gray-300 rounded-full mr-2"></div>
-                          <span className="text-sm text-gray-500">No jobs available</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {user?.type === 'worker' && shaktiScore !== null && (
-                    <div className="mt-2 inline-flex items-center">
-                      <span className="text-xs text-gray-500 uppercase tracking-wide md:tracking-widest mr-2">Trust Score</span>
-                      <span className="text-base md:text-lg font-light text-gray-900">{shaktiScore}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                <motion.button
-                  whileHover={{ scale: 1.02, y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate(`/${user.type}/profile`)}
-                  className="flex-1 px-4 py-3 md:px-6 bg-black text-white text-xs md:text-sm font-medium tracking-wide hover:bg-gray-800 transition-all duration-300 touch-manipulation rounded-2xl shadow-sm hover:shadow-md"
-                >
-                  PROFILE
-                </motion.button>
-                
-                {user.type === 'worker' && (jobCount > 0 || jobCountLoading) && (
-                  <motion.button
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleViewJobs}
-                    disabled={jobCountLoading}
-                    className="flex-1 px-4 py-3 md:px-6 border border-black text-black text-xs md:text-sm font-medium tracking-wide hover:bg-black hover:text-white transition-all duration-300 touch-manipulation rounded-2xl shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {jobCountLoading ? 'LOADING...' : `JOBS (${jobCount})`}
-                  </motion.button>
-                )}
-                
-                <motion.button
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleLogout}
-                  className="flex-1 px-4 py-3 md:px-6 bg-gradient-to-r from-red-500/5 to-red-600/5 border border-red-400/40 text-red-600 text-xs md:text-sm font-medium tracking-wide hover:from-red-500/15 hover:to-red-600/15 hover:border-red-500/60 hover:text-red-700 transition-all duration-300 touch-manipulation rounded-2xl backdrop-blur-sm shadow-sm hover:shadow-lg group"
-                >
-                  <LogOut className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform duration-300" />
-                  LOGOUT
-                </motion.button>
-              </div>
-            </div>
-          </div>
-          
-          {user?.type === 'worker' && recentEarnings.length > 0 && (
-            <div className="px-4 py-4 md:px-8 md:py-6 bg-gray-50 border-t">
-              <h4 className="text-xs md:text-sm font-medium text-gray-700 uppercase tracking-wide md:tracking-widest mb-3 md:mb-4">Recent Activity</h4>
-              <div className="space-y-2 md:space-y-3">
-                {recentEarnings.map((earning, index) => (
-                  <div key={index} className="flex justify-between items-center">
-                    <span className="text-xs md:text-sm text-gray-600 truncate pr-2">{earning.description}</span>
-                    <span className="text-xs md:text-sm font-medium text-gray-900 flex-shrink-0">+₹{earning.amount}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </motion.div>
-    );
+  const handleContactSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const name = formData.get('name');
+    toast.success(`Thanks${name ? `, ${name}` : ''}! We'll get back to you shortly.`);
+    event.currentTarget.reset();
   };
 
+  // Removed old boxed user profile component
+  const renderUserProfile = () => null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 relative overflow-hidden" style={{
-      background: `
-        linear-gradient(135deg, 
-          rgba(99, 102, 241, 0.1) 0%, 
-          rgba(59, 130, 246, 0.1) 25%, 
-          rgba(147, 51, 234, 0.1) 50%, 
-          rgba(236, 72, 153, 0.1) 75%, 
-          rgba(99, 102, 241, 0.1) 100%
-        ),
-        linear-gradient(45deg, 
-          rgba(99, 102, 241, 0.05) 0%, 
-          rgba(147, 51, 234, 0.05) 50%, 
-          rgba(59, 130, 246, 0.05) 100%
-        )
-      `
-    }}>
-      {/* Enhanced Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Primary animated blobs */}
-        <div className="absolute -top-20 -right-20 w-80 h-80 bg-gradient-to-br from-indigo-200 to-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob"></div>
-        <div className="absolute -bottom-20 left-0 w-96 h-96 bg-gradient-to-br from-blue-200 to-cyan-300 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 -left-20 w-72 h-72 bg-gradient-to-br from-purple-200 to-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-60 animate-blob animation-delay-4000"></div>
-        
-        {/* Secondary floating elements */}
-        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-gradient-to-br from-yellow-200 to-orange-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-1000"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-40 h-40 bg-gradient-to-br from-green-200 to-teal-300 rounded-full mix-blend-multiply filter blur-2xl opacity-40 animate-float animation-delay-3000"></div>
-        
-        {/* Additional floating orbs */}
-        <div className="absolute top-1/6 right-1/6 w-16 h-16 bg-gradient-to-br from-pink-200 to-rose-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-float animation-delay-1500"></div>
-        <div className="absolute bottom-1/6 left-1/6 w-20 h-20 bg-gradient-to-br from-emerald-200 to-green-300 rounded-full mix-blend-multiply filter blur-xl opacity-35 animate-float animation-delay-2500"></div>
-        
-        {/* Geometric shapes with enhanced animations */}
-        <div className="absolute top-1/3 right-1/3 w-24 h-24 bg-gradient-to-br from-red-200 to-pink-300 transform rotate-45 mix-blend-multiply filter blur-xl opacity-30 animate-pulse-glow"></div>
-        <div className="absolute bottom-1/3 left-1/3 w-20 h-20 bg-gradient-to-br from-cyan-200 to-blue-300 transform -rotate-45 mix-blend-multiply filter blur-xl opacity-30 animate-pulse-glow animation-delay-2000"></div>
-        
-        {/* Floating particles with enhanced effects */}
-        <div className="absolute top-1/6 left-1/6 w-2 h-2 bg-white rounded-full opacity-20 animate-bounce shadow-lg"></div>
-        <div className="absolute top-1/3 right-1/6 w-1 h-1 bg-white rounded-full opacity-30 animate-bounce animation-delay-1000 shadow-lg"></div>
-        <div className="absolute bottom-1/3 left-1/6 w-1.5 h-1.5 bg-white rounded-full opacity-25 animate-bounce animation-delay-2000 shadow-lg"></div>
-        <div className="absolute bottom-1/6 right-1/3 w-1 h-1 bg-white rounded-full opacity-20 animate-bounce animation-delay-3000 shadow-lg"></div>
-        <div className="absolute top-1/2 left-1/2 w-0.5 h-0.5 bg-white rounded-full opacity-40 animate-bounce animation-delay-1500 shadow-lg"></div>
-        <div className="absolute top-2/3 right-1/4 w-1.5 h-1.5 bg-white rounded-full opacity-25 animate-bounce animation-delay-3500 shadow-lg"></div>
-        
-        {/* Animated grid overlay */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0 animate-grid" style={{
-            backgroundImage: `
-              linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
-              linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: '50px 50px'
-          }}></div>
+    <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden devanagari">
+      {/* Dark patterns and subtle motion */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Soft radial vignette */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)',
+          }}
+        />
+        {/* Star trails effect */}
+        <div className="startrails absolute inset-0"></div>
+        {/* Grid lines */}
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
+        />
+        {/* Grain */}
+        <div className="absolute inset-0 opacity-10 noise-bg mix-blend-overlay" />
+        {/* Aurora animated background */}
+        <div className="aurora absolute inset-0">
+          <span className="aurora-blob aurora-a" />
+          <span className="aurora-blob aurora-b" />
+          <span className="aurora-blob aurora-c" />
         </div>
-        
-        {/* Radial gradient overlay */}
-        <div className="absolute inset-0 bg-radial-gradient opacity-20"></div>
-        
-        {/* Light rays effect */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-indigo-300 to-transparent animate-pulse"></div>
-          <div className="absolute top-0 right-1/3 w-px h-full bg-gradient-to-b from-transparent via-purple-300 to-transparent animate-pulse animation-delay-2000"></div>
-          <div className="absolute top-0 left-2/3 w-px h-full bg-gradient-to-b from-transparent via-blue-300 to-transparent animate-pulse animation-delay-4000"></div>
-        </div>
-        
-        {/* Floating geometric patterns */}
-        <div className="absolute top-1/4 right-1/4 w-12 h-12 border-2 border-indigo-300/30 rounded-full animate-spin"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-8 h-8 border-2 border-purple-300/30 rounded-full animate-spin animation-delay-2000"></div>
-        <div className="absolute top-3/4 right-1/6 w-6 h-6 border-2 border-blue-300/30 rounded-full animate-spin animation-delay-4000"></div>
       </div>
 
       <div className="relative z-10">
+        {/* Top-right controls: language + menu (no navbar) */}
+        <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-3 z-30">
+          <button onClick={toggleHomeLang} className="px-2.5 py-1 rounded-full text-xs md:text-sm bg-white/10 border border-white/15 text-white/90 hover:bg-white/15">
+            {isHindi ? 'HI' : 'EN'}
+          </button>
+          <button onClick={() => setShowHomeMenu(v=>!v)} className="p-2 md:p-3 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition-colors">
+            <span className="block w-5 md:w-6 h-0.5 bg-white mb-1"></span>
+            <span className="block w-4 md:w-5 h-0.5 bg-white mb-1"></span>
+            <span className="block w-6 md:w-7 h-0.5 bg-white"></span>
+          </button>
+        </div>
+        <AnimatePresence>
+          {showHomeMenu && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-16 right-4 md:right-6 w-56 bg-white/10 backdrop-blur-md border border-white/15 rounded-xl p-3 text-sm text-white z-40">
+              <button onClick={() => navigate(`/${user?.type || 'worker'}/profile`)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">{t('menu.profile', { ns: 'home' })}</button>
+              <button onClick={handleViewJobs} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">{t('menu.jobs', { ns: 'home' })}</button>
+              <button onClick={handleLogout} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">{t('menu.logout', { ns: 'home' })}</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {/* Mobile-Optimized Job Notification */}
       <AnimatePresence>
           {showJobNotification && user?.type === 'worker' && jobCount > 0 && !jobCountLoading && (
@@ -724,136 +578,349 @@ function Homepage() {
         )}
       </AnimatePresence>
 
-                {/* Hero Section */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50/50 via-blue-50/50 to-purple-50/50 backdrop-blur-sm">
-          {/* Hero Background Elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            {/* Hero-specific animated elements */}
-            <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-gradient-to-br from-indigo-200/40 to-purple-300/40 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob"></div>
-            <div className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-gradient-to-br from-blue-200/40 to-cyan-300/40 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-purple-200/30 to-pink-300/30 rounded-full mix-blend-multiply filter blur-3xl opacity-40 animate-float"></div>
-            
-            {/* Floating particles for hero */}
-            <div className="absolute top-1/3 left-1/3 w-2 h-2 bg-white rounded-full opacity-30 animate-bounce shadow-lg"></div>
-            <div className="absolute top-2/3 right-1/3 w-1 h-1 bg-white rounded-full opacity-25 animate-bounce animation-delay-1000 shadow-lg"></div>
-            <div className="absolute bottom-1/3 left-2/3 w-1.5 h-1.5 bg-white rounded-full opacity-20 animate-bounce animation-delay-2000 shadow-lg"></div>
-            
-            {/* Light rays for hero */}
-            <div className="absolute top-0 left-1/3 w-px h-full bg-gradient-to-b from-transparent via-indigo-300/30 to-transparent animate-pulse"></div>
-            <div className="absolute top-0 right-1/3 w-px h-full bg-gradient-to-b from-transparent via-purple-300/30 to-transparent animate-pulse animation-delay-2000"></div>
-            
-            {/* Geometric patterns for hero */}
-            <div className="absolute top-1/4 right-1/6 w-16 h-16 border-2 border-indigo-300/20 rounded-full animate-spin"></div>
-            <div className="absolute bottom-1/4 left-1/6 w-12 h-12 border-2 border-purple-300/20 rounded-full animate-spin animation-delay-2000"></div>
-          </div>
-          
-            <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-            <div className="pt-16 pb-16 md:pt-24 md:pb-24">
+          <div className="relative">
+            <div className="relative max-w-7xl mx-auto px-6 md:px-8 py-32 md:py-48">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="text-center"
+              >
+               
+                <div className="relative inline-block">
+            <div
+              className="absolute -inset-12 rounded-full blur-3xl opacity-30"
+              style={{
+                background:
+                  'radial-gradient(400px 160px at 50% 50%, rgba(120,120,255,0.2), transparent 70%)',
+              }}
+            />
+            <div className="relative flex items-center justify-center gap-4 md:gap-6">
+             
+              {isHindi ? (
+                <img 
+                  src="/sindh.svg" 
+                  alt="सिंधु" 
+                  className="relative w-40 h-30 sm:w-48 sm:h-36 md:w-56 md:h-42 filter invert brightness-0 drop-shadow-lg" 
+                />
+              ) : (
+                <img 
+                  src="/sindh.svg" 
+                  alt="सिंधु" 
+                  className="relative w-40 h-30 sm:w-48 sm:h-36 md:w-56 md:h-42 filter invert brightness-0 drop-shadow-lg" 
+                />
+              )}
+            </div>
+            {isAuthenticated && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="relative mt-6 flex flex-wrap items-center justify-center gap-4 text-white/90"
+              >
+                <button
+                  onClick={() => setShowUserMenu(v => !v)}
+                  className="relative inline-flex items-center gap-4 px-5 py-3 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-sm transition-colors"
+                >
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-bold tracking-wide text-lg">
+              {user?.name?.charAt(0)?.toUpperCase()}
+                </div>
+                  <div className="text-left">
+              <div className="text-base sm:text-lg font-semibold leading-tight">{user?.name}</div>
+              <div className="text-xs sm:text-sm uppercase tracking-widest text-white/70">{user?.type}</div>
+              </div>
+                  <svg className={`w-5 h-5 text-white/70 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd"/></svg>
+                </button>
 
-                      {/* Compact Mobile-Friendly Welcome Header */}
-        <AnimatePresence>
-          {isAuthenticated ? (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center mb-6 md:mb-8"
-            >
-              <div className="relative mx-2 sm:mx-0">
-                <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
-                  <div className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="flex items-center justify-between">
-                      {/* Compact User Info */}
-                      <div className="flex items-center">
-                        <div className="relative">
-                          <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold text-sm md:text-base shadow-md">
-                            {user.name?.charAt(0)?.toUpperCase() || 'U'}
-                          </div>
-                          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 md:w-3 md:h-3 bg-green-500 rounded-full border border-white animate-pulse"></div>
-                        </div>
-                        <div className="ml-3">
-                          <h3 className="text-sm md:text-base font-medium text-gray-900 leading-tight">
-                            {user?.name 
-                              ? `Welcome back, ${user.name.split(' ')[0]}!` 
-                              : 'Welcome to SINDH Platform!'}
-                          </h3>
-                          <p className="text-xs md:text-sm text-gray-500 capitalize">
-                            {user.type} • Online
-                            {workerProfile?.location 
-                              ? ` • ${workerProfile.location.city ? `${workerProfile.location.city}, ` : ''}${workerProfile.location.state || ''}` 
-                              : ` • ${user?.location?.state || 'Update your location in profile'}`}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {/* Compact Actions */}
-                      <div className="flex items-center space-x-2 md:space-x-3">
-                        {user?.type === 'worker' && jobCount > 0 && !jobCountLoading && (
-                          <motion.div
-                            initial={{ scale: 0.8 }}
-                            animate={{ scale: 1 }}
-                            className="relative"
-                          >
-                            <div className="px-2 py-1 md:px-3 md:py-1.5 bg-green-500 text-white text-xs md:text-sm font-medium rounded-lg shadow-sm">
-                              <div className="flex items-center">
-                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full mr-1.5 animate-pulse"></div>
-                                {jobCount} jobs
-                                {user.location?.state && (
-                                  <span className="hidden sm:inline"> in {user.location.state}</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-                          </motion.div>
-                        )}
-                        
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={handleLogout}
-                          className="px-3 py-1.5 md:px-4 md:py-2 bg-gray-100 text-gray-700 text-xs md:text-sm font-medium rounded-lg hover:bg-gray-200 transition-all duration-200 flex items-center shadow-sm"
-                        >
-                          <LogOut className="w-3 h-3 md:w-4 md:h-4 mr-1.5" />
-                          <span className="hidden sm:inline">Logout</span>
-                        </motion.button>
-                      </div>
+                <AnimatePresence>
+                  {showUserMenu && (
+                <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                className="absolute top-full mt-4 w-[min(92vw,580px)] left-1/2 -translate-x-1/2"
+              >
+                <div className="relative px-4">
+                  <div className="absolute inset-x-6 -top-2 h-8 bg-gradient-to-b from-white/10 to-transparent blur-2xl opacity-60 pointer-events-none" />
                     </div>
+                <div className="mx-auto max-w-3xl grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                  <button onClick={() => navigate(`/${user.type}/profile`)} className="group flex items-center justify-between p-4 sm:p-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors">
+                    <span className="text-sm sm:text-base font-semibold tracking-wide">Profile</span>
+                    <span className="text-xs sm:text-sm text-white/60 group-hover:text-white/80">→</span>
+                  </button>
+                  <button onClick={handleLogout} className="group flex items-center justify-between p-4 sm:p-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors">
+                    <span className="text-sm sm:text-base font-semibold tracking-wide">Logout</span>
+                    <span className="text-xs sm:text-sm text-white/60 group-hover:text-white/80">↘</span>
+                  </button>
+                  {user?.type === 'worker' && (
+                    <div className="flex items-center justify-between p-4 sm:p-5 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-sm sm:text-base font-semibold tracking-wide">Wallet</span>
+                <span className="text-sm sm:text-base">₹{workerBalance.toLocaleString()}</span>
+                  </div>
+                  )}
+                </div>
+                </motion.div>
+              )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+                </div>
+                <p className="mt-6 text-xl md:text-2xl text-gray-400 max-w-2xl mx-auto">
+           
+                </p>
+                <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
+              <motion.button
+              whileHover={{ y: -2, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+              onClick={!user ? () => navigate('/login?type=worker') : (user?.type === 'employer' ? () => navigate('/employer/posted-jobs') : handleFindWork)}
+              className="px-10 py-4 rounded-xl bg-white text-black font-medium inline-flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)] text-lg"
+            >
+              {!user 
+                ? t('home.ctaPrimary', { ns: 'home' })
+                : user?.type === 'employer'
+                  ? t('home.ctaPrimaryEmployer', { ns: 'home' })
+                  : t('home.ctaPrimaryWorker', { ns: 'home' })}
+              <ArrowRight className="w-6 h-6 ml-3" />
+            </motion.button>
+            <motion.button
+              whileHover={{ y: -2, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+              onClick={!user ? () => navigate('/login?type=employer') : (user?.type === 'employer' ? handlePostJob : handleMyJobs)}
+              className="px-10 py-4 rounded-xl bg-neutral-900 text-white border border-white/10 hover:border-white/20 font-medium text-lg"
+              >
+              {!user 
+                ? t('home.ctaSecondary', { ns: 'home' })
+                : user?.type === 'employer'
+                  ? t('home.ctaSecondaryEmployer', { ns: 'home' })
+                  : 'My Jobs'}
+              </motion.button>
+                  </div>
+              </motion.div>
+
+              {/* Adaptive layout for worker/employer */}
+            {user?.type === 'employer' ? (
+              <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-stretch">
+                {/* Big CTA card */}
+                <motion.div whileHover={{ y: -2 }} className="md:col-span-2 rounded-2xl bg-white/5 border border-white/10 p-6 md:p-10 flex flex-col justify-between">
+                  <div>
+                   
+                    <h3 className="mt-2 text-2xl md:text-4xl font-extrabold text-white">{t('home.employer.hero.title', { ns: 'home' })}</h3>
+                    <p className="mt-2 text-sm md:text-base text-white/70">{t('home.employer.hero.body', { ns: 'home' })}</p>
+                    </div>
+                  <div className="mt-6">
+                    <button onClick={handlePostJob} className="px-6 md:px-8 py-3 md:py-4 rounded-xl bg-white text-black font-semibold hover:opacity-95">{t('home.employer.hero.button', { ns: 'home' })}</button>
+                  </div>
+                </motion.div>
+                {/* Stat tiles */}
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Posted Jobs</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">{workerProfile?.postedJobs ?? 0}</div>
+                </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Active Hires</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">{workerProfile?.activeHires ?? 0}</div>
+              </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Completed</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">{workerProfile?.completedHires ?? 0}</div>
+                  </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Budget</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">₹{(workerProfile?.budget ?? 0).toLocaleString()}</div>
                   </div>
                 </div>
               </div>
-            </motion.div>
-          ) : (
+            ) : (
+              <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-stretch">
+                {/* Big CTA card */}
+                <motion.div whileHover={{ y: -2 }} className="md:col-span-2 rounded-2xl bg-white/5 border border-white/10 p-6 md:p-10 flex flex-col justify-between">
+                  <div>
+                    
+                    <h3 className="mt-2 text-2xl md:text-4xl font-extrabold text-white">{t('home.worker.hero.title', { ns: 'home' })}</h3>
+                    <p className="mt-2 text-sm md:text-base text-white/70">{t('home.worker.hero.body', { ns: 'home' })}</p>
+                        </div>
+                  <div className="mt-6">
+                    <button onClick={handleViewJobs} className="px-6 md:px-8 py-3 md:py-4 rounded-xl bg-white text-black font-semibold hover:opacity-95">{t('home.worker.hero.button', { ns: 'home' })}</button>
+                        </div>
+                </motion.div>
+                {/* Stat tiles */}
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Active Jobs</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">{jobCountLoading ? '…' : jobCount}</div>
+                    {user?.location?.state && (<div className="text-[10px] md:text-xs text-white/50 mt-1">in {user.location.state}</div>)}
+                      </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Completed</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">{workerProfile?.completedJobs ?? 0}</div>
+                    <div className="text-[10px] md:text-xs text-white/50 mt-1">All time</div>
+                    </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Wallet</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">₹{workerBalance.toLocaleString()}</div>
+                    <div className="text-[10px] md:text-xs text-white/50 mt-1">Available</div>
+                  </div>
+                  <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-white/60 mb-1">Trust</div>
+                    <div className="text-2xl md:text-3xl font-bold text-white">{(user?.type === 'worker' && shaktiScore !== null) ? shaktiScore : (workerProfile?.rating?.average ?? '—')}</div>
+                    <div className="text-[10px] md:text-xs text-white/50 mt-1">Score</div>
+                </div>
+              </div>
+              </div>
+          )}
+                      </div>
+                    </div>
+
+        {/* Contact + Contact Form (Hindi) */}
+        <section className="relative max-w-7xl mx-auto px-6 md:px-8 pb-24">
+          <div className="grid md:grid-cols-2 gap-8">
+              <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="rounded-2xl bg-neutral-900/60 border border-white/10 p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            >
+              <h4 className="text-white text-2xl font-semibold tracking-wide mb-4">संपर्क</h4>
+              <p className="text-sm text-gray-400 leading-relaxed mb-6">Have a question or want to work with us? Send a message and we’ll reply within 1–2 business days.</p>
+              <div className="space-y-2 text-sm">
+                <div className="text-gray-400">Address</div>
+                <div className="text-white/90">SINDH Platform, India</div>
+                <div className="text-gray-400 mt-4">Phone</div>
+                <div className="text-white/90">+91-00000-00000</div>
+                <div className="text-gray-400 mt-4">Email</div>
+                <div className="text-white/90">hello@SINDH.app</div>
+                </div>
+              </motion.div>
+
+            <motion.form
+              onSubmit={handleContactSubmit}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="rounded-2xl bg-neutral-900/60 border border-white/10 p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            >
+              <h4 className="text-white text-2xl font-semibold tracking-wide mb-4">Contact Form</h4>
+              <div className="grid grid-cols-1 gap-4">
+                <input name="name" placeholder="Name" className="bg-neutral-800/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/20" />
+                <input name="email" type="email" placeholder="Email" className="bg-neutral-800/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/20" />
+                <textarea name="message" placeholder="Message" rows={5} className="bg-neutral-800/60 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/20" />
+                <button type="submit" className="mt-2 inline-flex items-center justify-center px-6 py-3 rounded-xl bg-white text-black font-medium hover:opacity-95">Send Message</button>
+            </div>
+            </motion.form>
+          </div>
+        </section>
+
+        {/* Removed old boxed user profile */}
+
+        {/* Work Reminders Section */}
+        <AnimatePresence>
+          {showWorkReminders && workReminders.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center mb-6 md:mb-8"
+              exit={{ opacity: 0, y: -20 }}
+              className="py-4 md:py-6"
             >
-              <div className="relative mx-2 sm:mx-0">
-                <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200/50 overflow-hidden">
-                  <div className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-semibold text-sm md:text-base shadow-md">
-                          <span className="text-lg md:text-xl">🚀</span>
-                        </div>
-                        <div className="ml-3">
-                          <h3 className="text-sm md:text-base font-medium text-gray-900">
-                            Welcome to INDUS
-                          </h3>
-                          <p className="text-xs md:text-sm text-gray-500">
-                            Your digital employment platform
-                          </p>
-                        </div>
+              <div className="max-w-4xl mx-auto px-4 md:px-6">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 md:p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center mr-3">
+                        <Briefcase className="w-4 h-4 text-white" />
                       </div>
-                      
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => navigate('/login')}
-                        className="px-4 py-2 md:px-6 md:py-2.5 bg-black text-white text-xs md:text-sm font-medium rounded-lg hover:bg-gray-800 transition-all duration-200 flex items-center shadow-sm"
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {user?.type === 'employer' ? 'Active Work Assignments' : 'Work Reminders'}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {user?.type === 'employer' 
+                            ? 'Workers currently working on your jobs' 
+                            : 'Your active work assignments'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowWorkReminders(false)}
+                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {workReminders.map((reminder) => (
+                      <motion.div
+                        key={reminder.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="bg-white rounded-lg p-4 border border-blue-100 shadow-sm"
                       >
-                        <span className="mr-1.5">Get Started</span>
-                        <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
-                      </motion.button>
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center mb-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                              <h4 className="font-medium text-gray-900">
+                                {reminder.jobTitle}
+                              </h4>
+                            </div>
+                            <div className="text-sm text-gray-600 space-y-1">
+                              {user?.type === 'employer' ? (
+                                <>
+                                  <p>Worker: <span className="font-medium">{reminder.workerName}</span></p>
+                                  <p>Phone: <span className="font-medium">{reminder.workerPhone}</span></p>
+                                </>
+                              ) : (
+                                <p>{reminder.message}</p>
+                              )}
+                              <p>Started: <span className="font-medium">
+                                {new Date(reminder.startedAt).toLocaleDateString()} at {new Date(reminder.startedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </span></p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {user?.type === 'employer' && reminder.workerPhone && (
+                              <button
+                                onClick={() => window.open(`tel:${reminder.workerPhone}`)}
+                                className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                title="Call Worker"
+                              >
+                                <Phone className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => dismissWorkReminder(reminder.id)}
+                              className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                              title="Dismiss Reminder"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-blue-200">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">
+                        {workReminders.length} active reminder{workReminders.length !== 1 ? 's' : ''}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (user?.type === 'employer') {
+                            navigate('/employer/posted-jobs');
+                          } else {
+                            navigate('/worker/my-applications');
+                          }
+                        }}
+                        className="text-gray-900 hover:text-black font-medium flex items-center"
+                      >
+                        View All
+                        <ArrowRight className="w-3 h-3 ml-1" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -862,135 +929,6 @@ function Homepage() {
           )}
         </AnimatePresence>
 
-              {/* Clean Main Title */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-center mb-12 md:mb-16"
-              >
-                <div className="relative mb-8 md:mb-10">
-                  <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-gray-900 tracking-tight">
-                    INDUS
-                  </h1>
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-20 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent"></div>
-                </div>
-
-                <h2 className="text-xl md:text-2xl lg:text-3xl font-light text-gray-600 tracking-wide mb-8 md:mb-10 px-4 md:px-0">
-                  Digital Employment Platform
-                </h2>
-              </motion.div>
-
-              {/* Clean Action Buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="flex flex-col gap-4 md:gap-6 justify-center items-center max-w-lg md:max-w-4xl mx-auto mb-12 md:mb-16 px-4 md:px-0"
-              >
-                <motion.button
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={!user ? () => navigate('/login?type=worker') : (user?.type === 'employer' ? () => navigate('/employer/posted-jobs') : handleFindWork)}
-                  className="w-full md:w-auto px-8 py-4 bg-black text-white font-medium rounded-2xl hover:bg-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
-                >
-                  <span className="text-base">
-                    {!user ? 'Find Job' : (user?.type === 'employer' ? 'Posted Jobs' : (user?.type === 'worker' ? 'Find Work' : 'Find Workers'))}
-                  </span>
-                  <ArrowRight className="w-5 h-5 ml-3" />
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={!user ? () => navigate('/login?type=employer') : handlePostJob}
-                  className="w-full md:w-auto px-8 py-4 border-2 border-black text-black font-medium rounded-2xl hover:bg-black hover:text-white transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
-                >
-                  <span className="text-base">
-                    {!user ? 'Post Job' : (user?.type === 'employer' ? 'Post New Job' : 'Hire Workers')}
-                  </span>
-                  <ArrowRight className="w-5 h-5 ml-3" />
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => navigate('/chat-mode')}
-                  className="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-2xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
-                >
-                  <MessageCircle className="w-5 h-5 mr-3" />
-                  <span className="text-base">AI Assistant</span>
-                  <span className="ml-3 px-3 py-1 bg-white/20 text-white text-xs font-medium rounded-full">
-                    New
-                  </span>
-                </motion.button>
-              </motion.div>
-            </div>
-          </div>
-        </div>
-
-        {/* User Profile Section */}
-        {renderUserProfile()}
-
-        {/* Mobile-Optimized AI Assistant Highlight with Glass Effect */}
-        <div className="py-8 md:py-12 bg-gradient-to-br from-indigo-50/30 via-blue-50/30 to-purple-50/30 backdrop-blur-sm relative overflow-hidden">
-
-              <motion.div
-            initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-            className="max-w-md md:max-w-2xl mx-auto text-center px-4 md:px-0 relative z-10"
-          >
-            <div className="p-6 md:p-8 border border-gray-200/30 bg-white/30 backdrop-blur-md relative overflow-hidden rounded-2xl">
-              {/* Inner pattern overlay */}
-              <div className="absolute inset-0 opacity-5">
-                <motion.div
-                  className="absolute top-2 right-2 w-8 h-8"
-                  animate={{
-                    rotate: [0, 180, 360],
-                    scale: [1, 1.1, 1]
-                  }}
-                  transition={{
-                    duration: 8,
-                    repeat: Infinity,
-                    ease: "linear"
-                  }}
-                >
-                  <svg viewBox="0 0 100 100" className="w-full h-full">
-                    <polygon points="50,10 90,50 50,90 10,50" fill="black" />
-                  </svg>
-                </motion.div>
-                  </div>
-
-              <div className="relative z-10">
-                <motion.div
-                  className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mx-auto mb-4 md:mb-6 flex items-center justify-center rounded-2xl"
-                  animate={{
-                    scale: [1, 1.05, 1]
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-white" />
-              </motion.div>
-                <h3 className="text-lg md:text-xl font-light text-gray-900 mb-3 md:mb-4 tracking-wide">AI ASSISTANT</h3>
-                <p className="text-sm md:text-base text-gray-600 font-light leading-relaxed mb-4 md:mb-6">
-                  Instant help with jobs and platform guidance.
-                  </p>
-                  <button
-                    onClick={() => navigate('/chat-mode')}
-                  className="inline-flex items-center px-4 py-3 md:px-6 bg-black/90 backdrop-blur-md text-white text-sm font-medium tracking-wide md:tracking-widest hover:bg-gray-800 transition-colors touch-manipulation rounded-2xl"
-                  >
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                  TRY AI ASSISTANT
-                  </button>
-              </div>
-                </div>
-              </motion.div>
-        </div>
 
         {/* Motivational Quote Section */}
         <div className="py-8 md:py-12 bg-gradient-to-br from-indigo-50/20 via-blue-50/20 to-purple-50/20 backdrop-blur-sm relative overflow-hidden">
@@ -1022,222 +960,50 @@ function Homepage() {
                 </motion.div>
                   </div>
 
-              <div className="relative z-10">
-                <motion.div
-                  className="w-12 h-12 md:w-16 md:h-16 bg-black/90 backdrop-blur-sm mx-auto mb-4 md:mb-6 flex items-center justify-center rounded-2xl"
-                  animate={{
-                    scale: [1, 1.05, 1]
-                  }}
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  <span className="text-white text-lg md:text-2xl font-bold">💪</span>
-                </motion.div>
-                <blockquote className="text-lg md:text-2xl lg:text-3xl font-bold text-gray-900 mb-3 md:mb-4 leading-tight">
-                  "Work! As if you were chased by a dawgg!!"
-                </blockquote>
-                <cite className="text-sm md:text-base text-gray-600 font-medium">
-                  — Amar
-                </cite>
-            </div>
+              
           </div>
           </motion.div>
       </div>
 
-        {/* Mobile-Optimized Stats Grid with Glass Effect */}
-        <div className="py-8 md:py-12 bg-gradient-to-br from-indigo-50/25 via-blue-50/25 to-purple-50/25 backdrop-blur-sm relative overflow-hidden">
-
-          <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 relative z-10">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="text-center mb-10 md:mb-16"
-            >
-              <h2 className="text-2xl md:text-4xl font-light text-gray-900 tracking-wide mb-3 md:mb-4">
-                Platform Stats
-            </h2>
-              <div className="w-12 md:w-16 h-px bg-black mx-auto mb-4 md:mb-8"></div>
-              <p className="text-base md:text-xl text-gray-600 max-w-2xl mx-auto font-light px-4 md:px-0">
-                Connecting communities across India
-              </p>
-            </motion.div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            <motion.div
-                whileHover={{ y: -2 }}
-                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-              >
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                  <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.totalJobs}</h3>
-                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Active Jobs</p>
-            </motion.div>
-
-            <motion.div
-                whileHover={{ y: -2 }}
-                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-              >
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                  <Users className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.activeWorkers}</h3>
-                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Active Workers</p>
-            </motion.div>
-
-            <motion.div
-                whileHover={{ y: -2 }}
-                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-              >
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                  <Briefcase className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.successfulMatches}</h3>
-                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Successful Matches</p>
-            </motion.div>
-
-            <motion.div
-                whileHover={{ y: -2 }}
-                className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-              >
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                  <Star className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <h3 className="text-lg md:text-xl font-medium mb-2 md:mb-3 tracking-wide">{stats.averageRating}</h3>
-                <p className="text-xs md:text-sm text-gray-600 font-light uppercase tracking-wider">Average Rating</p>
-            </motion.div>
-          </div>
-        </div>
-        </div>
-      </div>
-
-      {/* Local Matching Section with Glass Effect */}
-      <section className="py-12 md:py-20 bg-gradient-to-br from-indigo-50/35 via-blue-50/35 to-purple-50/35 backdrop-blur-sm relative overflow-hidden">
-        
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-10 md:mb-16">
-            <h2 className="text-2xl md:text-4xl font-light text-gray-900 tracking-wide mb-3 md:mb-4">
-              Local Matching
-            </h2>
-            <div className="w-12 md:w-16 h-px bg-black mx-auto mb-4 md:mb-8"></div>
-            <p className="text-base md:text-xl text-gray-600 max-w-3xl mx-auto font-light px-4 md:px-0">
-              Connecting communities efficiently
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-            >
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                <div className="text-white text-lg md:text-xl">🏘️</div>
-              </div>
-              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Hyperlocal</h3>
-              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">Village-level job matching</p>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-            >
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                <div className="text-white text-lg md:text-xl">🤝</div>
-              </div>
-              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Direct Connect</h3>
-              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">No middleman approach</p>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-            >
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                <div className="text-white text-lg md:text-xl">💼</div>
-              </div>
-              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Local Hiring</h3>
-              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">Community-based recruitment</p>
-            </motion.div>
-
-            <motion.div
-              whileHover={{ y: -2 }}
-              className="bg-white/60 backdrop-blur-md p-4 md:p-8 border border-gray-100/50 group touch-manipulation rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300"
-            >
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-black/90 backdrop-blur-sm mb-4 md:mb-6 flex items-center justify-center group-hover:bg-gray-800 transition-colors rounded-2xl">
-                <div className="text-white text-lg md:text-xl">🌱</div>
-              </div>
-              <h3 className="text-sm md:text-lg font-medium mb-2 md:mb-3 tracking-wide">Growth</h3>
-              <p className="text-xs md:text-base text-gray-600 font-light hidden md:block">Economic development focus</p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Mobile-Optimized Recent Jobs Section with Glass Effect */}
-      <div className="py-12 md:py-20 bg-gradient-to-br from-indigo-50/30 via-blue-50/30 to-purple-50/30 backdrop-blur-sm relative overflow-hidden">
-        
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 relative z-10">
-          <div className="text-center mb-10 md:mb-16">
-            <h2 className="text-2xl md:text-4xl font-light text-gray-900 tracking-wide mb-3 md:mb-4">
-              Recent Jobs
-            </h2>
-            <div className="w-12 md:w-16 h-px bg-black mx-auto mb-4 md:mb-8"></div>
-            <p className="text-base md:text-xl text-gray-600 max-w-2xl mx-auto font-light px-4 md:px-0">
-              Latest opportunities from trusted employers
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center">
-              <div className="w-6 h-6 md:w-8 md:h-8 border border-gray-300 border-t-black rounded-full animate-spin"></div>
-            </div>
-          ) : recentJobs.length > 0 ? (
-            <div className="grid gap-4 md:gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {recentJobs.map((job) => (
-                <motion.div
-                  key={job._id}
-                  whileHover={{ y: -2 }}
-                  className="bg-white/70 backdrop-blur-md border border-gray-100/50 shadow-sm hover:shadow-lg group touch-manipulation rounded-2xl transition-all duration-300"
-                >
-                  <div className="p-4 md:p-8">
-                    <h3 className="text-lg md:text-xl font-medium text-gray-900 mb-1 md:mb-2 tracking-wide line-clamp-2">{job.title}</h3>
-                    <p className="text-xs md:text-sm text-gray-500 uppercase tracking-wide md:tracking-widest mb-4 md:mb-6 truncate">{job.companyName || job.company}</p>
-                    
-                    <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
-                      <div className="flex items-center text-xs md:text-sm text-gray-600">
-                        <MapPin className="w-3 h-3 md:w-4 md:h-4 mr-2 flex-shrink-0" />
-                        <span className="truncate">{job.location?.city ? `${job.location.city}, ${job.location.state}` : 'Remote'}</span>
-                    </div>
-                      <div className="flex items-center text-xs md:text-sm text-gray-600">
-                        <Wallet className="w-3 h-3 md:w-4 md:h-4 mr-2 flex-shrink-0" />
-                        <span>₹{job.salary?.toLocaleString() || 'Negotiable'}</span>
-                      </div>
-                    </div>
-                    
-                      <button
-                      onClick={() => navigate(`/jobs/${job._id}`)}
-                      className="w-full bg-black/90 backdrop-blur-sm text-white py-3 md:py-3 text-xs md:text-sm font-medium tracking-wide md:tracking-widest hover:bg-gray-800 transition-colors group-hover:bg-gray-800 touch-manipulation rounded-2xl"
-                    >
-                      VIEW DETAILS
-                      </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center px-4 md:px-0">
-              <p className="text-sm md:text-base text-gray-500 font-light">No jobs available at the moment</p>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Add global styles for animations */}
       <style jsx global>{`
+        /* Devanagari font stack for Hindi */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap');
+        .devanagari {
+          font-family: 'Noto Sans Devanagari', 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+        }
+
+        /* Subtle film grain */
+        .noise-bg {
+          background-image: url('data:image/svg+xml;utf8,\
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">\
+              <filter id="noise">\
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>\
+                <feColorMatrix type="saturate" values="0"/>\
+                <feComponentTransfer>\
+                  <feFuncA type="table" tableValues="0 0.2"/>\
+                </feComponentTransfer>\
+              </filter>\
+              <rect width="100%" height="100%" filter="url(%23noise)" opacity="0.4"/>\
+            </svg>');
+        }
+        /* Subtle film grain */
+        .noise-bg {
+          background-image: url('data:image/svg+xml;utf8,\
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">\
+              <filter id="noise">\
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>\
+                <feColorMatrix type="saturate" values="0"/>\
+                <feComponentTransfer>\
+                  <feFuncA type="table" tableValues="0 0.2"/>\
+                </feComponentTransfer>\
+              </filter>\
+              <rect width="100%" height="100%" filter="url(%23noise)" opacity="0.4"/>\
+            </svg>');
+        }
+
         @keyframes blob {
           0% { 
             transform: translate(0px, 0px) scale(1) rotate(0deg); 
@@ -1335,6 +1101,42 @@ function Homepage() {
           background: rgba(255, 255, 255, 0.1);
           border: 1px solid rgba(255, 255, 255, 0.2);
         }
+
+        /* Aurora effect */
+        .aurora-blob {
+          position: absolute;
+          width: 60vmax;
+          height: 60vmax;
+          filter: blur(60px);
+          opacity: 0.2;
+        }
+        .aurora-a { background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.6), transparent 60%); left: -20vmax; top: -10vmax; animation: drift 18s ease-in-out infinite; }
+        .aurora-b { background: radial-gradient(circle at 70% 40%, rgba(236,72,153,0.5), transparent 60%); right: -25vmax; top: -5vmax; animation: drift 22s ease-in-out infinite reverse; }
+        .aurora-c { background: radial-gradient(circle at 40% 70%, rgba(34,197,94,0.5), transparent 60%); left: 10vmax; bottom: -20vmax; animation: drift 26s ease-in-out infinite; }
+        @keyframes drift {
+          0%, 100% { transform: translate3d(0,0,0) rotate(0deg); }
+          50% { transform: translate3d(5vmax, -3vmax, 0) rotate(20deg); }
+        }
+
+        /* Star trails background - radial streaks rotating subtly */
+        .startrails { position:absolute; inset:0; background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%); overflow:hidden; }
+        .startrails::before, .startrails::after { content:""; position:absolute; inset:-20%; background-repeat:repeat; background-size: 300px 300px; mix-blend-mode: screen; opacity:.25; border-radius:50%; filter: blur(0.2px); }
+        /* Layer 1 - long streaks */
+        .startrails::before { background-image:
+            radial-gradient(2px 120px at 50% 0%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1.5px 100px at 80% 10%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1.2px 90px at 20% 30%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1.8px 110px at 70% 60%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 60%);
+          animation: trails-rotate 140s linear infinite; }
+        /* Layer 2 - shorter streaks */
+        .startrails::after { background-image:
+            radial-gradient(1px 60px at 30% 10%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 70px at 60% 40%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 50px at 10% 80%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 65px at 90% 50%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%);
+          animation: trails-rotate-rev 200s linear infinite; opacity:.18; }
+        @keyframes trails-rotate { from{ transform: rotate(0deg); } to{ transform: rotate(360deg);} }
+        @keyframes trails-rotate-rev { from{ transform: rotate(360deg);} to{ transform: rotate(0deg);} }
       `}</style>
     </div>
   );

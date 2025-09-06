@@ -3,10 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const workerRoutes = require('./routes/workerRoutes');
+const Worker = require('./models/Worker');
 const employerRoutes = require('./routes/employerRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const jobApplicationRoutes = require('./routes/jobApplicationRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const translationRoutes = require('./routes/translationRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 const app = express();
@@ -72,6 +74,15 @@ const initializeServer = async () => {
       });
     });
 
+    // Ensure indexes (fix legacy aadhar unique index issue)
+    try {
+      if (Worker && typeof Worker.ensureIndexes === 'function') {
+        Worker.ensureIndexes();
+      }
+    } catch (e) {
+      console.warn('Worker index ensure skipped:', e?.message);
+    }
+
     // Routes
     app.use('/api/auth', authRoutes);
     app.use('/api/workers', workerRoutes);
@@ -79,6 +90,7 @@ const initializeServer = async () => {
     app.use('/api/jobs', jobRoutes);
     app.use('/api/job-applications', jobApplicationRoutes);
     app.use('/api/notifications', notificationRoutes);
+    app.use('/api/translate', translationRoutes);
 
     // Error handling middleware
     app.use((err, req, res, next) => {
@@ -101,6 +113,8 @@ const initializeServer = async () => {
       
       console.log('🎉 Your service is live!');
     });
+
+    // Index ensure already attempted above
   } catch (error) {
     console.error('❌ Server initialization failed:', error.message);
     process.exit(1);

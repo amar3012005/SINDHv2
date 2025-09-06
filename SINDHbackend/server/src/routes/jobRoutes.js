@@ -419,7 +419,7 @@ router.get('/count', async (req, res) => {
         const completedJobs = await JobApplication.aggregate([
           {
             $match: {
-              worker: mongoose.Types.ObjectId(workerId),
+              worker: new mongoose.Types.ObjectId(workerId),
               status: 'completed'
             }
           },

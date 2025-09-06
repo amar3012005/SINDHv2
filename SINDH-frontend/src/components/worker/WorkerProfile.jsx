@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
@@ -13,6 +14,7 @@ import { useUser } from '../../context/UserContext';
 
 const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
   const location = useLocation();
   
   // Add useUser hook
@@ -672,6 +674,35 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
     return parts.length > 0 ? parts.join(', ') : 'Location not specified';
   };
 
+  // Shared top-right controls like Homepage
+  const TopRightControls = ({ i18n, navigate }) => {
+    const [lang, setLang] = useState(() => localStorage.getItem('homeLang') || 'EN');
+    const isHindi = lang === 'HI';
+    const [showMenu, setShowMenu] = useState(false);
+    const toggleLang = () => {
+      const next = isHindi ? 'EN' : 'HI';
+      setLang(next);
+      localStorage.setItem('homeLang', next);
+      i18n.changeLanguage(next.toLowerCase());
+    };
+    return (
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-3 z-30">
+        <button onClick={toggleLang} className="px-2.5 py-1 rounded-full text-xs md:text-sm bg-white/10 border border-white/15 text-white/90 hover:bg-white/15">{isHindi ? 'HI' : 'EN'}</button>
+        <button onClick={() => setShowMenu(v=>!v)} className="p-2 md:p-3 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition-colors">
+          <span className="block w-5 md:w-6 h-0.5 bg-white mb-1"></span>
+          <span className="block w-4 md:w-5 h-0.5 bg-white mb-1"></span>
+          <span className="block w-6 md:w-7 h-0.5 bg-white"></span>
+        </button>
+        {showMenu && (
+          <div className="absolute top-10 right-0 w-56 bg-white/10 backdrop-blur-md border border-white/15 rounded-xl p-3 text-sm text-white z-40">
+            <button onClick={() => navigate('/worker/profile')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">Profile</button>
+            <button onClick={() => navigate('/worker/applications')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10">My Jobs</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -746,8 +777,28 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-8">
+    <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden devanagari">
+      {/* Background aesthetics (mirror homepage) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Soft radial vignette */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)' }} />
+        {/* Star trails effect */}
+        <div className="startrails absolute inset-0" />
+        {/* Grid lines */}
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        {/* Grain */}
+        <div className="absolute inset-0 opacity-10 noise-bg mix-blend-overlay" />
+        {/* Aurora animated background */}
+        <div className="aurora absolute inset-0">
+          <span className="aurora-blob aurora-a" />
+          <span className="aurora-blob aurora-b" />
+          <span className="aurora-blob aurora-c" />
+        </div>
+      </div>
+      {/* Top-right controls: language + hamburger */}
+      <TopRightControls i18n={i18n} navigate={navigate} />
+
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 pt-10 md:pt-12 pb-4 sm:pb-8 relative z-10">
         {/* Header with refresh button */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -773,94 +824,86 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
           </button>
         </motion.div>
 
-        {/* Professional Eligibility Card */}
+        {/* Profile Header Card - glass theme */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-6 sm:mb-8"
         >
-          <div className="bg-gradient-to-r from-green-600 via-blue-600 to-purple-600 rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden">
-            <div className="bg-black bg-opacity-10 p-4 sm:p-6 lg:p-8">
+          <div className="rounded-xl sm:rounded-2xl overflow-hidden bg-white/5 border border-white/10 backdrop-blur-md">
+            <div className="p-4 sm:p-6 lg:p-8">
               {/* Mobile-first layout */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6">
                 <div className="flex items-center w-full sm:w-auto mb-4 sm:mb-0">
-                  <div className="w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 bg-white rounded-full p-1 shadow-lg mr-4 sm:mr-6 flex-shrink-0">
-                    <div className="w-full h-full bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 sm:w-18 sm:h-18 lg:w-20 lg:h-20 bg-white/10 rounded-full p-1 shadow-lg mr-4 sm:mr-6 flex-shrink-0 border border-white/20">
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
                       <span className="text-white font-bold text-lg sm:text-xl lg:text-2xl">
                         {getInitials(formData?.name)}
                       </span>
                     </div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 truncate">{formData?.name}</h2>
-                    <p className="text-green-100 text-sm sm:text-base lg:text-lg font-medium truncate">{formData?.preferredCategory} Professional</p>
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white mb-1 truncate">{formData?.name}</h2>
+                    <p className="text-white/80 text-sm sm:text-base lg:text-lg font-medium truncate">{formData?.preferredCategory} Professional</p>
                     <div className="flex items-center mt-1 sm:mt-2">
-                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-green-200 mr-1 flex-shrink-0" />
-                      <span className="text-green-100 text-xs sm:text-sm truncate">{formatLocation(formData?.location)}</span>
+                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-white/70 mr-1 flex-shrink-0" />
+                      <span className="text-white/70 text-xs sm:text-sm truncate">{formatLocation(formData?.location)}</span>
                     </div>
                   </div>
                 </div>
                 
                 <div className="w-full sm:w-auto">
-                  <div className="bg-white bg-opacity-20 rounded-lg sm:rounded-xl p-3 sm:p-4 backdrop-blur-sm text-center">
+                  <div className="bg-white/10 border border-white/10 rounded-lg sm:rounded-xl p-3 sm:p-4 backdrop-blur-sm text-center">
                     <div className="text-2xl sm:text-3xl font-bold text-white">{shaktiScore}</div>
-                    <div className="text-green-100 text-xs sm:text-sm">Shakti Score</div>
+                    <div className="text-white/70 text-xs sm:text-sm">Shakti Score</div>
                   </div>
                 </div>
               </div>
 
               {/* Eligibility Indicators - Mobile responsive grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
-                <div className="bg-white bg-opacity-15 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
+                <div className="bg-white/10 border border-white/10 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-1 sm:mb-2">
-                    <CheckCircle className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${formData?.verificationStatus === 'verified' ? 'text-green-300' : 'text-yellow-300'}`} />
-                    <span className={`text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full ${
-                      formData?.verificationStatus === 'verified' 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-yellow-500 text-white'
-                    }`}>
+                    <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white/80" />
+                    <span className={`text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full ${formData?.verificationStatus === 'verified' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-white'}`}>
                       {formData?.verificationStatus === 'verified' ? 'VERIFIED' : 'PENDING'}
                     </span>
                   </div>
                   <p className="text-white text-xs sm:text-sm font-medium">Identity</p>
-                  <p className="text-green-100 text-xs">Verified</p>
+                  <p className="text-white/70 text-xs">{formData?.verificationStatus === 'verified' ? 'Verified' : 'Pending'}</p>
                 </div>
 
-                <div className="bg-white bg-opacity-15 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
+                <div className="bg-white/10 border border-white/10 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-1 sm:mb-2">
-                    <Award className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-blue-300" />
-                    <span className="text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full bg-blue-500 text-white">
+                    <Award className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white/80" />
+                    <span className="text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full bg-white/20 text-white">
                       {formData?.skills?.length || 0}
                     </span>
                   </div>
                   <p className="text-white text-xs sm:text-sm font-medium">Skills</p>
-                  <p className="text-blue-100 text-xs">{formData?.experience}</p>
+                  <p className="text-white/70 text-xs">{formData?.experience}</p>
                 </div>
 
-                <div className="bg-white bg-opacity-15 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
+                <div className="bg-white/10 border border-white/10 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-1 sm:mb-2">
-                    <Clock className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${formData?.isAvailable ? 'text-green-300' : 'text-red-300'}`} />
-                    <span className={`text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full ${
-                      formData?.isAvailable 
-                        ? 'bg-green-500 text-white' 
-                        : 'bg-red-500 text-white'
-                    }`}>
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white/80" />
+                    <span className={`text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full ${formData?.isAvailable ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                       {formData?.isAvailable ? 'OPEN' : 'BUSY'}
                     </span>
                   </div>
                   <p className="text-white text-xs sm:text-sm font-medium">Status</p>
-                  <p className="text-green-100 text-xs">{formData?.availability}</p>
+                  <p className="text-white/70 text-xs">{formData?.availability}</p>
                 </div>
 
-                <div className="bg-white bg-opacity-15 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
+                <div className="bg-white/10 border border-white/10 rounded-lg p-3 sm:p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-1 sm:mb-2">
-                    <Star className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-yellow-300" />
-                    <span className="text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full bg-yellow-500 text-white">
+                    <Star className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white/80" />
+                    <span className="text-xs font-medium px-1 sm:px-2 py-0.5 sm:py-1 rounded-full bg-white/20 text-white">
                       {formData?.rating?.average ? formData.rating.average.toFixed(1) : '0.0'} ⭐
                     </span>
                   </div>
                   <p className="text-white text-xs sm:text-sm font-medium">Rating</p>
-                  <p className="text-yellow-100 text-xs">{formData?.completedJobs || 0} Jobs</p>
+                  <p className="text-white/70 text-xs">{formData?.completedJobs || 0} Jobs</p>
                 </div>
               </div>
 
@@ -917,25 +960,21 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
           </div>
         </motion.div>
 
-        {/* Navigation Tabs - Mobile responsive */}
+        {/* Navigation Tabs - glass theme */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-6 mb-6 sm:mb-8"
+          className="rounded-xl sm:rounded-2xl p-3 sm:p-6 mb-6 sm:mb-8 bg-white/5 border border-white/10 backdrop-blur-md"
         >
-          <div className="flex space-x-0.5 sm:space-x-1 bg-gray-100 p-0.5 sm:p-1 rounded-lg overflow-x-auto">
+          <div className="flex space-x-1 bg-white/10 p-1 rounded-lg overflow-x-auto">
             {tabs.map(tab => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 min-w-0 flex items-center justify-center px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? 'bg-green-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
+                  className={`flex-1 min-w-0 flex items-center justify-center px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${activeTab === tab.id ? 'bg-white text-black shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
                 >
                   <Icon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                   <span className="truncate">{tab.label}</span>
@@ -1475,6 +1514,33 @@ const WorkerProfile = ({ workerId, workerData: propWorkerData }) => {
           </motion.div>
         </AnimatePresence>
       </div>
+      {/* Background styles shared with homepage */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap');
+        .devanagari { font-family: 'Noto Sans Devanagari','Poppins',system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial; }
+        .noise-bg { background-image: url('data:image/svg+xml;utf8,\
+          <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">\
+            <filter id="noise">\
+              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>\
+              <feColorMatrix type="saturate" values="0"/>\
+              <feComponentTransfer>\
+                <feFuncA type="table" tableValues="0 0.2"/>\
+              </feComponentTransfer>\
+            </filter>\
+            <rect width="100%" height="100%" filter="url(%23noise)" opacity="0.4"/>\
+          </svg>'); }
+        .aurora-blob { position:absolute; width:60vmax; height:60vmax; filter:blur(60px); opacity:.2; }
+        .aurora-a { background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.6), transparent 60%); left:-20vmax; top:-10vmax; animation: drift 18s ease-in-out infinite; }
+        .aurora-b { background: radial-gradient(circle at 70% 40%, rgba(236,72,153,0.5), transparent 60%); right:-25vmax; top:-5vmax; animation: drift 22s ease-in-out infinite reverse; }
+        .aurora-c { background: radial-gradient(circle at 40% 70%, rgba(34,197,94,0.5), transparent 60%); left:10vmax; bottom:-20vmax; animation: drift 26s ease-in-out infinite; }
+        @keyframes drift { 0%,100% { transform: translate3d(0,0,0) rotate(0deg);} 50% { transform: translate3d(5vmax,-3vmax,0) rotate(20deg);} }
+        .startrails { position:absolute; inset:0; background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%); overflow:hidden; }
+        .startrails::before, .startrails::after { content:""; position:absolute; inset:-20%; background-repeat:repeat; background-size:300px 300px; mix-blend-mode:screen; opacity:.25; border-radius:50%; filter:blur(.2px); }
+        .startrails::before { background-image: radial-gradient(2px 120px at 50% 0%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.5px 100px at 80% 10%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.2px 90px at 20% 30%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.8px 110px at 70% 60%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 60%); animation: trails-rotate 140s linear infinite; }
+        .startrails::after { background-image: radial-gradient(1px 60px at 30% 10%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 60%), radial-gradient(1px 70px at 60% 40%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 60%), radial-gradient(1px 50px at 10% 80%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%); animation: trails-rotate-rev 200s linear infinite; opacity:.18; }
+        @keyframes trails-rotate { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+        @keyframes trails-rotate-rev { from { transform: rotate(360deg);} to { transform: rotate(0deg);} }
+      `}</style>
     </div>
   );
 };

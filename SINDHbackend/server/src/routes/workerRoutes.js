@@ -106,7 +106,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     phone,
     email: email || '',
     gender: gender || 'Male',
-    aadharNumber: aadharNumber || '123456789012',
+    // Allow deferred Aadhar verification; store placeholder when not provided
+    aadharNumber: aadharNumber || 'not provided',
     skills: skills || ['Construction'],
     experience: experience || 'Less than 1 year',
     preferredCategory: preferredCategory || 'Construction',

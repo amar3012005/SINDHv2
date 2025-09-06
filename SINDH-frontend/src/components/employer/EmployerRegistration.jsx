@@ -274,24 +274,11 @@ const EnhancedEmployerRegistration = () => {
     },
     {
       id: 'industry',
-      type: 'multi-select',
-      text: "What industries does your business operate in? You can select multiple options that apply to your business.",
+      type: 'question',
+      text: "What is your primary business industry? Choose the one that best describes your main business activity.",
       field: 'industry',
       suggestions: industryOptions,
-      multiSelect: true,
-      validation: (value) => {
-        const selected = Array.isArray(value) ? value : (value ? [value] : []);
-        return selected.length > 0 ? null : "Please select at least one industry";
-      },
-      followUp: {
-        text: "Which of these is your PRIMARY industry? This will be shown prominently on your profile.",
-        field: 'primaryIndustry',
-        suggestions: () => {
-          const selectedIndustries = formData.company?.industry || userResponses.industry || [];
-          return Array.isArray(selectedIndustries) ? selectedIndustries : [selectedIndustries].filter(Boolean);
-        },
-        validation: (value) => value.trim() ? null : "Please select your primary industry"
-      }
+      validation: (value) => value.trim() ? null : "Please select your primary industry"
     },
     {
       id: 'businessName',
@@ -554,46 +541,13 @@ const EnhancedEmployerRegistration = () => {
           } 
         }));
       } else if (question.field === 'industry') {
-        // Handle multi-select for industries
-        const currentSelected = selectedIndustries;
-        let newSelected;
-        
-        if (currentSelected.includes(processedResponse)) {
-          // Remove if already selected
-          newSelected = currentSelected.filter(item => item !== processedResponse);
-        } else {
-          // Add if not selected
-          newSelected = [...currentSelected, processedResponse];
-        }
-        
-        setSelectedIndustries(newSelected);
         setFormData(prev => ({ 
           ...prev, 
           company: { 
             ...prev.company, 
-            industry: newSelected 
+            industry: processedResponse 
           } 
         }));
-        
-        // Don't move to next question yet - let user select multiple
-        // Show continue button when at least one is selected
-        if (newSelected.length > 0) {
-          // Show primary industry selection after user finishes selecting
-          setTimeout(() => {
-            addBotMessage('Great choices! Now, which of these is your PRIMARY industry? This will be shown prominently on your profile.', newSelected, 1000);
-            setShowPrimaryIndustrySelection(true);
-          }, 500);
-        }
-        return; // Don't proceed to next question automatically
-      } else if (question.field === 'primaryIndustry') {
-        setFormData(prev => ({ 
-          ...prev, 
-          company: { 
-            ...prev.company, 
-            primaryIndustry: processedResponse 
-          } 
-        }));
-        setShowPrimaryIndustrySelection(false);
       } else if (question.field === 'village') {
         setFormData(prev => ({ 
           ...prev, 
@@ -882,34 +836,52 @@ const EnhancedEmployerRegistration = () => {
     await processUserResponse(currentInput);
   };
 
-  // --- Minimal, mobile-first, conversational stepper UI ---
+  // --- Minimal, mobile-first, conversational stepper UI matching WorkerRegistration ---
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f5f6fa] px-4" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <style jsx>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
-      {/* Logo at the top */}
-      <div className="w-full flex flex-col items-center justify-center pt-8 pb-2">
-        <div className="flex items-center gap-3">
-          {Logo ? (
-            <img src={Logo} alt="Logo" className="h-10 md:h-12 mb-2" style={{ maxWidth: 120 }} />
-          ) : (
-            <span className="text-2xl font-bold tracking-wide text-[#222] mb-2">LOGO</span>
-          )}
-          <span className="text-2xl font-extrabold tracking-widest text-[#222] mb-2">I N D U S</span>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-neutral-950 text-gray-300 px-2 sm:px-4 relative overflow-hidden devanagari">
+      {/* Mobile-first background aesthetics matching WorkerRegistration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)',
+          }}
+        />
+        <div className="startrails absolute inset-0" />
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
+        />
+        <div className="absolute inset-0 opacity-10 noise-bg mix-blend-overlay" />
+        <div className="aurora absolute inset-0">
+          <span className="aurora-blob aurora-a" />
+          <span className="aurora-blob aurora-b" />
+          <span className="aurora-blob aurora-c" />
         </div>
-        <span className="text-base font-semibold text-[#ff6b35] mt-1">Employer Registration</span>
       </div>
-      <div className="w-full max-w-md mx-auto flex flex-col justify-center min-h-screen">
-        {/* Progress Bar */}
+      
+      {/* Logo and header matching WorkerRegistration */}
+      <div className="w-full flex flex-col items-center justify-center pt-6 pb-2">
+        <div className="flex items-center gap-2">
+          {Logo ? (
+            <img src={Logo} alt="SINDH Logo" className="h-8 sm:h-10 mb-1 filter invert brightness-0" style={{ maxWidth: 90 }} />
+          ) : (
+            <span className="text-xl font-bold tracking-wide text-white mb-1">LOGO</span>
+          )}
+          <span className="text-xl sm:text-2xl font-extrabold tracking-widest text-white mb-1">S I N D H</span>
+        </div>
+        <span className="text-sm font-semibold text-orange-400 mt-1">Employer Registration</span>
+      </div>
+      
+      <div className="w-full max-w-xs sm:max-w-sm mx-auto flex flex-col justify-center min-h-screen relative z-10">
+        {/* Progress Bar matching WorkerRegistration */}
         <StepProgress current={currentQuestion} total={chatQuestions.length - 1} />
+        
         {/* Step Content */}
         <motion.div
           key={currentQ.id}
@@ -917,26 +889,24 @@ const EnhancedEmployerRegistration = () => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -30 }}
           transition={{ duration: 0.4, type: 'spring' }}
-          className="flex flex-col gap-10 md:gap-12"
+          className="flex flex-col gap-8"
         >
-          {/* Question/Prompt */}
+          {/* Question/Prompt matching WorkerRegistration style */}
           <div className="text-left">
             {(() => {
-              // Handle dynamic text functions (like village question showing fetched location)
               const questionText = typeof currentQ.text === 'function' ? currentQ.text() : currentQ.text;
               const textParts = questionText.split(/[.!?]/);
-              
               return (
                 <>
-                  <h2 className="text-3xl md:text-4xl font-extrabold text-[#222] mb-3 leading-tight" style={{ letterSpacing: '-0.5px' }}>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 leading-tight" style={{ letterSpacing: '-0.5px' }}>
                     {textParts[0].toUpperCase()}
                   </h2>
                   {textParts[1] && (
-                    <p className="text-lg md:text-xl text-[#222]/70 mt-2 whitespace-pre-line">{textParts[1]}</p>
+                    <p className="text-base sm:text-lg text-gray-400 mt-1 whitespace-pre-line">{textParts.slice(1).join('.')}</p>
                   )}
                   {/* Handle multi-line text for location display */}
                   {questionText.includes('\n') && (
-                    <div className="text-lg md:text-xl text-[#222]/70 mt-2 whitespace-pre-line">
+                    <div className="text-base sm:text-lg text-gray-400 mt-2 whitespace-pre-line">
                       {questionText.split('\n').slice(1).join('\n')}
                     </div>
                   )}
@@ -944,53 +914,45 @@ const EnhancedEmployerRegistration = () => {
               );
             })()}
           </div>
-          {/* Input or Suggestions */}
-          {(() => {
-            // Handle dynamic suggestions (functions) and static suggestions (arrays)
-            const suggestions = typeof currentQ.suggestions === 'function' ? currentQ.suggestions() : currentQ.suggestions;
-            
-            if (suggestions && suggestions.length > 0) {
-              return (
-                <div className="flex flex-col gap-6">
-                  {suggestions.map((suggestion, idx) => (
-                    <motion.button
-                      key={idx}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200"
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      aria-label={suggestion}
-                    >
-                      {suggestion}
-                      <span className="ml-2">→</span>
-                    </motion.button>
-                  ))}
-                </div>
-              );
-            } else if (currentQ.id === 'summary') {
-              return (
-            <div className="flex flex-col gap-8">
-              {/* Simple "All set!" message */}
+          {/* Input or Suggestions matching WorkerRegistration */}
+          {currentQ.suggestions && currentQ.suggestions.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              {currentQ.suggestions.map((suggestion, idx) => (
+                <motion.button
+                  key={idx}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full py-3 px-4 bg-white/10 border border-white/10 text-white rounded-lg text-base font-semibold flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-white/20 transition-all duration-200"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  aria-label={suggestion}
+                >
+                  {suggestion}
+                  <span className="ml-2">→</span>
+                </motion.button>
+              ))}
+            </div>
+          ) : currentQ.id === 'summary' ? (
+            <div className="flex flex-col gap-6">
+              {/* Simple "All set!" message matching WorkerRegistration */}
               <div className="text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#ff6b35] flex items-center justify-center text-white text-4xl">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white text-3xl">
                   ✓
                 </div>
-                <h3 className="text-2xl font-bold text-[#222] mb-2">All set!</h3>
-                <p className="text-lg text-[#666]">Ready to create your employer profile</p>
+                <h3 className="text-xl font-bold text-white mb-1">All set!</h3>
+                <p className="text-base text-gray-400">Ready to create your employer profile</p>
               </div>
-              
               {/* Submit Button */}
               <motion.button
-                onClick={() => handleSuggestionClick('Submit Registration')}
+                onClick={submitRegistration}
                 disabled={isSubmitting}
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="w-full py-5 px-6 bg-[#ff6b35] text-white rounded-xl text-xl font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 disabled:bg-[#e0e0e0] disabled:text-[#aaa]"
+                className="w-full py-3 px-4 bg-white text-black rounded-lg text-base font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white/20 transition-all duration-200 disabled:bg-white/40 disabled:text-black/50"
                 aria-label="Submit Registration"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black mr-2"></div>
                     SUBMITTING...
                   </>
                 ) : (
@@ -1001,69 +963,182 @@ const EnhancedEmployerRegistration = () => {
                 )}
               </motion.button>
             </div>
-              );
-            } else if (currentQ.id === 'complete') {
-              return (
-                <div className="flex flex-col gap-8 items-center justify-center">
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.5, type: 'spring' }}
-                    className="w-20 h-20 rounded-full bg-[#ff6b35] flex items-center justify-center text-white text-4xl mb-4"
-                    aria-label="Success"
-                  >
-                    ✓
-                  </motion.div>
-                  <p className="text-xl text-[#222] font-semibold text-center">Your employer profile has been created successfully!</p>
-                </div>
-              );
-            } else {
-              return (
-                <form onSubmit={handleInputSubmit} className="flex flex-col gap-8">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={currentInput}
-                      onChange={(e) => setCurrentInput(e.target.value)}
-                      placeholder=" "
-                      disabled={!isWaitingForInput || isSubmitting}
-                      className={`w-full py-5 px-4 text-xl bg-transparent border-b-2 border-[#e0e0e0] text-[#222] focus:outline-none focus:border-[#ff6b35] transition-all duration-300 peer rounded-none ${inputError ? 'animate-shake border-red-500' : ''}`}
-                      aria-label="Type your response"
-                      autoFocus
-                    />
-                    <label className="absolute left-4 top-1/2 -translate-y-1/2 text-[#222]/60 text-xl pointer-events-none transition-all duration-300 peer-focus:top-0 peer-focus:text-sm peer-focus:text-[#ff6b35] peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-xl peer-placeholder-shown:text-[#222]/60">
-                      {isWaitingForInput ? "Type your response..." : ""}
-                    </label>
-                  </div>
-                  <motion.button
-                    type="submit"
-                    disabled={!currentInput.trim() || !isWaitingForInput || isSubmitting}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="w-full py-5 px-6 bg-[#222] text-white rounded-xl text-xl font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-[#ff6b35] transition-all duration-200 disabled:bg-[#e0e0e0] disabled:text-[#aaa]"
-                    aria-label="Continue"
-                  >
-                    CONTINUE <span className="ml-2">→</span>
-                  </motion.button>
-                </form>
-              );
-            }
-          })()}
+          ) : currentQ.id === 'complete' ? (
+            <div className="flex flex-col gap-6 items-center justify-center">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5, type: 'spring' }}
+                className="w-20 h-20 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white text-4xl mb-4"
+                aria-label="Success"
+              >
+                🎉
+              </motion.div>
+              <p className="text-xl text-white font-semibold text-center">Welcome to SINDH! Your employer profile has been created successfully!</p>
+            </div>
+          ) : (
+            <form onSubmit={handleInputSubmit} className="flex flex-col gap-6">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={currentInput}
+                  onChange={(e) => setCurrentInput(e.target.value)}
+                  placeholder=" "
+                  disabled={!isWaitingForInput || isSubmitting}
+                  className={`w-full py-3 px-3 text-base bg-transparent border-b-2 border-white/15 text-white focus:outline-none focus:border-white/40 transition-all duration-300 peer rounded-none ${inputError ? 'animate-shake border-red-500' : ''}`}
+                  aria-label="Type your response"
+                  autoFocus
+                />
+                <label className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 text-base pointer-events-none transition-all duration-300 peer-focus:top-0 peer-focus:text-xs peer-focus:text-orange-400 peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/50">
+                  {isWaitingForInput ? "Type your response..." : ""}
+                </label>
+              </div>
+              <motion.button
+                type="submit"
+                disabled={!currentInput.trim() || !isWaitingForInput || isSubmitting}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="w-full py-3 px-4 bg-white/10 border border-white/10 text-white rounded-lg text-base font-semibold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white/20 transition-all duration-200 disabled:bg-white/5 disabled:text-white/40"
+                aria-label="Continue"
+              >
+                CONTINUE <span className="ml-2">→</span>
+              </motion.button>
+            </form>
+          )}
         </motion.div>
       </div>
-      {/* Slide-in success message (Framer Motion) */}
+      
+      {/* Slide-in success message matching WorkerRegistration */}
       {showSuccessMsg && (
         <motion.div
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#222] text-white px-6 py-4 rounded-2xl shadow-lg z-50 text-lg font-semibold"
-          style={{ minWidth: 280, textAlign: 'center' }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/10 border border-white/10 text-white px-5 py-3 rounded-xl shadow-lg z-50 text-base font-semibold"
+          style={{ minWidth: 220, textAlign: 'center' }}
         >
           🎉 Employer registration successful!
         </motion.div>
       )}
+
+      {/* Shared styles for font + effects (matched to WorkerRegistration) */}
+      <style jsx global>{`
+        /* Devanagari font stack for Hindi */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap');
+        .devanagari {
+          font-family: 'Noto Sans Devanagari', 'Poppins', system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+        }
+
+        /* Subtle film grain */
+        .noise-bg {
+          background-image: url('data:image/svg+xml;utf8,\
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">\
+              <filter id="noise">\
+                <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>\
+                <feColorMatrix type="saturate" values="0"/>\
+                <feComponentTransfer>\
+                  <feFuncA type="table" tableValues="0 0.2"/>\
+                </feComponentTransfer>\
+              </filter>\
+              <rect width="100%" height="100%" filter="url(%23noise)" opacity="0.4"/>\
+            </svg>');
+        }
+
+        @keyframes blob {
+          0% { 
+            transform: translate(0px, 0px) scale(1) rotate(0deg); 
+            opacity: 0.6;
+          }
+          25% { 
+            transform: translate(40px, -60px) scale(1.2) rotate(90deg); 
+            opacity: 0.8;
+          }
+          50% { 
+            transform: translate(-30px, 40px) scale(0.8) rotate(180deg); 
+            opacity: 0.4;
+          }
+          75% { 
+            transform: translate(60px, 20px) scale(1.1) rotate(270deg); 
+            opacity: 0.7;
+          }
+          100% { 
+            transform: translate(0px, 0px) scale(1) rotate(360deg); 
+            opacity: 0.6;
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          25% { transform: translateY(-20px) rotate(5deg); }
+          50% { transform: translateY(-10px) rotate(-5deg); }
+          75% { transform: translateY(-15px) rotate(3deg); }
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% { 
+            opacity: 0.3;
+            filter: blur(1rem);
+          }
+          50% { 
+            opacity: 0.6;
+            filter: blur(1.5rem);
+          }
+        }
+        
+        @keyframes grid-move {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(50px, 50px); }
+        }
+        
+        .animate-blob { animation: blob 8s infinite ease-in-out; }
+        .animate-float { animation: float 6s infinite ease-in-out; }
+        .animate-pulse-glow { animation: pulse-glow 4s infinite ease-in-out; }
+        .animate-grid { animation: grid-move 20s infinite linear; }
+        .animation-delay-1000 { animation-delay: 1s; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-3000 { animation-delay: 3s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+        .bg-radial-gradient { background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 70%); }
+        .blur-3xl { filter: blur(3rem); }
+        .blur-2xl { filter: blur(2rem); }
+        .glass-effect { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); }
+
+        /* Aurora effect */
+        .aurora-blob { position: absolute; width: 60vmax; height: 60vmax; filter: blur(60px); opacity: 0.2; }
+        .aurora-a { background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.6), transparent 60%); left: -20vmax; top: -10vmax; animation: drift 18s ease-in-out infinite; }
+        .aurora-b { background: radial-gradient(circle at 70% 40%, rgba(236,72,153,0.5), transparent 60%); right: -25vmax; top: -5vmax; animation: drift 22s ease-in-out infinite reverse; }
+        .aurora-c { background: radial-gradient(circle at 40% 70%, rgba(34,197,94,0.5), transparent 60%); left: 10vmax; bottom: -20vmax; animation: drift 26s ease-in-out infinite; }
+        @keyframes drift { 0%, 100% { transform: translate3d(0,0,0) rotate(0deg); } 50% { transform: translate3d(5vmax, -3vmax, 0) rotate(20deg); } }
+
+        /* Star trails background - radial streaks rotating subtly */
+        .startrails { position:absolute; inset:0; background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%); overflow:hidden; }
+        .startrails::before, .startrails::after { content:""; position:absolute; inset:-20%; background-repeat:repeat; background-size: 300px 300px; mix-blend-mode: screen; opacity:.25; border-radius:50%; filter: blur(0.2px); }
+        /* Layer 1 - long streaks */
+        .startrails::before { background-image:
+            radial-gradient(2px 120px at 50% 0%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1.5px 100px at 80% 10%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1.2px 90px at 20% 30%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1.8px 110px at 70% 60%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 60%);
+          animation: trails-rotate 140s linear infinite; }
+        /* Layer 2 - shorter streaks */
+        .startrails::after { background-image:
+            radial-gradient(1px 60px at 30% 10%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 70px at 60% 40%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 50px at 10% 80%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%),
+            radial-gradient(1px 65px at 90% 50%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%);
+          animation: trails-rotate-rev 200s linear infinite; opacity:.18; }
+        @keyframes trails-rotate { from{ transform: rotate(0deg); } to{ transform: rotate(360deg);} }
+        @keyframes trails-rotate-rev { from{ transform: rotate(360deg);} to{ transform: rotate(0deg);} }
+
+        /* Keep local input error shake animation used by this page */
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.5s ease-in-out; }
+      `}</style>
     </div>
   );
 };

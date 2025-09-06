@@ -9,13 +9,18 @@ import {
   MapPin, 
   Briefcase, 
   CheckCircle,
-  Search
+  Search,
+  ArrowLeft,
+  Menu
 } from 'lucide-react';
 import JobApplicationProgress from '../worker/JobApplicationProgress';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import 'swiper/css';
 
 const AvailableJobs = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { t, i18n } = useTranslation();
   
   // Core state management
   const [loading, setLoading] = useState(true);
@@ -28,6 +33,8 @@ const AvailableJobs = () => {
   const [applyingJobs, setApplyingJobs] = useState(new Set());
   const [selectedJob, setSelectedJob] = useState(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [myApplicationsCount, setMyApplicationsCount] = useState(0);
+  const [appliedJobsCount, setAppliedJobsCount] = useState(0);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,7 +49,70 @@ const AvailableJobs = () => {
   const [locationBasedJobs, setLocationBasedJobs] = useState([]);
   const [otherLocationJobs, setOtherLocationJobs] = useState([]);
 
-  // Enhanced fetch jobs function with proper debugging
+  // Language and menu controls
+  const [isHindi, setIsHindi] = useState(localStorage.getItem('language') === 'hi');
+  const [showPageMenu, setShowPageMenu] = useState(false);
+
+  const toggleLang = () => {
+    const newLang = isHindi ? 'en' : 'hi';
+    setIsHindi(!isHindi);
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('language', newLang);
+  };
+
+  const navigateToPage = (path) => {
+    navigate(path);
+  };
+
+  // Fetch applications count for stats card
+  const fetchApplicationsCount = useCallback(async () => {
+    if (!user?.id || user.type !== 'worker') return;
+    
+    try {
+      const response = await fetch(buildApiUrl(`/job-applications/worker/${user.id}/count`), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Type': user?.type || 'guest',
+          'User-ID': user?.id || ''
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMyApplicationsCount(data.totalApplications || 0);
+        setAppliedJobsCount(data.appliedJobs || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching applications count:', error);
+    }
+  }, [user]);
+
+  // Progress ring component for stats
+  const ProgressRing = ({ size = 28, strokeWidth = 3, progress = 0 }) => {
+    const clamped = Math.max(0, Math.min(1, progress));
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const dashOffset = circumference * (1 - clamped);
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.12)" strokeWidth={strokeWidth} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgb(163, 230, 53)"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+        />
+      </svg>
+    );
+  };
+
+  // Fetch jobs
   const fetchJobs = useCallback(async () => {
     try {
       console.log('🚀 Starting to fetch jobs...');
@@ -151,11 +221,7 @@ const AvailableJobs = () => {
           hasApplied: sampleJob.hasApplied
         });
         
-        // Log all jobs for debugging
-        console.log('📋 All received jobs:');
-        jobsArray.forEach((job, index) => {
-          console.log(`   ${index + 1}. ${job.title} - ${job.companyName} - ${job.location?.city}, ${job.location?.state} - ₹${job.salary}`);
-        });
+        // Optional verbose logging removed for production
       }
       
       // Deduplicate jobs by ID
@@ -366,6 +432,7 @@ const AvailableJobs = () => {
         setShowSuccessAnimation(true);
         setTimeout(() => setShowSuccessAnimation(false), 3000);
         fetchJobs(); // Refresh jobs to update application status
+        fetchApplicationsCount(); // Refresh applications count for stats card
         
         // Save application ID to localStorage for MyApplications tracking
         if (result.data && result.data._id) {
@@ -399,6 +466,15 @@ const AvailableJobs = () => {
           </div>,
           { autoClose: 5000 }
         );
+
+        // Automatically redirect to applications page after successful application
+        setTimeout(() => {
+          toast.success('🎉 Redirecting to your applications page...', {
+            autoClose: 2000
+          });
+          navigate('/worker/applications');
+        }, 1500); // Reduced from 2000ms to 1500ms for faster redirect
+        
       } else {
         const errorData = await response.json();
         toast.error(errorData.message || 'Failed to submit application');
@@ -427,7 +503,7 @@ const AvailableJobs = () => {
     fetchJobs();
   };
 
-  // Enhanced render job card with better error handling
+  // Enhanced render job card with MyApplications styling
   const renderJobCard = (job) => {
     const applicationStatus = job.applicationStatus;
     const hasApplied = job.hasApplied;
@@ -438,6 +514,26 @@ const AvailableJobs = () => {
       return null;
     }
 
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'pending': return 'bg-white/10 text-yellow-300 border-white/10';
+        case 'accepted': return 'bg-white/10 text-green-300 border-white/10';
+        case 'in-progress': return 'bg-white/10 text-blue-300 border-white/10';
+        case 'completed': return 'bg-white/10 text-purple-300 border-white/10';
+        default: return 'bg-white/10 text-white/80 border-white/10';
+      }
+    };
+
+    const getStatusIcon = (status) => {
+      switch (status) {
+        case 'pending': return '⏳';
+        case 'accepted': return '✅';
+        case 'in-progress': return '🔄';
+        case 'completed': return '✅';
+        default: return '❌';
+      }
+    };
+
     return (
       <motion.div
         key={job._id}
@@ -446,54 +542,80 @@ const AvailableJobs = () => {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         whileHover={{ y: -5 }}
-        className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden"
+        className="bg-white/5 border border-white/10 text-white rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 mx-1 backdrop-blur-md"
       >
-        <div className="p-6">
-          {/* Job Header */}
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
-                {job.title || 'Untitled Job'}
-              </h3>
-              <p className="text-gray-600 font-medium">
-                {job.companyName || 'Unknown Company'}
-              </p>
-            </div>
-            
-            {/* Application Status Badge */}
-            {hasApplied && (
-              <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                applicationStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                applicationStatus === 'accepted' ? 'bg-green-100 text-green-800' :
-                applicationStatus === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                applicationStatus === 'completed' ? 'bg-purple-100 text-purple-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {applicationStatus === 'pending' ? '⏳ Pending' :
-                 applicationStatus === 'accepted' ? '✅ Accepted' :
-                 applicationStatus === 'in-progress' ? '🔄 In Progress' :
-                 applicationStatus === 'completed' ? '✅ Completed' :
-                 '❌ Rejected'}
+        {/* Status Banner - Only show if user has applied */}
+        {hasApplied && (
+          <div className={`px-3 sm:px-4 py-2 ${getStatusColor(applicationStatus)} border-b`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <span className="mr-2">{getStatusIcon(applicationStatus)}</span>
+                <span className="ml-2 text-xs sm:text-sm font-medium">
+                  {applicationStatus === 'pending' ? 'Applied' :
+                   applicationStatus === 'accepted' ? 'Accepted' :
+                   applicationStatus === 'in-progress' ? 'In Progress' :
+                   applicationStatus === 'completed' ? 'Completed' :
+                   'Applied'}
+                </span>
               </div>
-            )}
+              <span className="text-xs text-white/70">
+                {new Date(job.application?.createdAt || Date.now()).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Job Details */}
+        <div className="p-4 sm:p-6">
+          {/* Salary Display */}
+          <div className="mb-4">
+            <div className="relative">
+              <div className="text-2xl sm:text-3xl font-bold mb-1 bg-gradient-to-r from-green-300 to-emerald-400 bg-clip-text text-transparent">
+                ₹{job.salary?.toLocaleString() || '0'}
+              </div>
+              <div className="absolute -bottom-1 left-0 w-12 h-1 bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"></div>
+            </div>
+            <div className="text-xs text-white/60 mt-2">
+              {job.employmentType === 'Full-time' ? 'Per Month' : 'Per Day'}
+            </div>
+          </div>
+
+          {/* Job Title and Company */}
+          <div className="mb-4">
+            <h3 className="text-lg sm:text-xl font-semibold text-white mb-1 line-clamp-2">
+              {job.title || 'Untitled Job'}
+            </h3>
+            <div className="flex items-center text-white/70 mb-2">
+              <Briefcase className="w-4 h-4 mr-1" />
+              <span className="text-sm">{job.companyName || 'Unknown Company'}</span>
+            </div>
+            <div className="flex items-center text-white/70">
+              <MapPin className="w-4 h-4 mr-1" />
+              <span className="text-sm">
+                {job.location?.city || 'Location not specified'}, {job.location?.state || 'State not specified'}
+              </span>
+            </div>
           </div>
 
           {/* Application Progress - Show if user has applied */}
           {userApplication && (
             <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-gray-900">Application Status</h4>
-                <span className="text-xs text-gray-500">
-                  Last updated: {new Date(userApplication.updatedAt || Date.now()).toLocaleString()}
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-white/80">Application Progress</span>
+                <span className="text-sm font-bold text-white">
+                  {userApplication.status === 'pending' ? '25%' :
+                   userApplication.status === 'accepted' ? '50%' :
+                   userApplication.status === 'in-progress' ? '75%' :
+                   '100%'}
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div 
-                  className={`h-2 rounded-full ${
-                    userApplication.status === 'accepted' ? 'bg-green-500' :
-                    userApplication.status === 'in-progress' ? 'bg-blue-500' :
-                    userApplication.status === 'completed' ? 'bg-purple-500' :
-                    'bg-yellow-500'
+              <div className="w-full bg-white/10 rounded-full h-2 mb-3">
+                <div
+                  className={`h-2 rounded-full transition-all duration-1000 ${
+                    userApplication.status === 'accepted' ? 'bg-gradient-to-r from-green-500 to-emerald-600' :
+                    userApplication.status === 'in-progress' ? 'bg-gradient-to-r from-blue-500 to-indigo-600' :
+                    userApplication.status === 'completed' ? 'bg-gradient-to-r from-green-500 to-emerald-600' :
+                    'bg-gradient-to-r from-yellow-500 to-orange-600'
                   }`}
                   style={{
                     width: 
@@ -502,104 +624,144 @@ const AvailableJobs = () => {
                       userApplication.status === 'in-progress' ? '75%' :
                       '100%'
                   }}
-                ></div>
+                />
               </div>
-              <div className="flex justify-between text-xs text-gray-500">
-                <span className={userApplication.status === 'pending' ? 'font-bold text-blue-600' : ''}>Applied</span>
-                <span className={userApplication.status === 'accepted' ? 'font-bold text-green-600' : ''}>Accepted</span>
-                <span className={userApplication.status === 'in-progress' ? 'font-bold text-blue-600' : ''}>In Progress</span>
-                <span className={userApplication.status === 'completed' ? 'font-bold text-purple-600' : ''}>Completed</span>
+              <div className="flex justify-between text-xs text-white/60">
+                <div className="flex flex-col items-center">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${
+                    ['pending', 'accepted', 'in-progress', 'completed'].includes(userApplication.status) ? 'bg-blue-500 text-white' : 'bg-white/10 text-white/40'
+                  }`}>
+                    ⏳
+                  </div>
+                  <span>Applied</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${
+                    ['accepted', 'in-progress', 'completed'].includes(userApplication.status) ? 'bg-green-500 text-white' : 'bg-white/10 text-white/40'
+                  }`}>
+                    ✅
+                  </div>
+                  <span>Accepted</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${
+                    ['in-progress', 'completed'].includes(userApplication.status) ? 'bg-blue-600 text-white' : 'bg-white/10 text-white/40'
+                  }`}>
+                    🔄
+                  </div>
+                  <span>Working</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center mb-1 ${
+                    userApplication.status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/40'
+                  }`}>
+                    🏆
+                  </div>
+                  <span>Completed</span>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Job Details */}
-          <div className="space-y-3 mb-4">
-            <div className="flex items-center text-gray-600">
-              <MapPin className="w-4 h-4 mr-2 text-blue-500" />
-              <span className="text-sm">
-                {job.location?.city || 'Location not specified'}, {job.location?.state || 'State not specified'}
-              </span>
-            </div>
-            
-            <div className="flex items-center text-gray-600">
-              <span className="text-green-600 font-semibold">₹</span>
-              <span className="text-sm font-medium ml-1">
-                {job.salary?.toLocaleString() || '0'} {job.employmentType === 'Full-time' ? '/month' : '/day'}
-              </span>
-            </div>
-            
-            <div className="flex items-center text-gray-600">
-              <Briefcase className="w-4 h-4 mr-2 text-purple-500" />
-              <span className="text-sm">{job.category || 'General Work'}</span>
-            </div>
+          {/* Job Description */}
+          <div className="mb-4">
+            <p className="text-white/80 text-sm line-clamp-3">
+              {job.description || 'No description available'}
+            </p>
           </div>
 
-          {/* Job Description */}
-          <p className="text-gray-700 text-sm mb-4 line-clamp-3">
-            {job.description || 'No description available'}
-          </p>
+          {/* Job Category Badge */}
+          <div className="mb-4">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-white/80 border border-white/15">
+              <Briefcase className="w-3 h-3 mr-1" />
+              {job.category || 'General Work'}
+            </span>
+          </div>
 
-          {/* Action Buttons - Always visible */}
+          {/* Application Status for Applied Jobs */}
+          {hasApplied && (
+            <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center text-white/90">
+                  <span className="mr-2">{getStatusIcon(applicationStatus)}</span>
+                  <span className="text-sm font-medium">
+                    {applicationStatus === 'pending' ? 'Application Submitted' :
+                     applicationStatus === 'accepted' ? 'Application Accepted' :
+                     applicationStatus === 'in-progress' ? 'Work in Progress' :
+                     applicationStatus === 'completed' ? 'Job Completed' :
+                     'Application Status'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-white/70">
+                    Applied: {new Date(job.application?.createdAt || Date.now()).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-white/70">
+                {applicationStatus === 'pending' ? 'Waiting for employer response...' :
+                 applicationStatus === 'accepted' ? 'Great! Employer has accepted your application.' :
+                 applicationStatus === 'in-progress' ? 'Keep working! Payment on completion.' :
+                 applicationStatus === 'completed' ? '🎉 Congratulations on completing this job!' :
+                 'Track your application progress here.'}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
           <div className="flex gap-2 mt-4">
             {!hasApplied ? (
               <>
                 <button
                   onClick={() => handleApplyForJob(job)}
                   disabled={applyingJobs.has(job._id)}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="flex-1 flex items-center justify-center px-3 py-2 bg-white text-black rounded-lg hover:opacity-95 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {applyingJobs.has(job._id) ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
                       Applying...
                     </>
                   ) : (
-                    'Apply Now'
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Apply Now
+                    </>
                   )}
                 </button>
                 <button
                   onClick={() => navigate(`/jobs/${job._id}`)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-center px-3 py-2 bg-white/10 text-white rounded-lg border border-white/10 hover:bg-white/15 transition-colors text-sm"
                 >
-                  View Details
+                  👁️
                 </button>
               </>
             ) : (
-              <div className="w-full space-y-2">
-                <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg">
-                  <span className="text-sm font-medium text-blue-700">
-                    Applied on {new Date(job.application?.createdAt || Date.now()).toLocaleDateString()}
-                  </span>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                    {applicationStatus === 'pending' ? '⏳ Pending' : '✅ ' + applicationStatus}
-                  </span>
-                </div>
-                <button
-                  onClick={() => navigate(`/jobs/${job._id}`)}
-                  className="w-full mt-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Track Application
-                </button>
-              </div>
+              <button
+                onClick={() => navigate('/worker/applications')}
+                className="flex-1 flex items-center justify-center px-3 py-2 bg-white text-black rounded-lg hover:opacity-95 transition-colors text-sm font-medium"
+              >
+                <span className="mr-1">📊</span>
+                View Applications
+              </button>
             )}
           </div>
 
           {/* Requirements */}
           {job.skillsRequired && job.skillsRequired.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-xs text-gray-500 mb-2">Required Skills:</p>
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-xs text-white/60 mb-2">Required Skills:</p>
               <div className="flex flex-wrap gap-1">
                 {job.skillsRequired.slice(0, 3).map((skill, index) => (
                   <span
                     key={index}
-                    className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs"
+                    className="px-2 py-1 bg-white/10 text-white/80 rounded-full text-xs border border-white/15"
                   >
                     {skill}
                   </span>
                 ))}
                 {job.skillsRequired.length > 3 && (
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                  <span className="px-2 py-1 bg-white/10 text-white/80 rounded-full text-xs border border-white/15">
                     +{job.skillsRequired.length - 3} more
                   </span>
                 )}
@@ -620,98 +782,175 @@ const AvailableJobs = () => {
     // Add a small delay to ensure user context is loaded
     const timer = setTimeout(() => {
       fetchJobs();
+      fetchApplicationsCount(); // Fetch applications count for stats card
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [fetchJobs]);
+  }, [fetchJobs, fetchApplicationsCount]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
-      {/* Header */}
-      <div className="bg-white/90 shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Available Jobs
-              </h1>
-              {loading && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Loading jobs...
-                </p>
-              )}
-              {error && (
-                <p className="text-sm text-red-600 mt-1">
-                  Error: {error}
-                </p>
-              )}
-              {!loading && !error && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Found {filteredJobs.length} jobs
-                  {user?.location?.state && (
-                    <span className="ml-2">
-                      ({locationBasedJobs.length} in {user.location.state}, {otherLocationJobs.length} other)
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
+    <div className="min-h-screen bg-neutral-950 text-gray-300 relative overflow-hidden devanagari">
+      {/* Background aesthetics (mirror homepage) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Soft radial vignette */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(1200px 600px at 50% -10%, rgba(120,120,255,0.06), transparent 60%), radial-gradient(800px 400px at 100% 0%, rgba(255,120,180,0.05), transparent 70%), radial-gradient(900px 500px at -10% 10%, rgba(120,255,200,0.05), transparent 70%)' }} />
+        {/* Star trails effect */}
+        <div className="startrails absolute inset-0" />
+        {/* Grid lines */}
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        {/* Grain */}
+        <div className="absolute inset-0 opacity-10 noise-bg mix-blend-overlay" />
+        {/* Aurora animated background */}
+        <div className="aurora absolute inset-0">
+          <span className="aurora-blob aurora-a" />
+          <span className="aurora-blob aurora-b" />
+          <span className="aurora-blob aurora-c" />
+        </div>
+      </div>
 
-          {/* Search and Filters */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+      {/* Top navigation controls */}
+      <div className="absolute top-4 left-4 md:top-6 md:left-6 z-30">
+        <button 
+          onClick={() => navigateToPage('/')}
+          className="p-2 md:p-3 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition-colors"
+        >
+          <ArrowLeft className="w-5 md:w-6 h-5 md:h-6 text-white" />
+        </button>
+      </div>
+      
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-3 z-30">
+        <button 
+          onClick={toggleLang} 
+          className="px-2.5 py-1 rounded-full text-xs md:text-sm bg-white/10 border border-white/15 text-white/90 hover:bg-white/15"
+        >
+          {isHindi ? 'HI' : 'EN'}
+        </button>
+        <button 
+          onClick={() => setShowPageMenu(v=>!v)} 
+          className="p-2 md:p-3 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition-colors"
+        >
+          <Menu className="w-5 md:w-6 h-5 md:h-6 text-white" />
+        </button>
+      </div>
+
+      {/* Header */}
+      <div className="relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md p-5">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Available Jobs</h1>
+                {loading && (
+                  <p className="text-sm text-white/70 mt-1">Loading jobs...</p>
+                )}
+                {error && (
+                  <p className="text-sm text-red-400 mt-1">Error: {error}</p>
+                )}
+                {!loading && !error && (
+                  <p className="text-sm text-white/70 mt-1">
+                    Found {filteredJobs.length} jobs
+                    {user?.location?.state && (
+                      <span className="ml-2">
+                        ({locationBasedJobs.length} in {user.location.state}, {otherLocationJobs.length} other)
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search jobs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full bg-white/10 border border-white/15 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/20"
+                />
+              </div>
+
+              <select
+                value={filters.category}
+                onChange={(e) => handleFilterChange('category', e.target.value)}
+                className="px-4 py-2 bg-white/10 border border-white/15 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+              >
+                <option value="">All Categories</option>
+                <option value="construction">Construction</option>
+                <option value="agriculture">Agriculture</option>
+                <option value="household">Household</option>
+                <option value="transportation">Transportation</option>
+                <option value="manufacturing">Manufacturing</option>
+              </select>
+
               <input
                 type="text"
-                placeholder="Search jobs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Location"
+                value={filters.location}
+                onChange={(e) => handleFilterChange('location', e.target.value)}
+                className="px-4 py-2 bg-white/10 border border-white/15 rounded-lg text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/20"
               />
+
+              <select
+                value={filters.employmentType}
+                onChange={(e) => handleFilterChange('employmentType', e.target.value)}
+                className="px-4 py-2 bg-white/10 border border-white/15 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+              >
+                <option value="">All Types</option>
+                <option value="full-time">Full-time</option>
+                <option value="part-time">Part-time</option>
+                <option value="contract">Contract</option>
+              </select>
             </div>
-
-            <select
-              value={filters.category}
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Categories</option>
-              <option value="construction">Construction</option>
-              <option value="agriculture">Agriculture</option>
-              <option value="household">Household</option>
-              <option value="transportation">Transportation</option>
-              <option value="manufacturing">Manufacturing</option>
-            </select>
-
-            <input
-              type="text"
-              placeholder="Location"
-              value={filters.location}
-              onChange={(e) => handleFilterChange('location', e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-
-            <select
-              value={filters.employmentType}
-              onChange={(e) => handleFilterChange('employmentType', e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Types</option>
-              <option value="full-time">Full-time</option>
-              <option value="part-time">Part-time</option>
-              <option value="contract">Contract</option>
-            </select>
           </div>
         </div>
       </div>
 
+      {/* Stats Card - Similar to MyApplications */}
+      {user?.type === 'worker' && (
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+          <div className="relative rounded-2xl p-4 sm:p-6 text-white bg-white/5 border border-white/10 backdrop-blur-md overflow-hidden">
+            <div className="absolute -inset-10 opacity-20 blur-3xl bg-gradient-to-br from-lime-300/30 to-emerald-300/20 pointer-events-none" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-white/70">Available Jobs</div>
+                  <div className="mt-1 text-3xl font-extrabold tracking-tight">{filteredJobs.length}</div>
+                </div>
+                <div className="px-2 py-1 text-[10px] rounded-full bg-white/10 border border-white/15 text-white/80">LIVE</div>
+              </div>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] text-white/80">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>My Applications · </span>
+                  <span className="text-white">{myApplicationsCount}</span>
+                </div>
+                <div className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] text-white/80">
+                  <ProgressRing progress={myApplicationsCount / Math.max(1, filteredJobs.length)} />
+                  <span>Application Rate · </span>
+                  <span className="text-white">{Math.round((myApplicationsCount / Math.max(1, filteredJobs.length)) * 100)}%</span>
+                </div>
+                <button
+                  onClick={() => navigate('/worker/applications')}
+                  className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] text-white/80 hover:bg-white/15 transition-colors"
+                >
+                  📊
+                  <span>View Applications</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Only render location-based sections if we have location preference and jobs */}
         {user?.location?.state && locationBasedJobs.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <h2 className="text-xl font-semibold text-white mb-4">
               Jobs in {user.location.state}
             </h2>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -723,7 +962,7 @@ const AvailableJobs = () => {
         {/* Other locations section - only if we have location preference */}
         {user?.location?.state && otherLocationJobs.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            <h2 className="text-xl font-semibold text-white mb-4">
               Other Locations
             </h2>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -732,15 +971,7 @@ const AvailableJobs = () => {
           </div>
         )}
 
-        {/* Debug: Show all jobs for troubleshooting */}
-        {process.env.NODE_ENV === 'development' && filteredJobs.length > 0 && (
-          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔍 Debug: All Jobs ({filteredJobs.length})</h3>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredJobs.map(renderJobCard)}
-            </div>
-          </div>
-        )}
+        {/* Debug section removed for production */}
 
         {/* Main Jobs Grid - always show all jobs */}
         {filteredJobs.length > 0 && (
@@ -763,11 +994,11 @@ const AvailableJobs = () => {
                 exit={{ opacity: 0, y: -20 }}
                 className="text-center py-12"
               >
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading jobs</h3>
-                <p className="text-gray-500 mb-6">{error}</p>
+                <h3 className="text-lg font-medium text-white mb-2">Error loading jobs</h3>
+                <p className="text-white/70 mb-6">{error}</p>
                 <button
                   onClick={fetchJobs}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-white text-black rounded-lg hover:opacity-95 transition-colors"
                 >
                   Try Again
                 </button>
@@ -780,9 +1011,9 @@ const AvailableJobs = () => {
                 exit={{ opacity: 0, y: -20 }}
                 className="text-center py-12"
               >
-                <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs available</h3>
-                <p className="text-gray-500 mb-6">
+                <Briefcase className="w-16 h-16 text-white/40 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">No jobs available</h3>
+                <p className="text-white/70 mb-6">
                   {searchTerm || filters.category || filters.location || filters.employmentType
                     ? "Try adjusting your filters to see more results."
                     : "Check back later for new opportunities."}
@@ -798,7 +1029,7 @@ const AvailableJobs = () => {
                         employmentType: ''
                       });
                     }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="px-4 py-2 bg-white text-black rounded-lg hover:opacity-95 transition-colors"
                   >
                     Clear Filters
                   </button>
@@ -806,13 +1037,28 @@ const AvailableJobs = () => {
               </motion.div>
             ) : (
               <motion.div
-                key="jobs-grid"
+                key="jobs-carousel"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+                className="w-full"
               >
-                {filteredJobs.map(renderJobCard)}
+                <Swiper
+                  spaceBetween={16}
+                  slidesPerView={1.1}
+                  breakpoints={{
+                    640: { slidesPerView: 1.5 },
+                    768: { slidesPerView: 2.2 },
+                    1024: { slidesPerView: 3.2 },
+                  }}
+                  style={{ paddingBottom: '2rem' }}
+                >
+                  {filteredJobs.map((job) => (
+                    <SwiperSlide key={job._id || job.id}>
+                      {renderJobCard(job)}
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
               </motion.div>
             )}
           </AnimatePresence>
@@ -825,23 +1071,76 @@ const AvailableJobs = () => {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50"
+              className="fixed inset-0 flex items-center justify-center z-50 bg-black/60 backdrop-blur-sm"
             >
-              <div className="bg-white rounded-lg p-8 max-w-sm mx-4">
-                <div className="text-center">
-                  <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Application Submitted!
-                  </h3>
-                  <p className="text-gray-600">
-                    Your application has been sent to the employer successfully.
-                  </p>
+              <motion.div 
+                initial={{ y: 50 }}
+                animate={{ y: 0 }}
+                className="bg-white/5 border border-white/10 backdrop-blur-md rounded-3xl p-8 max-w-sm mx-4 text-center shadow-xl text-white"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="w-20 h-20 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6"
+                >
+                  <CheckCircle className="w-10 h-10 text-white" />
+                </motion.div>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  🎉 Application Submitted!
+                </h3>
+                <p className="text-white/80 mb-6">
+                  Your application has been sent successfully. Redirecting to your applications page...
+                </p>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowSuccessAnimation(false);
+                      navigate('/worker/applications');
+                    }}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-2xl hover:from-green-600 hover:to-green-700 transition-all duration-200 font-semibold"
+                  >
+                    View My Applications →
+                  </button>
+                  <button
+                    onClick={() => setShowSuccessAnimation(false)}
+                    className="w-full px-6 py-3 bg-white/10 border border-white/20 text-white/90 rounded-2xl hover:bg-white/20 transition-all duration-200 font-medium"
+                  >
+                    Continue Browsing
+                  </button>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+      {/* Background styles shared with homepage */}
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap');
+        .devanagari { font-family: 'Noto Sans Devanagari','Poppins',system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial; }
+        .noise-bg { background-image: url('data:image/svg+xml;utf8,\
+          <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">\
+            <filter id="noise">\
+              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>\
+              <feColorMatrix type="saturate" values="0"/>\
+              <feComponentTransfer>\
+                <feFuncA type="table" tableValues="0 0.2"/>\
+              </feComponentTransfer>\
+            </filter>\
+            <rect width="100%" height="100%" filter="url(%23noise)" opacity="0.4"/>\
+          </svg>'); }
+        .aurora-blob { position:absolute; width:60vmax; height:60vmax; filter:blur(60px); opacity:.2; }
+        .aurora-a { background: radial-gradient(circle at 30% 30%, rgba(99,102,241,0.6), transparent 60%); left:-20vmax; top:-10vmax; animation: drift 18s ease-in-out infinite; }
+        .aurora-b { background: radial-gradient(circle at 70% 40%, rgba(236,72,153,0.5), transparent 60%); right:-25vmax; top:-5vmax; animation: drift 22s ease-in-out infinite reverse; }
+        .aurora-c { background: radial-gradient(circle at 40% 70%, rgba(34,197,94,0.5), transparent 60%); left:10vmax; bottom:-20vmax; animation: drift 26s ease-in-out infinite; }
+        @keyframes drift { 0%,100% { transform: translate3d(0,0,0) rotate(0deg);} 50% { transform: translate3d(5vmax,-3vmax,0) rotate(20deg);} }
+        .startrails { position:absolute; inset:0; background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 60%); overflow:hidden; }
+        .startrails::before, .startrails::after { content:""; position:absolute; inset:-20%; background-repeat:repeat; background-size:300px 300px; mix-blend-mode:screen; opacity:.25; border-radius:50%; filter:blur(.2px); }
+        .startrails::before { background-image: radial-gradient(2px 120px at 50% 0%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.5px 100px at 80% 10%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.2px 90px at 20% 30%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 60%), radial-gradient(1.8px 110px at 70% 60%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 60%); animation: trails-rotate 140s linear infinite; }
+        .startrails::after { background-image: radial-gradient(1px 60px at 30% 10%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 60%), radial-gradient(1px 70px at 60% 40%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 60%), radial-gradient(1px 50px at 10% 80%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%); animation: trails-rotate-rev 200s linear infinite; opacity:.18; }
+        @keyframes trails-rotate { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+        @keyframes trails-rotate-rev { from { transform: rotate(360deg);} to { transform: rotate(0deg);} }
+      `}</style>
     </div>
   );
 };
