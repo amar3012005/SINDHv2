@@ -1,36 +1,15 @@
 {
-  "version": 2,
-  "name": "sindh-frontend",
-  "builds": [
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "env": {
     "REACT_APP_API_URL": "https://sindh-backend.onrender.com/api",
     "REACT_APP_ENVIRONMENT": "production",
-    "NODE_ENV": "production"
-  },
-  "build": {
-    "env": {
-      "REACT_APP_API_URL": "https://sindh-backend.onrender.com/api",
-      "REACT_APP_ENVIRONMENT": "production",
-      "NODE_ENV": "production",
-      "CI": "false"
-    }
+    "NODE_ENV": "production",
+    "CI": "false",
+    "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
   }
 }
