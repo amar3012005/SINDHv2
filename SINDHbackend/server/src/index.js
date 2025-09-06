@@ -30,6 +30,8 @@ const getCorsOrigins = () => {
   // Add production origins
   if (process.env.NODE_ENV === 'production') {
     origins.push(
+      'https://sind-hv2-uk8v.vercel.app',
+      'https://sindh-frontend.vercel.app',
       'https://splendid-travesseiro-45ebea.netlify.app',
       'https://sindh-frontend.netlify.app',
       'https://sindh-app.netlify.app'
