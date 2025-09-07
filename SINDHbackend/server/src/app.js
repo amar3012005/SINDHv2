@@ -46,7 +46,8 @@ const getCorsOrigins = () => {
     origins.push(
       'https://splendid-travesseiro-45ebea.netlify.app',
       'https://sindh-frontend.netlify.app',
-      'https://sindh-app.netlify.app'
+      'https://sindh-app.netlify.app',
+      'https://sindhx1.vercel.app'
     );
   }
   
