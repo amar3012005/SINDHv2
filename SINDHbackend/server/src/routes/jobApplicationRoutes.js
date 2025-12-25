@@ -859,6 +859,7 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         $inc: {
           'wallet.totalBalance': paymentAmt,
           'wallet.pendingBalance': paymentAmt, // Legacy
+          'balance': paymentAmt, // SYNC ROOT LEGACY FIELD (Global Truth)
           activeJobs: 1
         },
         $set: {
@@ -918,6 +919,7 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         $inc: {
           'wallet.totalBalance': -paymentAmt,
           'wallet.pendingBalance': -paymentAmt,
+          'balance': -paymentAmt, // SYNC LEGACY FIELD
           activeJobs: -1
         },
         $set: {
