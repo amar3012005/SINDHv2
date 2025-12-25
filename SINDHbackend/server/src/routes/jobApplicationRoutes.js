@@ -890,10 +890,27 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     logger.info(`✅ Job ${application.job._id} status updated to accepted`);
   }
 
-  // Get employer for notifications (use populated employer if available)
-  const employer = application.job.employer || await Employer.findById(application.job.employer);
+  // Get employer for notifications
+  // Try to use populated employer first, then fetch by ID, then fall back to job data
+  let employer = application.job.employer;
+
+  if (!employer || !employer.name) {
+    // If employer not fully populated, try fetching
+    const employerId = application.job.employer?._id || application.job.employer;
+    if (employerId) {
+      employer = await Employer.findById(employerId);
+    }
+  }
+
+  // Construct a fallback employer object if still null, using Job data
   if (!employer) {
-    logger.warn(`⚠️ Employer not found for job ${application.job._id} during notification`);
+    logger.warn(`⚠️ Employer not found for job ${application.job._id} during notification - constructing fallback`);
+    employer = {
+      _id: application.job.employer,
+      companyName: application.job.companyName || 'Employer',
+      name: application.job.companyName || 'Employer',
+      phone: 'N/A'
+    };
   }
 
   // Send notifications based on status
