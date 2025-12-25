@@ -428,8 +428,8 @@ const MyApplications = () => {
                   </div>
                 </div>
 
-                {/* Withdraw Button Only */}
-                {['applied', 'APPLIED', 'accepted', 'ACCEPTED'].includes(selectedApp.status) && (
+                {/* Withdraw Button - only for applied/accepted */}
+                {['applied', 'APPLIED'].includes(selectedApp.status) && (
                   <button
                     onClick={async () => {
                       try {
@@ -459,6 +459,96 @@ const MyApplications = () => {
                   >
                     Withdraw Application
                   </button>
+                )}
+
+                {/* Start Work Button - shows when accepted AND startDate reached */}
+                {['accepted', 'ACCEPTED'].includes(selectedApp.status) &&
+                  new Date(selectedApp.job?.startDate) <= new Date() && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(buildApiUrl(`/job-applications/${selectedApp._id}/start-work`), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                          });
+                          if (response.ok) {
+                            toast.success('🚀 Work started!');
+                            setSelectedApp({ ...selectedApp, status: 'working' });
+                            fetchData(); // Refresh data
+                          } else {
+                            const error = await response.json();
+                            toast.error(error.message || 'Failed to start work');
+                          }
+                        } catch (error) {
+                          console.error(error);
+                          toast.error('Failed to start work');
+                        }
+                      }}
+                      className="w-full py-3 bg-green-600 text-white rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-green-700 transition-all active:scale-95"
+                    >
+                      🚀 Start Work
+                    </button>
+                  )}
+
+                {/* Waiting for start date */}
+                {['accepted', 'ACCEPTED'].includes(selectedApp.status) &&
+                  new Date(selectedApp.job?.startDate) > new Date() && (
+                    <div className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
+                      ⏳ Work starts on {new Date(selectedApp.job?.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </div>
+                  )}
+
+                {/* Work Finished Button - shows when working AND endDate passed AND not yet confirmed */}
+                {['working', 'in-progress', 'WORKING'].includes(selectedApp.status) &&
+                  !selectedApp.workerConfirmedFinish &&
+                  new Date(selectedApp.job?.endDate) <= new Date() && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(buildApiUrl(`/job-applications/${selectedApp._id}/worker-finish`), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                          });
+                          if (response.ok) {
+                            toast.success('✅ Work marked as complete!');
+                            setSelectedApp({ ...selectedApp, workerConfirmedFinish: true });
+                            fetchData(); // Refresh data
+                          } else {
+                            const error = await response.json();
+                            toast.error(error.message || 'Failed to mark work finished');
+                          }
+                        } catch (error) {
+                          console.error(error);
+                          toast.error('Failed to mark work finished');
+                        }
+                      }}
+                      className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-blue-700 transition-all active:scale-95"
+                    >
+                      ✅ Work Finished
+                    </button>
+                  )}
+
+                {/* Working in progress - before end date */}
+                {['working', 'in-progress', 'WORKING'].includes(selectedApp.status) &&
+                  new Date(selectedApp.job?.endDate) > new Date() && (
+                    <div className="w-full py-3 bg-orange-100 text-orange-600 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
+                      🔨 Work in Progress • Ends {new Date(selectedApp.job?.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </div>
+                  )}
+
+                {/* Waiting for employer confirmation */}
+                {['working', 'in-progress', 'WORKING'].includes(selectedApp.status) &&
+                  selectedApp.workerConfirmedFinish && (
+                    <div className="w-full py-3 bg-yellow-100 text-yellow-700 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
+                      ⏳ Waiting for employer to confirm and pay...
+                    </div>
+                  )}
+
+                {/* Completed */}
+                {['completed', 'COMPLETED', 'paid', 'PAID'].includes(selectedApp.status) && (
+                  <div className="w-full py-3 bg-green-100 text-green-700 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
+                    🎉 Job Completed!
+                  </div>
                 )}
               </div>
             </motion.div>

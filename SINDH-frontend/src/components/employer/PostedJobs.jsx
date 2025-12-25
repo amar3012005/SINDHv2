@@ -28,6 +28,12 @@ const PostedJobs = () => {
   const [pendingPaymentApp, setPendingPaymentApp] = useState(null);
   const [isPaying, setIsPaying] = useState(false);
 
+  // Additional charges modal state
+  const [showAdditionalChargesModal, setShowAdditionalChargesModal] = useState(false);
+  const [additionalAmount, setAdditionalAmount] = useState(0);
+  const [selectedAppForPayment, setSelectedAppForPayment] = useState(null);
+  const [isProcessingFinish, setIsProcessingFinish] = useState(false);
+
   // Fetch posted jobs... (rest of the state and useEffect remains same)
 
   useEffect(() => {
@@ -159,6 +165,65 @@ const PostedJobs = () => {
     } catch (error) {
       console.error('Error revoking applicant:', error);
       toast.error('Failed to revoke');
+    }
+  };
+
+  // Handle Start Work (employer triggers)
+  const handleStartWork = async (applicationId) => {
+    try {
+      const apiUrl = getApiUrlSync();
+      const response = await fetch(`${apiUrl}/job-applications/${applicationId}/start-work`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        toast.success('🚀 Work started!');
+        const updatedApps = applications.map(app =>
+          app._id === applicationId ? { ...app, status: 'working' } : app
+        );
+        setApplications(updatedApps);
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to start work');
+      }
+    } catch (error) {
+      console.error('Error starting work:', error);
+      toast.error('Failed to start work');
+    }
+  };
+
+  // Handle employer finish with additional charges
+  const handleEmployerFinish = async () => {
+    if (!selectedAppForPayment) return;
+
+    setIsProcessingFinish(true);
+    try {
+      const apiUrl = getApiUrlSync();
+      const response = await fetch(`${apiUrl}/job-applications/${selectedAppForPayment._id}/employer-finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ additionalCharges: additionalAmount })
+      });
+
+      if (response.ok) {
+        toast.success(`🎉 Job completed! ${additionalAmount > 0 ? `₹${additionalAmount} paid to worker.` : ''}`);
+        const updatedApps = applications.map(app =>
+          app._id === selectedAppForPayment._id ? { ...app, status: 'completed' } : app
+        );
+        setApplications(updatedApps);
+        setShowAdditionalChargesModal(false);
+        setSelectedAppForPayment(null);
+        setAdditionalAmount(0);
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to complete job');
+      }
+    } catch (error) {
+      console.error('Error completing job:', error);
+      toast.error('Failed to complete job');
+    } finally {
+      setIsProcessingFinish(false);
     }
   };
 
@@ -509,32 +574,80 @@ const PostedJobs = () => {
                             </div>
                           </div>
 
-                          {app.status === 'applied' || app.status === 'APPLIED' ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAcceptClick(app);
-                              }}
-                              className="px-6 py-2 bg-[#FF7124] text-white rounded-xl font-bold uppercase text-xs hover:bg-[#e66420] transition-all active:scale-95 whitespace-nowrap self-end"
-                            >
-                              Accept
-                            </button>
-                          ) : (
-                            <div className="flex flex-col gap-2 items-end">
-                              <div className="px-4 py-2 bg-[#10b981] text-white rounded-xl font-bold uppercase text-xs">
-                                ✓ Accepted
-                              </div>
+                          {/* Action Buttons based on status */}
+                          <div className="flex flex-col gap-2 items-end">
+                            {/* Applied - show Accept button */}
+                            {(app.status === 'applied' || app.status === 'APPLIED') && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleRevokeApplicant(app._id);
+                                  handleAcceptClick(app);
                                 }}
-                                className="px-4 py-2 border-2 border-[#FF7124] text-[#FF7124] rounded-xl font-bold uppercase text-xs hover:bg-[#FF7124] hover:text-white transition-all active:scale-95 whitespace-nowrap"
+                                className="px-6 py-2 bg-[#FF7124] text-white rounded-xl font-bold uppercase text-xs hover:bg-[#e66420] transition-all active:scale-95 whitespace-nowrap"
                               >
-                                Revoke
+                                Accept
                               </button>
-                            </div>
-                          )}
+                            )}
+
+                            {/* Accepted - show Start Work or waiting */}
+                            {(app.status === 'accepted' || app.status === 'ACCEPTED') && (
+                              <>
+                                {new Date(selectedJob?.startDate) <= new Date() ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartWork(app._id);
+                                    }}
+                                    className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-green-700 transition-all active:scale-95 whitespace-nowrap"
+                                  >
+                                    🚀 Start Work
+                                  </button>
+                                ) : (
+                                  <div className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl font-bold uppercase text-[10px] text-center">
+                                    Starts {new Date(selectedJob?.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                  </div>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRevokeApplicant(app._id);
+                                  }}
+                                  className="px-4 py-2 border-2 border-[#FF7124] text-[#FF7124] rounded-xl font-bold uppercase text-xs hover:bg-[#FF7124] hover:text-white transition-all active:scale-95 whitespace-nowrap"
+                                >
+                                  Revoke
+                                </button>
+                              </>
+                            )}
+
+                            {/* Working - show status or Work Finished button */}
+                            {(app.status === 'working' || app.status === 'in-progress' || app.status === 'WORKING') && (
+                              <>
+                                {app.workerConfirmedFinish ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedAppForPayment(app);
+                                      setShowAdditionalChargesModal(true);
+                                    }}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 transition-all active:scale-95 whitespace-nowrap"
+                                  >
+                                    ✅ Work Finished
+                                  </button>
+                                ) : (
+                                  <div className="px-4 py-2 bg-orange-100 text-orange-600 rounded-xl font-bold uppercase text-[10px] text-center">
+                                    🔨 Working...
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {/* Completed */}
+                            {(app.status === 'completed' || app.status === 'COMPLETED') && (
+                              <div className="px-4 py-2 bg-green-100 text-green-700 rounded-xl font-bold uppercase text-xs">
+                                🎉 Completed
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-2 text-xs text-[#202124]/50">
@@ -550,6 +663,90 @@ const PostedJobs = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Additional Charges Modal */}
+      <AnimatePresence>
+        {showAdditionalChargesModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowAdditionalChargesModal(false);
+                setSelectedAppForPayment(null);
+                setAdditionalAmount(0);
+              }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full relative z-10 shadow-2xl"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CreditCard className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-black text-[#3B4883] uppercase mb-2">
+                  Additional Charges
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Enter any additional amount to pay the worker:
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <div className="flex items-center border-2 border-[#3B4883]/20 rounded-xl overflow-hidden focus-within:border-[#FF7124]">
+                  <span className="px-4 py-3 bg-gray-50 text-xl font-bold text-gray-500">₹</span>
+                  <input
+                    type="number"
+                    value={additionalAmount}
+                    onChange={(e) => setAdditionalAmount(Math.max(0, Number(e.target.value)))}
+                    placeholder="0"
+                    className="flex-1 px-4 py-3 text-xl font-bold text-[#3B4883] outline-none"
+                    min="0"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-2 text-center">
+                  Leave as 0 if no additional payment needed
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleEmployerFinish}
+                  disabled={isProcessingFinish}
+                  className="w-full py-4 bg-[#FF7124] text-white rounded-xl font-black uppercase tracking-wider hover:bg-[#e66420] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isProcessingFinish ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      {additionalAmount > 0 ? `Pay ₹${additionalAmount} & Complete` : 'Complete Job'}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAdditionalChargesModal(false);
+                    setSelectedAppForPayment(null);
+                    setAdditionalAmount(0);
+                  }}
+                  disabled={isProcessingFinish}
+                  className="w-full py-3 border-2 border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-wider hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
               </div>
             </motion.div>
           </div>

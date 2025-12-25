@@ -90,6 +90,11 @@ const NotificationBell = () => {
             case 'job_update': return '💼';
             case 'payment': return '💰';
             case 'welcome': return '👋';
+            // New lifecycle notification icons
+            case 'work_started': return '🚀';
+            case 'work_finished_worker': return '✅';
+            case 'work_finished_employer': return '🎉';
+            case 'additional_payment': return '💰';
             default: return '🔔';
         }
     };
