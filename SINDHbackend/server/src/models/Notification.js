@@ -22,7 +22,20 @@ const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['application_accepted', 'application_rejected', 'application_submitted', 'job_started', 'job_completed', 'new_application', 'system']
+    enum: [
+      'application_accepted',
+      'application_rejected',
+      'application_submitted',
+      'job_started',
+      'job_completed',
+      'new_application',
+      'system',
+      // Job workflow types
+      'work_started',           // When work begins
+      'work_finished_worker',   // Worker confirmed work is done
+      'work_finished_employer', // Employer confirmed + paid additional
+      'additional_payment'      // Additional charges paid
+    ]
   },
   title: {
     type: String,

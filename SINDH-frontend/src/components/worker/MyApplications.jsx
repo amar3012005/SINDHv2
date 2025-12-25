@@ -408,8 +408,29 @@ const MyApplications = () => {
                   </div>
                 </div>
 
-                {/* Additional Info Row */}
+                {/* Timing & Location Info Row */}
                 <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="bg-[#F8F5F2] p-3 rounded-xl">
+                    <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Work Timing</p>
+                    <p className="text-xs font-black text-[#3B4883]">
+                      {(selectedApp.job?.startDate || selectedApp.job?.startTime) ? (
+                        <>
+                          {selectedApp.job.startDate ? new Date(selectedApp.job.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                          {selectedApp.job.startTime ? ` @ ${selectedApp.job.startTime}` : ' - Full day'}
+                        </>
+                      ) : 'Check description'}
+                    </p>
+                  </div>
+                  <div className="bg-[#F8F5F2] p-3 rounded-xl">
+                    <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Location</p>
+                    <p className="text-xs font-black text-[#3B4883] truncate">
+                      {selectedApp.job?.location?.village || selectedApp.job?.location?.district || 'On-site'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Info Row */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="bg-[#F8F5F2] p-3 rounded-xl">
                     <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Applied On</p>
                     <p className="text-xs font-black text-[#3B4883]">

@@ -22,7 +22,9 @@ import axios from 'axios';
 const debug = process.env.NODE_ENV !== 'production';
 
 // Production backend URL (Render deployment)
-const PRODUCTION_API_URL = 'https://sindh-backend.onrender.com/api';
+// Production backend URL (Render deployment)
+// TEMPORARILY FORCED TO LOCALHOST to fix OTP issue
+const PRODUCTION_API_URL = 'http://localhost:10000/api'; // 'https://sindh-backend.onrender.com/api';
 
 // Development backend URLs to try (reduced list for better performance)
 const DEVELOPMENT_API_URLS = [

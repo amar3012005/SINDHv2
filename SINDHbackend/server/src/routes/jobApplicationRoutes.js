@@ -15,6 +15,25 @@ const {
   asyncHandler
 } = require('../middleware/errorHandler');
 
+// Helper function: Calculate distance using Haversine formula
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+};
+
+const deg2rad = (deg) => {
+  return deg * (Math.PI / 180);
+};
+
 // Apply for a job
 router.post('/apply', asyncHandler(async (req, res) => {
   logger.info('🎯 Job application request received');
@@ -118,12 +137,33 @@ router.post('/apply', asyncHandler(async (req, res) => {
 
     const employerId = job.employer?._id || job.employer || '000000000000000000000000';
 
+    // Calculate distance from worker to job location
+    let distanceFromWork = 10; // Default 10km
+    const workerCoords = workerDetails?.location?.coordinates?.coordinates;
+    const jobCoords = job.location?.coordinates?.coordinates;
+
+    if (workerCoords && jobCoords && workerCoords.length === 2 && jobCoords.length === 2) {
+      const calculatedDistance = calculateDistance(
+        workerCoords[1], // latitude
+        workerCoords[0], // longitude
+        jobCoords[1],    // latitude
+        jobCoords[0]     // longitude
+      );
+      if (calculatedDistance !== null) {
+        distanceFromWork = calculatedDistance;
+        logger.info(`📍 Distance calculated: ${distanceFromWork.toFixed(2)}km (worker not in DB)`);
+      }
+    } else {
+      logger.info(`📍 Using default distance: ${distanceFromWork}km (coordinates not available)`);
+    }
+
     const applicationData = {
       job: jobId,
       worker: workerId,
       employer: employerId,
       status: 'applied',
       workerDetails: sanitizedWorkerDetails,
+      distanceFromWork: distanceFromWork,
       appliedAt: new Date(),
       statusHistory: [{
         status: 'applied',
@@ -162,12 +202,33 @@ router.post('/apply', asyncHandler(async (req, res) => {
       : (workerDetails?.rating || worker.rating?.average || 0)
   };
 
+  // Calculate distance from worker to job location
+  let distanceFromWork = 10; // Default 10km
+  const workerCoords = worker.location?.coordinates?.coordinates;
+  const jobCoords = job.location?.coordinates?.coordinates;
+
+  if (workerCoords && jobCoords && workerCoords.length === 2 && jobCoords.length === 2) {
+    const calculatedDistance = calculateDistance(
+      workerCoords[1], // latitude
+      workerCoords[0], // longitude
+      jobCoords[1],    // latitude
+      jobCoords[0]     // longitude
+    );
+    if (calculatedDistance !== null) {
+      distanceFromWork = calculatedDistance;
+      logger.info(`📍 Distance calculated: ${distanceFromWork.toFixed(2)}km`);
+    }
+  } else {
+    logger.info(`📍 Using default distance: ${distanceFromWork}km (coordinates not available)`);
+  }
+
   const applicationData = {
     job: jobId,
     worker: workerId,
     employer: employerId,
     status: 'applied',
     workerDetails: sanitizedWorkerDetails,
+    distanceFromWork: distanceFromWork,
     appliedAt: new Date(),
     statusHistory: [{
       status: 'applied',
@@ -1627,5 +1688,289 @@ router.post('/process-all-completed-payments/:workerId', async (req, res) => {
     });
   }
 });
+
+// ============================================
+// JOB WORKFLOW LIFECYCLE ENDPOINTS
+// ============================================
+
+// Start Work - ACCEPTED → WORKING
+// Either worker or employer can trigger this
+router.post('/:applicationId/start-work', asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+
+  logger.info(`🚀 Start Work request for application: ${applicationId}`);
+
+  const application = await JobApplication.findById(applicationId)
+    .populate('job')
+    .populate('worker')
+    .populate('employer');
+
+  if (!application) {
+    throw new NotFoundError('Application not found');
+  }
+
+  if (application.status !== 'accepted') {
+    throw new ValidationError(`Cannot start work. Current status: ${application.status}. Must be 'accepted'.`);
+  }
+
+  // Update application status to working
+  application.status = 'working';
+  application.startedAt = new Date();
+  application.statusHistory.push({
+    status: 'working',
+    changedAt: new Date(),
+    note: 'Work started'
+  });
+  await application.save();
+
+  // Update job status
+  const job = await Job.findById(application.job._id || application.job);
+  if (job) {
+    job.status = 'WORKING';
+    job.workerStatus = 'working';
+    job.employerStatus = 'working';
+    await job.save();
+    logger.info(`✅ Job ${job._id} status updated to WORKING`);
+  }
+
+  // Send notifications to both parties
+  const Notification = require('../models/Notification');
+
+  // Notify worker
+  try {
+    await Notification.create({
+      recipient: application.worker._id || application.worker,
+      recipientModel: 'Worker',
+      sender: application.employer._id || application.employer,
+      senderModel: 'Employer',
+      type: 'work_started',
+      title: '🚀 Work Started!',
+      message: `Work has started for "${job?.title || 'Job'}"`,
+      data: {
+        jobId: job?._id,
+        applicationId: application._id
+      }
+    });
+  } catch (e) {
+    logger.warn('Could not create worker notification:', e.message);
+  }
+
+  // Notify employer
+  try {
+    await Notification.create({
+      recipient: application.employer._id || application.employer,
+      recipientModel: 'Employer',
+      sender: application.worker._id || application.worker,
+      senderModel: 'Worker',
+      type: 'work_started',
+      title: '🚀 Work Started!',
+      message: `Work has started for "${job?.title || 'Job'}"`,
+      data: {
+        jobId: job?._id,
+        applicationId: application._id
+      }
+    });
+  } catch (e) {
+    logger.warn('Could not create employer notification:', e.message);
+  }
+
+  logger.info(`✅ Application ${applicationId} status updated to WORKING`);
+
+  res.json({
+    success: true,
+    message: 'Work started successfully',
+    data: application
+  });
+}));
+
+// Worker Finish - Worker confirms work is done
+router.post('/:applicationId/worker-finish', asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+
+  logger.info(`✅ Worker Finish request for application: ${applicationId}`);
+
+  const application = await JobApplication.findById(applicationId)
+    .populate('job')
+    .populate('worker')
+    .populate('employer');
+
+  if (!application) {
+    throw new NotFoundError('Application not found');
+  }
+
+  if (application.status !== 'working') {
+    throw new ValidationError(`Cannot finish work. Current status: ${application.status}. Must be 'working'.`);
+  }
+
+  // Mark worker as confirmed finish
+  application.workerConfirmedFinish = true;
+  application.workerConfirmedFinishAt = new Date();
+  application.statusHistory.push({
+    status: 'working',
+    changedAt: new Date(),
+    note: 'Worker confirmed work is complete'
+  });
+  await application.save();
+
+  // Notify employer that worker finished
+  const Notification = require('../models/Notification');
+  const job = application.job;
+
+  try {
+    await Notification.create({
+      recipient: application.employer._id || application.employer,
+      recipientModel: 'Employer',
+      sender: application.worker._id || application.worker,
+      senderModel: 'Worker',
+      type: 'work_finished_worker',
+      title: '✅ Work Completed!',
+      message: `${application.worker?.name || 'Worker'} marked work as complete for "${job?.title || 'Job'}"`,
+      data: {
+        jobId: job?._id,
+        applicationId: application._id,
+        workerId: application.worker._id || application.worker
+      }
+    });
+    logger.info('Notification sent to employer about worker finish');
+  } catch (e) {
+    logger.warn('Could not create employer notification:', e.message);
+  }
+
+  logger.info(`✅ Worker confirmed finish for application ${applicationId}`);
+
+  res.json({
+    success: true,
+    message: 'Work marked as complete. Waiting for employer confirmation.',
+    data: application
+  });
+}));
+
+// Employer Finish - Employer confirms + pays additional charges
+router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  const { additionalCharges = 0 } = req.body;
+
+  logger.info(`💰 Employer Finish request for application: ${applicationId}, additionalCharges: ${additionalCharges}`);
+
+  const application = await JobApplication.findById(applicationId)
+    .populate('job')
+    .populate('worker')
+    .populate('employer');
+
+  if (!application) {
+    throw new NotFoundError('Application not found');
+  }
+
+  if (application.status !== 'working') {
+    throw new ValidationError(`Cannot complete work. Current status: ${application.status}. Must be 'working'.`);
+  }
+
+  if (!application.workerConfirmedFinish) {
+    throw new ValidationError('Worker has not confirmed work completion yet.');
+  }
+
+  // Update application
+  application.status = 'completed';
+  application.employerConfirmedFinish = true;
+  application.employerConfirmedFinishAt = new Date();
+  application.completedAt = new Date();
+  application.additionalCharges = additionalCharges;
+  application.totalPayment = (application.baseAmount || 0) + additionalCharges;
+
+  if (additionalCharges > 0) {
+    application.additionalChargesPaid = true;
+    application.additionalChargesPaidAt = new Date();
+  }
+
+  application.statusHistory.push({
+    status: 'completed',
+    changedAt: new Date(),
+    note: `Job completed. Additional charges: ₹${additionalCharges}`
+  });
+  await application.save();
+
+  // Update job status
+  const job = await Job.findById(application.job._id || application.job);
+  if (job) {
+    job.status = 'COMPLETED';
+    job.workerStatus = 'completed';
+    job.employerStatus = 'completed';
+    job.additionalCharges = additionalCharges;
+    job.totalPayment = (job.baseAmount || 0) + additionalCharges;
+    job.completedAt = new Date();
+    await job.save();
+    logger.info(`✅ Job ${job._id} status updated to COMPLETED`);
+  }
+
+  // Credit additional charges to worker wallet
+  if (additionalCharges > 0) {
+    try {
+      const worker = await Worker.findById(application.worker._id || application.worker);
+      if (worker) {
+        worker.balance = (worker.balance || 0) + additionalCharges;
+        worker.pendingBalance = (worker.pendingBalance || 0) + additionalCharges;
+        await worker.save();
+        logger.info(`✅ Worker wallet credited with ₹${additionalCharges}. New balance: ₹${worker.balance}`);
+      }
+    } catch (e) {
+      logger.error('Error updating worker wallet:', e.message);
+    }
+  }
+
+  // Send notifications
+  const Notification = require('../models/Notification');
+
+  // Notify worker about completion and additional payment
+  try {
+    await Notification.create({
+      recipient: application.worker._id || application.worker,
+      recipientModel: 'Worker',
+      sender: application.employer._id || application.employer,
+      senderModel: 'Employer',
+      type: additionalCharges > 0 ? 'additional_payment' : 'job_completed',
+      title: additionalCharges > 0 ? '💰 Additional Payment Received!' : '🎉 Job Completed!',
+      message: additionalCharges > 0
+        ? `Received ₹${additionalCharges} additional payment for "${job?.title || 'Job'}"`
+        : `Job "${job?.title || 'Job'}" is now complete!`,
+      data: {
+        jobId: job?._id,
+        applicationId: application._id,
+        additionalCharges: additionalCharges
+      }
+    });
+  } catch (e) {
+    logger.warn('Could not create worker notification:', e.message);
+  }
+
+  // Notify employer about completion
+  try {
+    await Notification.create({
+      recipient: application.employer._id || application.employer,
+      recipientModel: 'Employer',
+      type: 'job_completed',
+      title: '🎉 Job Completed!',
+      message: `Job "${job?.title || 'Job'}" is now complete!${additionalCharges > 0 ? ` Additional payment: ₹${additionalCharges}` : ''}`,
+      data: {
+        jobId: job?._id,
+        applicationId: application._id,
+        additionalCharges: additionalCharges
+      }
+    });
+  } catch (e) {
+    logger.warn('Could not create employer notification:', e.message);
+  }
+
+  logger.info(`✅ Application ${applicationId} COMPLETED with ₹${additionalCharges} additional charges`);
+
+  res.json({
+    success: true,
+    message: 'Job completed successfully',
+    data: {
+      application,
+      additionalCharges,
+      totalPayment: application.totalPayment
+    }
+  });
+}));
 
 module.exports = router;

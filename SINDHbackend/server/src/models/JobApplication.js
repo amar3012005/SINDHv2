@@ -34,6 +34,23 @@ const jobApplicationSchema = new mongoose.Schema({
   completedAt: {
     type: Date
   },
+  // Work completion confirmation flags
+  workerConfirmedFinish: {
+    type: Boolean,
+    default: false,
+    description: 'Worker marked work as complete'
+  },
+  workerConfirmedFinishAt: {
+    type: Date
+  },
+  employerConfirmedFinish: {
+    type: Boolean,
+    default: false,
+    description: 'Employer confirmed work complete and paid additional'
+  },
+  employerConfirmedFinishAt: {
+    type: Date
+  },
   rating: {
     worker: {
       score: { type: Number, min: 0, max: 5 },

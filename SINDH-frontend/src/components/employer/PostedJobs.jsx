@@ -6,6 +6,7 @@ import {
   Users,
   Clock,
   Briefcase,
+  AlertCircle,
   X,
   Building,
   CheckCircle,
@@ -392,6 +393,15 @@ const PostedJobs = () => {
                     <Building className="w-4 h-4 shrink-0" />
                     <span className="font-bold">{selectedJob.companyName || 'Company'}</span>
                   </div>
+                  {(selectedJob.startDate || selectedJob.startTime) && (
+                    <div className="flex items-center gap-1.5 text-[#FF7124]">
+                      <Clock className="w-4 h-4 shrink-0" />
+                      <span className="font-bold">
+                        {selectedJob.startDate ? new Date(selectedJob.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                        {selectedJob.startTime ? ` @ ${selectedJob.startTime}` : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {selectedJob.category && (

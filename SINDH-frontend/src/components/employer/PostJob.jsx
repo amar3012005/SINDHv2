@@ -54,6 +54,9 @@ const PostJob = () => {
     requirements: [],
     urgency: 'Normal',
     startDate: '',
+    endDate: '',
+    startTime: '09:00',
+    endTime: '18:00',
     experience: ''
   });
 
@@ -201,6 +204,14 @@ const PostJob = () => {
         toast.error('Select a state');
         return;
       }
+      if (!formData.startDate || !formData.endDate) {
+        toast.error('Please select both start and end dates');
+        return;
+      }
+      if (new Date(formData.startDate) > new Date(formData.endDate)) {
+        toast.error('End date cannot be before start date');
+        return;
+      }
       setCurrentPhase(3);
     } else if (currentPhase === 3) {
       handleSubmit();
@@ -258,8 +269,10 @@ const PostJob = () => {
           : (formData.requirements || 'Basic requirements apply'),
         status: 'POSTED',
         urgency: formData.urgency,
-        startDate: formData.startDate || new Date().toISOString(),
-        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        startTime: formData.startTime,
+        endTime: formData.endTime
       };
 
       const response = await fetch(buildApiUrl('/jobs'), {
@@ -341,17 +354,89 @@ const PostJob = () => {
           </div>
         </div>
       );
-    } else if (currentPhase === 2) {
-      // LOCATION & PAYMENT
+      // Payment
+      const renderPaymentFields = () => (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Base Amount (₹) *</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3B4883]/40 font-bold">₹</span>
+              <input
+                type="number"
+                placeholder="500"
+                value={formData.salary.amount}
+                onChange={(e) => setFormData(p => ({ ...p, salary: { ...p.salary, amount: e.target.value } }))}
+                className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 pl-8 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Payment Type</label>
+            <select
+              value={formData.salary.period}
+              onChange={(e) => setFormData(p => ({ ...p, salary: { ...p.salary, period: e.target.value } }))}
+              className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
+            >
+              <option value="total">Base Amount</option>
+              <option value="daily">Daily Wage</option>
+            </select>
+          </div>
+        </div>
+      );
+
       return (
         <div className="space-y-6">
-          <div className="flex items-center gap-4 mb-8">
+          <div className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-white shadow-sm border border-[#3B4883]/10 flex items-center justify-center">
               <MapPin className="w-6 h-6 text-[#3B4883]" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-[#272D4E] uppercase">Location & Payment</h3>
-              <p className="text-xs font-bold text-[#3B4883]/50 uppercase tracking-wide">Where and how much</p>
+              <h3 className="text-lg font-black text-[#272D4E] uppercase">Location & Timing</h3>
+              <p className="text-xs font-bold text-[#3B4883]/50 uppercase tracking-wide">Where and when</p>
+            </div>
+          </div>
+
+          {/* Date Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Start Date *</label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => setFormData(p => ({ ...p, startDate: e.target.value }))}
+                className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">End Date *</label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData(p => ({ ...p, endDate: e.target.value }))}
+                className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
+              />
+            </div>
+          </div>
+
+          {/* Time Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Start Time</label>
+              <input
+                type="time"
+                value={formData.startTime}
+                onChange={(e) => setFormData(p => ({ ...p, startTime: e.target.value }))}
+                className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">End Time</label>
+              <input
+                type="time"
+                value={formData.endTime}
+                onChange={(e) => setFormData(p => ({ ...p, endTime: e.target.value }))}
+                className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
+              />
             </div>
           </div>
 
@@ -377,18 +462,6 @@ const PostJob = () => {
                 className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
               />
             </div>
-          </div>
-
-          {/* Street Address */}
-          <div>
-            <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Street Address (Optional)</label>
-            <input
-              type="text"
-              placeholder="e.g. Near Main Market"
-              value={formData.location.street}
-              onChange={(e) => setFormData(p => ({ ...p, location: { ...p.location, street: e.target.value } }))}
-              className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
-            />
           </div>
 
           {/* State & Pincode */}
@@ -419,38 +492,12 @@ const PostJob = () => {
             </div>
           </div>
 
-          {/* Payment */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Base Amount (₹) *</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3B4883]/40 font-bold">₹</span>
-                <input
-                  type="number"
-                  placeholder="500"
-                  value={formData.salary.amount}
-                  onChange={(e) => setFormData(p => ({ ...p, salary: { ...p.salary, amount: e.target.value } }))}
-                  className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 pl-8 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Payment Type</label>
-              <select
-                value={formData.salary.period}
-                onChange={(e) => setFormData(p => ({ ...p, salary: { ...p.salary, period: e.target.value } }))}
-                className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-3 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
-              >
-                <option value="total">Base Amount</option>
-                <option value="daily">Daily Wage</option>
-              </select>
-            </div>
-          </div>
+          {renderPaymentFields()}
 
           {/* Note */}
           <div className="p-4 bg-[#FF7124]/5 rounded-2xl border border-[#FF7124]/10">
             <p className="text-[10px] text-[#FF7124] font-bold uppercase">
-              💡 Competitive wages attract higher quality workers faster
+              💡 Clear timing helps workers plan their schedule
             </p>
           </div>
         </div>
@@ -517,8 +564,8 @@ const PostJob = () => {
                   key={type}
                   onClick={() => setFormData(p => ({ ...p, employmentType: type }))}
                   className={`p-3 rounded-2xl border-2 transition-all ${formData.employmentType === type
-                      ? 'border-[#FF7124] bg-[#FF7124]/5'
-                      : 'border-[#3B4883]/5 bg-white/50 hover:border-[#FF7124]/30'
+                    ? 'border-[#FF7124] bg-[#FF7124]/5'
+                    : 'border-[#3B4883]/5 bg-white/50 hover:border-[#FF7124]/30'
                     }`}
                 >
                   <span className="text-[10px] font-black text-[#272D4E] uppercase">{type}</span>

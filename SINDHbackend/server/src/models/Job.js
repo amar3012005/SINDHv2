@@ -192,6 +192,14 @@ const jobSchema = new mongoose.Schema({
     type: Date,
     required: [true, 'End date is required']
   },
+  startTime: {
+    type: String,
+    description: 'Job start time (e.g., 09:00 AM)'
+  },
+  endTime: {
+    type: String,
+    description: 'Job end time (e.g., 06:00 PM)'
+  },
   completedAt: Date,
 
   // Application tracking

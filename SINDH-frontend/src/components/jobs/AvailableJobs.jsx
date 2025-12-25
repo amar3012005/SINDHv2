@@ -11,7 +11,8 @@ import {
   TrendingUp,
   DollarSign,
   Navigation,
-  ChevronRight
+  ChevronRight,
+  Clock
 } from 'lucide-react';
 
 const AvailableJobs = () => {
@@ -390,6 +391,18 @@ const AvailableJobs = () => {
                           <span className="text-[#202124]/40 ml-1">(~{job.calculatedDistance ? job.calculatedDistance.toFixed(1) : '?'}km)</span>
                         </span>
                       </div>
+
+                      {/* Timing */}
+                      {(job.startDate || job.startTime) && (
+                        <div className="flex items-center gap-2 text-sm text-[#FF7124] font-semibold">
+                          <Clock className="w-4 h-4" />
+                          <span>
+                            {job.startDate ? new Date(job.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                            {job.startTime ? ` @ ${job.startTime}` : ''}
+                            {job.endTime ? ` - ${job.endTime}` : ''}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Applicants */}
                       <div className="flex items-center gap-2 text-sm text-[#202124]/60 font-semibold">

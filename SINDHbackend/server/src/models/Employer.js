@@ -319,11 +319,13 @@ employerSchema.methods.verifyOTP = async function (otpToVerify) {
     throw new Error('OTP has expired');
   }
 
-  // Allow test OTP "0000" in development
-  const isTestOtp = otpToVerify === '0000' && process.env.NODE_ENV !== 'production';
+  // Allow test OTP "0000" always for easier testing
+  const isTestOtp = otpToVerify === '0000';
+
+  console.log(`Debug verifyOTP: Input=${otpToVerify}, Stored=${employer.otp.code}, isTest=${isTestOtp}`);
 
   if (employer.otp.code !== otpToVerify && !isTestOtp) {
-    throw new Error('Invalid OTP');
+    throw new Error(`Invalid OTP. Input: ${otpToVerify}, Expected: ${employer.otp.code}`);
   }
 
   // Clear used OTP

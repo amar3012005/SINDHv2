@@ -272,21 +272,18 @@ const workerSchema = new mongoose.Schema({
     totalBalance: {
       type: Number,
       default: 0,
-      min: 0,
       description: 'Global Total Balance (Withdrawable + Pending)'
     },
     // The amount actually available for withdrawal (only completed jobs)
     withdrawableBalance: {
       type: Number,
       default: 0,
-      min: 0,
       description: 'Actually withdrawable amount'
     },
     // Legacy mapping (virtual)
     pendingBalance: {
       type: Number,
       default: 0,
-      min: 0,
       description: 'Legacy - mapped to totalBalance logic'
     },
     totalEarnings: {
@@ -407,8 +404,7 @@ const workerSchema = new mongoose.Schema({
   // Balance and earnings
   balance: {
     type: Number,
-    default: 0,
-    min: 0
+    default: 0
   },
   earnings: [{
     jobId: {
