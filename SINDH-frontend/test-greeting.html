@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Greeting Page</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 50%, #f3e8ff 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+        }
+        .greeting {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 1rem;
+            opacity: 0;
+            animation: fadeIn 1s ease-out 0.5s forwards;
+        }
+        .logo {
+            width: 128px;
+            height: 128px;
+            margin: 2rem auto;
+            opacity: 0;
+            animation: fadeIn 1s ease-out 1.5s forwards;
+        }
+        .indus-text {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #2563eb, #4f46e5, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 3rem;
+            opacity: 0;
+            animation: fadeIn 1s ease-out 2.5s forwards;
+        }
+        .language-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            max-height: 256px;
+            overflow-y: auto;
+            opacity: 0;
+            animation: fadeIn 1s ease-out 3.5s forwards;
+        }
+        .language-btn {
+            padding: 12px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .language-btn:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-color: #3b82f6;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .greeting, .logo, .indus-text, .language-grid {
+            transform: translateY(32px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="greeting">Namaste!</div>
+        <div class="logo">
+            <svg viewBox="0 0 240 240" style="width: 100%; height: 100%;">
+                <path fill="#000000" d="M127.864716,106.613457 C133.477173,112.493637 138.958298,118.078804 144.417862,123.684967 C145.795151,125.099236 147.611710,126.416931 145.408203,128.640121 C135.690628,138.444519 126.006523,148.282104 116.200356,158.219070 C111.765350,155.519180 108.946495,152.023697 105.989151,148.765472 C103.931320,146.498260 106.483696,145.178619 107.794647,143.926071 C113.438416,138.533737 119.183907,133.247849 124.859299,127.954041 C122.159294,123.147148 118.798149,120.759239 115.049812,117.062515 C109.622444,122.733330 104.237495,128.115601 99.151955,133.767303 C96.216377,137.029694 94.136467,137.489990 90.814186,133.958557 C82.828308,125.469963 74.470352,117.325569 66.114388,109.194542 C63.620365,106.767639 63.612858,105.186020 66.171165,102.726662 C74.318565,94.894394 74.229630,94.791565 82.287422,102.847092 C85.585976,106.144730 88.949837,109.384407 92.106804,112.813560 C94.026871,114.899162 95.423126,114.748505 97.499313,112.920708 C104.843567,106.455101 104.897911,106.434975 98.070587,99.766571 C94.138741,95.926247 90.261559,92.029938 86.361122,88.157463 C84.814636,86.622063 83.782715,85.158058 85.823601,83.102890 C95.433006,73.426247 104.973083,63.680748 114.595413,53.901371 C119.282959,56.288937 121.857025,60.041576 124.980621,63.145008 C126.676888,64.830307 125.331680,66.175545 124.136269,67.381172 C119.562904,71.993614 114.964912,76.581635 110.377335,81.179993 C109.100906,82.459404 107.584694,83.550316 106.967125,85.216835 C107.137703,85.720413 107.165115,86.095566 107.359909,86.333946 C114.780876,95.415375 114.797401,95.421555 122.996277,87.348824 C126.319328,84.076889 129.709473,80.863167 132.868805,77.438217 C135.145691,74.969894 136.865234,74.708527 139.389130,77.294815 C147.880035,85.995689 156.584015,94.488548 165.196289,103.071220 C165.782730,103.655647 166.760559,104.331268 166.751694,104.953011 C166.677124,110.187935 161.522263,111.688461 158.948517,115.120697 C157.243439,117.394485 155.335251,115.603569 153.903519,114.202271 C149.260635,109.658134 144.477615,105.230843 140.153503,100.396347 C137.114761,96.998917 134.800873,97.101883 132.237885,100.581306 C130.793030,102.542763 128.154602,103.566765 127.864716,106.613457z"/>
+            </svg>
+        </div>
+        <div class="indus-text">I N D U S</div>
+        <h3 style="margin-bottom: 1.5rem; color: #374151;">Choose your preferred language</h3>
+        <div class="language-grid">
+            <div class="language-btn">
+                <div style="font-weight: 500; color: #1f2937;">English</div>
+                <div style="font-size: 0.875rem; color: #6b7280;">English</div>
+            </div>
+            <div class="language-btn">
+                <div style="font-weight: 500; color: #1f2937;">हिंदी</div>
+                <div style="font-size: 0.875rem; color: #6b7280;">Hindi</div>
+            </div>
+            <div class="language-btn">
+                <div style="font-weight: 500; color: #1f2937;">తెలుగు</div>
+                <div style="font-size: 0.875rem; color: #6b7280;">Telugu</div>
+            </div>
+            <div class="language-btn">
+                <div style="font-weight: 500; color: #1f2937;">தமிழ்</div>
+                <div style="font-size: 0.875rem; color: #6b7280;">Tamil</div>
+            </div>
+            <div class="language-btn">
+                <div style="font-weight: 500; color: #1f2937;">ಕನ್ನಡ</div>
+                <div style="font-size: 0.875rem; color: #6b7280;">Kannada</div>
+            </div>
+            <div class="language-btn">
+                <div style="font-weight: 500; color: #1f2937;">മലയാളം</div>
+                <div style="font-size: 0.875rem; color: #6b7280;">Malayalam</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

@@ -1,0 +1,451 @@
+/* Mobile-specific styles for Capacitor app */
+
+/* Safe area adjustments for mobile devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 20px);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left, 0);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right, 0);
+}
+
+/* Keyboard handling */
+body.keyboard-open {
+  --keyboard-height: 300px;
+}
+
+.keyboard-padding {
+  padding-bottom: var(--keyboard-height, 0);
+  transition: padding-bottom 0.3s ease;
+}
+
+/* Mobile app specific adjustments */
+body.capacitor-app {
+  /* Remove web scrollbars on mobile */
+  overflow-x: hidden;
+  
+  /* Prevent bounce scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+  
+  /* Prevent text selection on mobile */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in input areas */
+body.capacitor-app input,
+body.capacitor-app textarea,
+body.capacitor-app [contenteditable] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Status bar spacing */
+.mobile-header {
+  padding-top: env(safe-area-inset-top, 44px);
+  background: linear-gradient(135deg, #FF7124 0%, #e66420 100%);
+}
+
+/* Touch improvements */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.touch-feedback {
+  transition: all 0.1s ease;
+}
+
+.touch-feedback:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+/* Mobile navigation adjustments */
+.mobile-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Camera overlay styles */
+.camera-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-controls {
+  position: absolute;
+  bottom: env(safe-area-inset-bottom, 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 20px;
+}
+
+/* Location permission styles */
+.location-prompt {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px;
+  text-align: center;
+}
+
+/* Network status indicator */
+.network-status {
+  position: fixed;
+  top: env(safe-area-inset-top, 44px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #FF7124;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.network-status.offline {
+  background: #dc3545;
+}
+
+.network-status.online {
+  background: #28a745;
+}
+
+/* Mobile form improvements */
+.mobile-form {
+  padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0));
+}
+
+.mobile-input {
+  font-size: 16px; /* Prevent zoom on iOS */
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 2px solid #e1e5e9;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.mobile-input:focus {
+  border-color: #FF7124;
+  box-shadow: 0 0 0 3px rgba(255, 113, 36, 0.1);
+  outline: none;
+}
+
+/* Loading states for mobile */
+.mobile-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mobile-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #FF7124;
+  border-radius: 50%;
+  animation: mobile-spin 1s linear infinite;
+}
+
+@keyframes mobile-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Pull to refresh indicator */
+.pull-to-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+.pull-to-refresh.active {
+  color: #FF7124;
+}
+
+/* Mobile modal adjustments */
+.mobile-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+}
+
+.mobile-modal-content {
+  background: white;
+  width: 100%;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0));
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Chat interface mobile adjustments */
+.mobile-chat {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.mobile-chat-input {
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
+  background: white;
+  border-top: 1px solid #e1e5e9;
+}
+
+/* Job cards mobile optimization */
+.mobile-job-card {
+  margin: 10px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Profile image mobile styles */
+.mobile-profile-image {
+  position: relative;
+  display: inline-block;
+}
+
+.mobile-profile-image::after {
+  content: '📷';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #FF7124;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Haptic feedback class */
+.haptic-light { animation: haptic-pulse 0.1s ease; }
+.haptic-medium { animation: haptic-pulse 0.15s ease; }
+.haptic-heavy { animation: haptic-pulse 0.2s ease; }
+
+@keyframes haptic-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+/* Mobile toast notifications */
+.mobile-toast {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 44px) + 20px);
+  left: 20px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 16px;
+  border-radius: 12px;
+  z-index: 1000;
+  text-align: center;
+}
+
+.mobile-toast.success {
+  background: rgba(40, 167, 69, 0.9);
+}
+
+.mobile-toast.error {
+  background: rgba(220, 53, 69, 0.9);
+}
+
+/* Swipe gestures */
+.swipe-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.swipe-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  background: #FF7124;
+  color: white;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+.swipe-container.swiped .swipe-actions {
+  transform: translateX(0);
+}
+
+/* Mobile-specific utility classes */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+  
+  .desktop-only {
+    display: none;
+  }
+}
+
+/* Dark mode adjustments for mobile */
+@media (prefers-color-scheme: dark) {
+  .mobile-modal-content {
+    background: #1a1a1a;
+    color: white;
+  }
+  
+  .mobile-input {
+    background: #2a2a2a;
+    border-color: #444;
+    color: white;
+  }
+  
+  .mobile-input:focus {
+    border-color: #FF7124;
+  }
+}
+
+/* Light theme utilities for mobile */
+.light-theme .network-status {
+  background: #3B4883;
+  border: 2px solid rgba(59, 72, 131, 0.1);
+}
+
+.light-theme .mobile-spinner {
+  border-top-color: #3B4883;
+}
+
+.light-theme .mobile-header {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E8DFD5 100%);
+  border-bottom: 2px solid rgba(59, 72, 131, 0.1);
+}
+
+.light-theme .mobile-input:focus {
+  border-color: #3B4883;
+  box-shadow: 0 0 0 3px rgba(59, 72, 131, 0.1);
+}
+
+.light-theme .touch-feedback:active {
+  background: rgba(59, 72, 131, 0.05);
+}
+
+/* Light Theme Mobile Optimizations for Jobs */
+@media (max-width: 768px) {
+  .job-card-light {
+    margin: 0 4px;
+    padding: 20px;
+  }
+  
+  .job-card-light .salary {
+    font-size: 24px;
+  }
+  
+  .job-card-light .title {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  
+  .job-card-light .description {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .filter-input-light {
+    font-size: 16px; /* Prevents iOS zoom */
+    padding: 12px 16px;
+    min-height: 44px; /* Touch target */
+  }
+  
+  .filter-input-light:focus {
+    font-size: 16px; /* Maintain size on focus */
+  }
+  
+  .stats-card-light {
+    padding: 16px;
+    margin: 0 16px;
+  }
+  
+  .stats-card-light .stat-value {
+    font-size: 28px;
+  }
+  
+  .stats-card-light .stat-label {
+    font-size: 10px;
+  }
+  
+  .light-btn-primary,
+  .light-btn-secondary {
+    min-height: 48px;
+    font-size: 16px;
+    padding: 14px 32px;
+  }
+  
+  .page-menu-light {
+    width: calc(100vw - 32px);
+    max-width: 280px;
+    right: 16px;
+  }
+  
+  .page-menu-light button {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  
+  .swiper-slide {
+    padding: 0 4px;
+  }
+  
+  .swiper-container {
+    padding-bottom: 24px;
+  }
+}
+ 

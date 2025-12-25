@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- SINDH Jobs Brand Colors -->
+    <color name="colorPrimary">#ff6b35</color>
+    <color name="colorPrimaryDark">#e55a2b</color>
+    <color name="colorAccent">#ff6b35</color>
+    
+    <!-- Icon Background -->
+    <color name="ic_launcher_background">#ff6b35</color>
+    
+    <!-- Additional Colors -->
+    <color name="colorBackground">#FFFFFF</color>
+    <color name="colorSurface">#FFFFFF</color>
+    <color name="colorError">#F44336</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    <color name="colorOnBackground">#000000</color>
+</resources>

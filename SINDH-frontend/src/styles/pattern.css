@@ -1,0 +1,22 @@
+@keyframes patternMove {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 100% 100%;
+  }
+}
+
+.bg-pattern {
+  background-image: 
+    linear-gradient(45deg, #4f46e5 25%, transparent 25%),
+    linear-gradient(-45deg, #4f46e5 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #4f46e5 75%),
+    linear-gradient(-45deg, transparent 75%, #4f46e5 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+.animate-pattern {
+  animation: patternMove 20s linear infinite;
+} 

@@ -268,11 +268,26 @@ const workerSchema = new mongoose.Schema({
 
   // Wallet/Earnings tracking
   wallet: {
+    // The "Global Truth" displayed everywhere - includes pending base payments
+    totalBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+      description: 'Global Total Balance (Withdrawable + Pending)'
+    },
+    // The amount actually available for withdrawal (only completed jobs)
+    withdrawableBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+      description: 'Actually withdrawable amount'
+    },
+    // Legacy mapping (virtual)
     pendingBalance: {
       type: Number,
       default: 0,
       min: 0,
-      description: 'Money earned but not yet withdrawn'
+      description: 'Legacy - mapped to totalBalance logic'
     },
     totalEarnings: {
       type: Number,
@@ -293,7 +308,7 @@ const workerSchema = new mongoose.Schema({
     transactionHistory: [{
       type: {
         type: String,
-        enum: ['credit', 'debit', 'withdrawal'],
+        enum: ['credit', 'debit', 'withdrawal', 'credit_pending'],
         required: true
       },
       amount: {

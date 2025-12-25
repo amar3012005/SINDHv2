@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SINDH Jobs</string>
+    <string name="title_activity_main">SINDH Jobs</string>
+    <string name="package_name">com.sindh.jobs</string>
+    <string name="custom_url_scheme">com.sindh.jobs</string>
+</resources>

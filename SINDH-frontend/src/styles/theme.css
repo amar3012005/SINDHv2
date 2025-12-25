@@ -1,0 +1,182 @@
+:root {
+  /* Primary color palette - new light theme colors */
+  --color-primary: #FF7124; /* Burning Orange */
+  --color-primary-dark: #e66420; /* Darker orange for hover states */
+  --color-secondary: #3B4883; /* Blue Estate */
+  --color-secondary-dark: #272D4E; /* Wahoo - darker blue */
+  --color-accent: #FF7124; /* Same as primary for consistency */
+  --color-error: #C62828; /* Red - error state */
+  --color-success: #2E7D32; /* Green - success state */
+  
+  /* Background and surface colors */
+  --color-background: #FFFFFF; /* Pure white */
+  --color-background-secondary: #E8DFD5; /* Pale Cashmere */
+  --color-background-tertiary: #DBBBA7; /* Cinnamon Ice */
+  --color-surface: #FFFFFF; /* White surface */
+  --color-card: #FFFFFF; /* White cards */
+  
+  /* Text colors */
+  --color-text-primary: #202124; /* Noble Black */
+  --color-text-secondary: #6B7280; /* Secondary text */
+  --color-text-tertiary: rgba(32, 33, 36, 0.6); /* Muted text */
+  --color-text-on-primary: #FFFFFF; /* Text on orange */
+  --color-text-on-secondary: #FFFFFF; /* Text on blue */
+  --color-text-disabled: #9CA3AF; /* Disabled text */
+  
+  /* Border colors */
+  --color-border: rgba(59, 72, 131, 0.15); /* Blue-tinted border */
+  --color-border-light: rgba(59, 72, 131, 0.08); /* Lighter variant */
+  --color-divider: rgba(59, 72, 131, 0.1); /* Divider lines */
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(59, 72, 131, 0.06);
+  --shadow-md: 0 4px 16px rgba(59, 72, 131, 0.1);
+  --shadow-lg: 0 8px 32px rgba(59, 72, 131, 0.15);
+  --shadow-xl: 0 12px 48px rgba(59, 72, 131, 0.2);
+  --shadow-orange: 0 6px 24px rgba(255, 113, 36, 0.25);
+  --shadow-blue: 0 6px 24px rgba(59, 72, 131, 0.25);
+  
+  /* Border radius */
+  --border-radius-sm: 0.125rem;
+  --border-radius-md: 0.375rem;
+  --border-radius-lg: 0.5rem;
+  --border-radius-xl: 1rem;
+  --border-radius-full: 9999px;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+}
+
+/* Form elements - consistent styling */
+.form-control {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+
+.form-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-primary);
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  font-size: 1rem;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+  transition: border-color 0.15s ease-in-out;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(226, 125, 96, 0.2);
+}
+
+.form-input::placeholder {
+  color: var(--color-text-disabled);
+}
+
+/* Button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  font-weight: 500;
+  border-radius: var(--border-radius-md);
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+  box-shadow: var(--shadow-orange);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+  box-shadow: 0 8px 32px rgba(255, 113, 36, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-text-on-secondary);
+  box-shadow: var(--shadow-blue);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-secondary-dark);
+  box-shadow: 0 8px 32px rgba(59, 72, 131, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-accent {
+  background-color: var(--color-accent);
+  color: var(--color-text-on-primary);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.btn-outline:hover {
+  background-color: var(--color-background);
+}
+
+/* Card styles */
+.card {
+  background-color: var(--color-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-lg);
+}
+
+/* Language specific adjustments */
+html[lang="hi"] {
+  font-family: 'Noto Sans Devanagari', sans-serif;
+}
+
+/* Custom styles for Hindi language */
+.lang-hi {
+  font-family: 'Noto Sans Devanagari', sans-serif;
+}
+
+/* New color utilities */
+.bg-cream { background-color: #E8DFD5; }
+.bg-peach { background-color: #DBBBA7; }
+.bg-orange-primary { background-color: #FF7124; }
+.bg-blue-primary { background-color: #3B4883; }
+.bg-blue-dark { background-color: #272D4E; }
+.text-noble-black { color: #202124; }
+.text-blue-primary { color: #3B4883; }
+.text-orange-primary { color: #FF7124; }
+.border-blue-light { border-color: rgba(59, 72, 131, 0.15); }
+
+/* Custom styles for Hindi language */
+.lang-hi {
+  line-height: 1.6;
+  font-family: 'Noto Sans Devanagari', sans-serif;
+}

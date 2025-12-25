@@ -335,23 +335,27 @@ router.get('/:id/balance', asyncHandler(async (req, res) => {
   }
 
   // Use new wallet structure if available, fallback to old or 0
-  const balance = worker.wallet?.pendingBalance || worker.balance || 0;
+  const totalBalance = worker.wallet?.totalBalance || worker.balance || 0;
+  const withdrawableBalance = worker.wallet?.withdrawableBalance || 0;
+  // Previously this was 'balance', implying distinct from earnings, but 'totalBalance' is the main view now.
 
   // Map earnings from transaction history if available
   let earnings = worker.earnings || [];
   if (worker.wallet?.transactionHistory) {
     earnings = worker.wallet.transactionHistory
-      .filter(t => t.type === 'credit' || t.type === 'earning')
+      .filter(t => t.type === 'credit' || t.type === 'earning' || t.type === 'credit_pending') // Show pending credits too
       .map(t => ({
         jobId: t.jobId,
         amount: t.amount,
         description: t.description,
-        date: t.createdAt
+        date: t.createdAt,
+        status: t.type === 'credit_pending' ? 'pending' : 'completed'
       }));
   }
 
   res.json({
-    balance: balance,
+    balance: totalBalance, // This is what shows on Homepage
+    withdrawableBalance: withdrawableBalance, // For withdrawal UI
     earnings: earnings
   });
 }));
@@ -458,9 +462,10 @@ router.get('/:id/wallet', asyncHandler(async (req, res) => {
   }
 
   // Use the source of truth from the worker document
-  const currentBalance = worker.wallet.pendingBalance || 0;
+  const totalBalance = worker.wallet.totalBalance || 0;
+  const withdrawableBalance = worker.wallet.withdrawableBalance || 0;
   const totalEarned = worker.wallet.totalEarnings || 0;
-  const totalWithdrawn = worker.wallet.withdrawnAmount || 0;
+  const totalSpent = worker.wallet.withdrawnAmount || 0;
 
   // Format transactions for frontend
   const transactions = (worker.wallet.transactionHistory || []).map(t => ({
@@ -469,15 +474,16 @@ router.get('/:id/wallet', asyncHandler(async (req, res) => {
     amount: t.amount,
     description: t.description,
     date: t.createdAt,
-    status: 'completed',
+    status: t.type === 'credit_pending' ? 'pending' : 'completed',
     jobId: t.jobId,
     applicationId: t.applicationId
   })).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   res.json({
-    balance: currentBalance,
+    balance: totalBalance, // Main display
+    withdrawableBalance: withdrawableBalance, // Specific display
     totalEarned: totalEarned,
-    totalSpent: totalWithdrawn,
+    totalSpent: totalSpent,
     transactions: transactions
   });
 }));
@@ -492,13 +498,16 @@ router.post('/:id/withdraw', asyncHandler(async (req, res) => {
     throw new NotFoundError('Worker not found');
   }
 
-  if (amount > worker.balance) {
-    throw new ValidationError('Insufficient balance');
+  // NEW WITHDRAWAL LOGIC: Check against withdrawableBalance
+  const safeWithdrawable = worker.wallet?.withdrawableBalance || 0; // Fallback to 0 if wallet missing
+
+  if (amount > safeWithdrawable) {
+    throw new ValidationError(`Insufficient withdrawable balance. Available: ₹${safeWithdrawable}`);
   }
 
-  if (!Array.isArray(worker.withdrawals)) {
-    worker.withdrawals = [];
-  }
+  if (!worker.wallet) worker.wallet = {};
+  if (!Array.isArray(worker.wallet.transactionHistory)) worker.wallet.transactionHistory = [];
+  if (!Array.isArray(worker.withdrawals)) worker.withdrawals = []; // Maintain legacy array too
 
   const withdrawal = {
     amount: amount,
@@ -507,16 +516,32 @@ router.post('/:id/withdraw', asyncHandler(async (req, res) => {
     status: 'pending'
   };
 
-  worker.withdrawals.push(withdrawal);
-  worker.balance -= amount;
+  worker.withdrawals.push(withdrawal); // Legacy
 
+  // Debit from Two-Tier Wallet
+  worker.wallet.withdrawableBalance = (worker.wallet.withdrawableBalance || 0) - amount;
+  worker.wallet.totalBalance = (worker.wallet.totalBalance || 0) - amount;
+  worker.wallet.withdrawnAmount = (worker.wallet.withdrawnAmount || 0) + amount;
+
+  // Legacy
+  worker.balance = (worker.balance || 0) - amount;
+
+  worker.wallet.transactionHistory.push({
+    type: 'withdrawal',
+    amount: amount,
+    description: `Withdrawal via ${method || 'bank_transfer'}`,
+    createdAt: new Date()
+  });
+
+  worker.markModified('wallet');
   await worker.save();
 
-  logger.info(`Withdrawal processed: ${worker.name} - ₹${amount}`);
+  logger.info(`Withdrawal processed: ${worker.name} - ₹${amount} (Remaining: ₹${worker.wallet.totalBalance}, Withdrawable: ₹${worker.wallet.withdrawableBalance})`);
   res.json({
     success: true,
     message: 'Withdrawal request submitted successfully',
-    newBalance: worker.balance
+    newBalance: worker.wallet.totalBalance,
+    withdrawableBalance: worker.wallet.withdrawableBalance
   });
 }));
 

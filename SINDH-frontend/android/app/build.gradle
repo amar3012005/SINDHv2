@@ -1,0 +1,130 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.sindh.jobs"
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.sindh.jobs"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    
+    // Signing configuration for release builds
+    signingConfigs {
+        release {
+            // Try environment variables first (for CI/CD)
+            def envStoreFile = System.getenv("SINDH_KEYSTORE_FILE")
+            def envStorePassword = System.getenv("SINDH_KEYSTORE_PASSWORD")
+            def envKeyAlias = System.getenv("SINDH_KEY_ALIAS")
+            def envKeyPassword = System.getenv("SINDH_KEY_PASSWORD")
+            
+            // Fall back to keystore.properties (for local development)
+            def keystorePropertiesFile = rootProject.file("keystore.properties")
+            def keystoreProperties = new Properties()
+            if (keystorePropertiesFile.exists()) {
+                keystorePropertiesFile.withInputStream { stream ->
+                    keystoreProperties.load(stream)
+                }
+            }
+            
+            // Validate that ALL required credentials are present
+            def canSignRelease = false
+            if (envStoreFile != null && !envStoreFile.isEmpty() && 
+                envStorePassword != null && !envStorePassword.isEmpty() &&
+                envKeyAlias != null && !envKeyAlias.isEmpty() && 
+                envKeyPassword != null && !envKeyPassword.isEmpty()) {
+                // Environment variables complete
+                canSignRelease = true
+                storeFile file(envStoreFile)
+                storePassword envStorePassword
+                keyAlias envKeyAlias
+                keyPassword envKeyPassword
+            } else if (keystorePropertiesFile.exists() && 
+                       keystoreProperties['storeFile'] != null && !keystoreProperties['storeFile'].toString().isEmpty() &&
+                       keystoreProperties['storePassword'] != null && !keystoreProperties['storePassword'].toString().isEmpty() &&
+                       keystoreProperties['keyAlias'] != null && !keystoreProperties['keyAlias'].toString().isEmpty() &&
+                       keystoreProperties['keyPassword'] != null && !keystoreProperties['keyPassword'].toString().isEmpty()) {
+                // Properties file complete
+                canSignRelease = true
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+            
+            // Store flag for use in buildTypes
+            project.ext.canSignRelease = canSignRelease
+        }
+    }
+    
+    buildTypes {
+        debug {
+            debuggable true
+            minifyEnabled false
+            applicationIdSuffix ".debug"
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            
+            // Only sign if ALL credentials are complete
+            if (project.ext.canSignRelease) {
+                signingConfig signingConfigs.release
+            } else {
+                // Fail fast with descriptive error if signing is required but incomplete
+                gradle.taskGraph.whenReady { graph ->
+                    if (graph.hasTask(':app:assembleRelease') || graph.hasTask(':app:bundleRelease')) {
+                        throw new GradleException(
+                            "Release signing credentials incomplete! " +
+                            "Please ensure ALL of the following are set:\n" +
+                            "  - storeFile (keystore file path)\n" +
+                            "  - storePassword (keystore password)\n" +
+                            "  - keyAlias (key alias name)\n" +
+                            "  - keyPassword (key password)\n\n" +
+                            "Set them via keystore.properties file OR environment variables:\n" +
+                            "  SINDH_KEYSTORE_FILE, SINDH_KEYSTORE_PASSWORD, SINDH_KEY_ALIAS, SINDH_KEY_PASSWORD"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

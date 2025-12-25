@@ -850,12 +850,15 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
 
     // 2. Update Worker's wallet
     const workerId = application.worker?._id || application.worker;
+
+    // TWO-TIER WALLET LOGIC:
+    // On Acceptance: Credit 'totalBalance' (visible upcoming) but NOT 'withdrawableBalance'.
     const workerUpdate = await Worker.findByIdAndUpdate(
       workerId,
       {
         $inc: {
-          'wallet.pendingBalance': paymentAmt,
-          'wallet.totalEarnings': paymentAmt,
+          'wallet.totalBalance': paymentAmt,
+          'wallet.pendingBalance': paymentAmt, // Legacy
           activeJobs: 1
         },
         $set: {
@@ -863,9 +866,9 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         },
         $push: {
           'wallet.transactionHistory': {
-            type: 'credit',
+            type: 'credit_pending',
             amount: paymentAmt,
-            description: `Base payment for job: ${application.job?.title}`,
+            description: `Base payment (Pending Completion): ${application.job?.title}`,
             jobId: application.job?._id,
             applicationId: application._id,
             createdAt: new Date()
@@ -908,13 +911,13 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     // 2. Debit Worker's wallet
     const workerId = application.worker?._id || application.worker;
 
-    // Check ensure we don't reduce below zero if possible, although technically we should reverse exactly what was given
+    // REVERSAL LOGIC: Debit totalBalance (was credited at acceptance).
     const workerUpdate = await Worker.findByIdAndUpdate(
       workerId,
       {
         $inc: {
+          'wallet.totalBalance': -paymentAmt,
           'wallet.pendingBalance': -paymentAmt,
-          'wallet.totalEarnings': -paymentAmt,
           activeJobs: -1
         },
         $set: {
@@ -922,7 +925,7 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         },
         $push: {
           'wallet.transactionHistory': {
-            type: 'debit', // New transaction type for reversal
+            type: 'debit',
             amount: paymentAmt,
             description: `Revoked acceptance for job: ${application.job?.title}`,
             jobId: application.job?._id,
@@ -935,7 +938,7 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     );
 
     if (workerUpdate) {
-      logger.info(`✅ Worker ${workerId} wallet debited. New pending balance: ₹${workerUpdate.wallet?.pendingBalance || 0}`);
+      logger.info(`✅ Worker ${workerId} wallet debited. New Total Balance: ₹${workerUpdate.wallet?.totalBalance || 0}`);
     } else {
       logger.warn(`⚠️ Worker ${workerId} not found for wallet debit`);
     }
@@ -1326,7 +1329,7 @@ async function updateJobStatusIfCompleted(jobId) {
   }
 }
 
-// Helper function to update worker balance
+// Helper function to update worker balance (Two-Tier Recalculation)
 async function updateWorkerBalance(workerId) {
   try {
     const Worker = require('../models/Worker');
@@ -1337,30 +1340,52 @@ async function updateWorkerBalance(workerId) {
       return;
     }
 
-    const completedApplications = await JobApplication.find({
+    if (!worker.wallet) worker.wallet = { totalBalance: 0, withdrawableBalance: 0 };
+
+    // 1. Accepted Jobs (Pending Base Amount)
+    // Only count baseAmount here.
+    const acceptedApps = await JobApplication.find({
       worker: workerId,
-      status: 'completed',
-      paymentStatus: 'paid'
+      status: 'accepted'
     }).populate('job');
 
-    const totalEarned = completedApplications.reduce((sum, app) => {
+    // 2. Completed Jobs (Fully Earned)
+    // These contribute to both Total and Withdrawable
+    const completedApps = await JobApplication.find({
+      worker: workerId,
+      status: 'completed'
+    }).populate('job');
+
+    let calculatedTotal = 0;
+    let calculatedWithdrawable = 0;
+
+    // Add Pending (Accepted) Amounts
+    acceptedApps.forEach(app => {
+      // Prefer tracking fields if available, else job salary
+      const amount = app.baseAmount || app.job?.salary || 0;
+      calculatedTotal += amount;
+    });
+
+    // Add Earned (Completed) Amounts
+    completedApps.forEach(app => {
       const amount = app.paymentAmount || app.job?.salary || 0;
-      return sum + amount;
-    }, 0);
+      calculatedTotal += amount;
+      calculatedWithdrawable += amount;
+    });
 
-    const totalWithdrawn = (worker.withdrawals || []).reduce((sum, w) => sum + w.amount, 0);
+    // Deduct Withdrawals
+    const totalWithdrawn = worker.wallet.withdrawnAmount || 0;
 
-    worker.balance = totalEarned - totalWithdrawn;
-    worker.earnings = completedApplications.map(app => ({
-      jobId: app.job._id,
-      amount: app.paymentAmount || app.job?.salary || 0,
-      description: `Payment for: ${app.job?.title || 'Job'}`,
-      date: app.paymentDate || app.updatedAt
-    }));
+    // Final Calculation
+    worker.wallet.totalBalance = Math.max(0, calculatedTotal - totalWithdrawn);
+    worker.wallet.withdrawableBalance = Math.max(0, calculatedWithdrawable - totalWithdrawn);
+    worker.wallet.pendingBalance = worker.wallet.totalBalance; // Legacy sync
+    worker.wallet.totalEarnings = calculatedTotal; // Lifetime earnings
 
+    worker.markModified('wallet');
     await worker.save();
 
-    logger.info(`Worker balance updated: ${worker.name} - New balance: ₹${worker.balance}`);
+    logger.info(`✅ Worker Wallet Recalculated: Total: ₹${worker.wallet.totalBalance}, Withdrawable: ₹${worker.wallet.withdrawableBalance}`);
 
   } catch (error) {
     logger.error('Error updating worker balance:', error);

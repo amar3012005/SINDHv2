@@ -1,0 +1,38 @@
+{
+  "appId": "com.sindh.jobs",
+  "appName": "SINDH Jobs",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "http"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#ff6b35"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchFadeOutDuration": 300,
+      "backgroundColor": "#ff6b35",
+      "showSpinner": false,
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "dark",
+      "resizeOnFullScreen": true
+    },
+    "SafeArea": {
+      "enabled": true
+    }
+  },
+  "cordova": {},
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#ffffff"
+  },
+  "ios": {
+    "backgroundColor": "#ffffff"
+  }
+}

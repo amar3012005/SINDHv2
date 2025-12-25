@@ -1,0 +1,424 @@
+/* SINDH Jobs - Light Theme Stylesheet */
+/* Based on color palette from download (11).jpg */
+
+:root {
+  /* Color Palette */
+  --light-bg-primary: #FFFFFF;
+  --light-bg-secondary: #E8DFD5;
+  --light-bg-tertiary: #DBBBA7;
+  --orange-primary: #FF7124;
+  --orange-secondary: #e66420;
+  --blue-primary: #3B4883;
+  --blue-secondary: #272D4E;
+  --text-primary: #202124;
+  --text-secondary: #6B7280;
+  --text-tertiary: rgba(32, 33, 36, 0.6);
+  --border-light: rgba(59, 72, 131, 0.1);
+  --shadow-soft: 0 4px 20px rgba(59, 72, 131, 0.08);
+  --shadow-medium: 0 8px 30px rgba(59, 72, 131, 0.12);
+}
+
+/* Base Container */
+.homepage-light {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8DFD5 100%);
+  color: var(--text-primary);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Navigation */
+.light-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 70px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: var(--shadow-soft);
+  transition: all 0.3s ease;
+}
+
+@media (min-width: 1024px) {
+  .light-nav {
+    height: 80px;
+  }
+}
+
+.light-nav-logo {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--orange-primary);
+  letter-spacing: -0.5px;
+}
+
+.light-nav-links {
+  display: flex;
+  gap: 40px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.light-nav-links a {
+  transition: color 0.2s ease;
+}
+
+.light-nav-links a:hover {
+  color: var(--orange-primary);
+}
+
+@media (max-width: 768px) {
+  .light-nav-links {
+    display: none;
+  }
+}
+
+/* Hero Section */
+.light-hero {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: calc(100px + env(safe-area-inset-top)) 24px 60px;
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.light-hero-headline {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  max-width: 900px;
+  color: var(--text-primary);
+  letter-spacing: -1px;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 768px) {
+  .light-hero-headline {
+    font-size: 56px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .light-hero-headline {
+    font-size: 72px;
+  }
+}
+
+.light-hero-subheadline {
+  font-size: 18px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 48px;
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+/* Card Styles */
+.light-card {
+  background: white;
+  border-radius: 24px;
+  padding: 40px;
+  box-shadow: var(--shadow-medium);
+  border: 1px solid var(--border-light);
+  transition: all 0.3s ease;
+}
+
+.light-card:hover {
+  box-shadow: 0 12px 48px rgba(59, 72, 131, 0.15);
+  transform: translateY(-2px);
+}
+
+.light-card-accent {
+  background: linear-gradient(135deg, #E8DFD5 0%, #DBBBA7 100%);
+  border: 2px solid var(--orange-primary);
+}
+
+/* Button Styles */
+.light-btn-primary {
+  background: linear-gradient(to right, #FF7124, #e66420);
+  color: white;
+  padding: 18px 48px;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  box-shadow: 0 6px 24px rgba(255, 113, 36, 0.3);
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.light-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(255, 113, 36, 0.4);
+}
+
+.light-btn-primary:active {
+  transform: translateY(0);
+}
+
+.light-btn-secondary {
+  background: var(--blue-primary);
+  color: white;
+  padding: 18px 48px;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  box-shadow: 0 6px 24px rgba(59, 72, 131, 0.25);
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.light-btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(59, 72, 131, 0.35);
+}
+
+.light-btn-outline {
+  background: transparent;
+  border: 2px solid var(--blue-primary);
+  color: var(--blue-primary);
+  padding: 16px 46px;
+  border-radius: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.light-btn-outline:hover {
+  background: var(--blue-primary);
+  color: white;
+}
+
+/* Animations */
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-float-gentle {
+  animation: float-gentle 6s ease-in-out infinite;
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 8s ease infinite;
+  background-size: 200% 200%;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.4s ease-out forwards;
+}
+
+/* Utility Classes */
+.orange-accent {
+  color: var(--orange-primary);
+}
+
+.blue-accent {
+  color: var(--blue-primary);
+}
+
+.text-muted {
+  color: var(--text-tertiary);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.shadow-orange {
+  box-shadow: 0 8px 32px rgba(255, 113, 36, 0.2);
+}
+
+.shadow-blue {
+  box-shadow: 0 8px 32px rgba(59, 72, 131, 0.2);
+}
+
+/* Touch Optimizations */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.touch-feedback {
+  -webkit-tap-highlight-color: rgba(255, 113, 36, 0.2);
+}
+
+.touch-feedback:active {
+  opacity: 0.8;
+  transform: scale(0.98);
+}
+
+.tap-highlight-none {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe Area Support */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 767px) {
+  .light-card {
+    padding: 24px;
+    border-radius: 16px;
+  }
+  
+  .light-btn-primary,
+  .light-btn-secondary {
+    padding: 14px 32px;
+    font-size: 16px;
+  }
+  
+  .light-hero {
+    padding: calc(80px + env(safe-area-inset-top)) 16px 40px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .light-hero-headline {
+    font-size: 48px;
+  }
+}
+
+/* Job Card Styles */
+.job-card-light {
+  background: white;
+  border: 1px solid rgba(59, 72, 131, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(59, 72, 131, 0.08);
+  transition: all 0.3s ease;
+}
+
+.job-card-light:hover {
+  border-color: rgba(255, 113, 36, 0.3);
+  box-shadow: 0 8px 32px rgba(59, 72, 131, 0.15);
+  transform: translateY(-4px);
+}
+
+/* Filter Styles */
+.filter-input-light {
+  background: rgba(232, 223, 213, 0.3);
+  border: 1px solid rgba(59, 72, 131, 0.2);
+  color: #202124;
+  padding: 10px 16px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.filter-input-light:focus {
+  outline: none;
+  border-color: #FF7124;
+  box-shadow: 0 0 0 3px rgba(255, 113, 36, 0.1);
+}
+
+.filter-input-light::placeholder {
+  color: rgba(32, 33, 36, 0.4);
+}
+
+/* Stats Badge */
+.stats-badge-light {
+  background: rgba(255, 113, 36, 0.1);
+  border: 1px solid rgba(255, 113, 36, 0.3);
+  color: #FF7124;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Section Headers */
+.section-header-light {
+  color: #272D4E;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* Loading Skeleton */
+.skeleton-light {
+  background: linear-gradient(
+    90deg,
+    rgba(232, 223, 213, 0.3) 0%,
+    rgba(219, 187, 167, 0.5) 50%,
+    rgba(232, 223, 213, 0.3) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
