@@ -889,6 +889,65 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     });
     logger.info(`✅ Job ${application.job._id} status updated to accepted`);
   }
+  // REVOKE PAYMENT FLOW - When employer revokes acceptance (authentically or by accident)
+  else if (currentStatus === 'accepted' && status !== 'accepted' && status !== 'completed') {
+    logger.info('↩️ REVOKE FLOW: Application acceptance revoked! Reversing payment.');
+
+    const paymentAmt = application.totalPayment || application.baseAmount || application.job?.salary || 0;
+
+    // 1. Update JobApplication to remove payment info
+    await JobApplication.findByIdAndUpdate(applicationId, {
+      baseAmountPaid: false,
+      baseAmountPaidAt: null,
+      paymentStatus: 'pending', // Reset to pending
+      // derived fields might need adjustment depending on your business logic 
+      acceptedAt: null
+    });
+    logger.info(`✅ JobApplication ${applicationId} payment info reverted`);
+
+    // 2. Debit Worker's wallet
+    const workerId = application.worker?._id || application.worker;
+
+    // Check ensure we don't reduce below zero if possible, although technically we should reverse exactly what was given
+    const workerUpdate = await Worker.findByIdAndUpdate(
+      workerId,
+      {
+        $inc: {
+          'wallet.pendingBalance': -paymentAmt,
+          'wallet.totalEarnings': -paymentAmt,
+          activeJobs: -1
+        },
+        $set: {
+          'wallet.lastUpdated': new Date()
+        },
+        $push: {
+          'wallet.transactionHistory': {
+            type: 'debit', // New transaction type for reversal
+            amount: paymentAmt,
+            description: `Revoked acceptance for job: ${application.job?.title}`,
+            jobId: application.job?._id,
+            applicationId: application._id,
+            createdAt: new Date()
+          }
+        }
+      },
+      { new: true }
+    );
+
+    if (workerUpdate) {
+      logger.info(`✅ Worker ${workerId} wallet debited. New pending balance: ₹${workerUpdate.wallet?.pendingBalance || 0}`);
+    } else {
+      logger.warn(`⚠️ Worker ${workerId} not found for wallet debit`);
+    }
+
+    // 3. Reset Job document status to 'posted' (so it appears in search again)
+    await Job.findByIdAndUpdate(application.job._id, {
+      status: 'posted', // Back to posted
+      acceptedAt: null,
+      acceptedWorker: null
+    });
+    logger.info(`✅ Job ${application.job._id} status reset to posted`);
+  }
 
   // Get employer for notifications
   // Try to use populated employer first, then fetch by ID, then fall back to job data

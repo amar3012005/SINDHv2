@@ -421,7 +421,7 @@ router.post('/:id/sync-balance', asyncHandler(async (req, res) => {
   });
 }));
 
-// Get worker wallet data
+// Get worker wallet data (New Implementation using embedded wallet)
 router.get('/:id/wallet', asyncHandler(async (req, res) => {
   const workerId = req.params.id;
 
@@ -430,46 +430,33 @@ router.get('/:id/wallet', asyncHandler(async (req, res) => {
     throw new NotFoundError('Worker not found');
   }
 
-  const JobApplication = require('../models/JobApplication');
-  const completedApplications = await JobApplication.find({
-    worker: workerId,
-    status: 'completed',
-    paymentStatus: 'paid'
-  }).populate('job');
-
-  const totalEarned = completedApplications.reduce((sum, app) => {
-    return sum + (app.paymentAmount || app.job?.salary || 0);
-  }, 0);
-
-  const withdrawals = worker.withdrawals || [];
-  const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, 0);
-
-  const transactions = [
-    ...completedApplications.map(app => ({
-      id: app._id.toString(),
-      type: 'earning',
-      amount: app.paymentAmount || app.job?.salary || 0,
-      description: `Payment for: ${app.job?.title || 'Job'}`,
-      date: app.paymentDate || app.updatedAt,
-      status: 'completed',
-      jobTitle: app.job?.title
-    })),
-    ...withdrawals.map((w, index) => ({
-      id: w._id ? w._id.toString() : `withdrawal_${index}`,
-      type: 'withdrawal',
-      amount: w.amount,
-      description: `Withdrawal to ${w.method || 'bank account'}`,
-      date: w.date,
-      status: w.status || 'completed'
-    }))
-  ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  const currentBalance = totalEarned - totalWithdrawn;
-  if (worker.balance !== currentBalance) {
-    worker.balance = currentBalance;
+  // Initialize wallet if missing
+  if (!worker.wallet) {
+    worker.wallet = {
+      pendingBalance: 0,
+      totalEarnings: 0,
+      withdrawnAmount: 0,
+      transactionHistory: []
+    };
     await worker.save();
-    logger.info(`Updated worker balance from ${worker.balance} to ${currentBalance}`);
   }
+
+  // Use the source of truth from the worker document
+  const currentBalance = worker.wallet.pendingBalance || 0;
+  const totalEarned = worker.wallet.totalEarnings || 0;
+  const totalWithdrawn = worker.wallet.withdrawnAmount || 0;
+
+  // Format transactions for frontend
+  const transactions = (worker.wallet.transactionHistory || []).map(t => ({
+    id: t._id ? t._id.toString() : `tx_${Date.now()}`,
+    type: t.type === 'credit' ? 'earning' : t.type, // Map 'credit' to 'earning' for frontend compatibility
+    amount: t.amount,
+    description: t.description,
+    date: t.createdAt,
+    status: 'completed',
+    jobId: t.jobId,
+    applicationId: t.applicationId
+  })).sort((a, b) => new Date(b.date) - new Date(a.date));
 
   res.json({
     balance: currentBalance,
