@@ -256,8 +256,8 @@ const MyApplications = () => {
                       </div>
                       {app.job?.location?.city && (
                         <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3 h-3" />
-                          <span>{app.job.location.city}</span>
+                          <MapPin className="w-3 h-3 text-green-600" />
+                          <span className="text-green-600 font-bold">~{app.distanceFromWork ? app.distanceFromWork.toFixed(1) : 10}km</span>
                         </div>
                       )}
                     </div>
@@ -325,9 +325,9 @@ const MyApplications = () => {
 
                 {/* Distance, Company & Location */}
                 <div className="flex items-start gap-3 text-sm flex-wrap">
-                  <div className="flex items-center gap-1.5 text-[#3B4883]/70">
+                  <div className="flex items-center gap-1.5 text-green-600">
                     <MapPin className="w-4 h-4 shrink-0" />
-                    <span className="font-bold">~{selectedApp.distanceFromWork ? selectedApp.distanceFromWork.toFixed(1) : '?'}km</span>
+                    <span className="font-bold">~{selectedApp.distanceFromWork ? selectedApp.distanceFromWork.toFixed(1) : 10}km</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[#3B4883]/70">
                     <Building className="w-4 h-4 shrink-0" />

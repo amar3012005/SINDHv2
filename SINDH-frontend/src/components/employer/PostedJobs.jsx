@@ -502,9 +502,9 @@ const PostedJobs = () => {
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-1 text-[#3B4883]/60">
+                              <div className="flex items-center gap-1 text-green-600">
                                 <MapPin className="w-3 h-3" />
-                                <span className="font-bold">~{app.distanceFromWork ? app.distanceFromWork.toFixed(1) : Math.floor(Math.random() * 10 + 1)}km</span>
+                                <span className="font-bold">~{app.distanceFromWork ? app.distanceFromWork.toFixed(1) : 10}km</span>
                               </div>
                             </div>
                           </div>
