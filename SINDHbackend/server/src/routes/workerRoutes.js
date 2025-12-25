@@ -329,14 +329,30 @@ router.post('/login', asyncHandler(async (req, res) => {
 
 // Get worker balance and earnings
 router.get('/:id/balance', asyncHandler(async (req, res) => {
-  const worker = await Worker.findById(req.params.id).select('balance earnings name');
+  const worker = await Worker.findById(req.params.id);
   if (!worker) {
     throw new NotFoundError('Worker not found');
   }
 
+  // Use new wallet structure if available, fallback to old or 0
+  const balance = worker.wallet?.pendingBalance || worker.balance || 0;
+
+  // Map earnings from transaction history if available
+  let earnings = worker.earnings || [];
+  if (worker.wallet?.transactionHistory) {
+    earnings = worker.wallet.transactionHistory
+      .filter(t => t.type === 'credit' || t.type === 'earning')
+      .map(t => ({
+        jobId: t.jobId,
+        amount: t.amount,
+        description: t.description,
+        date: t.createdAt
+      }));
+  }
+
   res.json({
-    balance: worker.balance || 0,
-    earnings: worker.earnings || []
+    balance: balance,
+    earnings: earnings
   });
 }));
 
