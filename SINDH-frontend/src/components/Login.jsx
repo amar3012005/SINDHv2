@@ -44,7 +44,11 @@ const Login = () => {
       const response = await api.post(endpoint, { phone: phoneNumber });
 
       if (response.data.success) {
-        toast.success('OTP sent successfully! Use 0000 for testing.');
+        if (response.data.otp) {
+          toast.success(`OTP sent: ${response.data.otp}`);
+        } else {
+          toast.success('OTP sent successfully! Use 0000 for testing.');
+        }
         setOtpSent(true);
       }
     } catch (error) {
@@ -61,16 +65,16 @@ const Login = () => {
     setOtpError('');
 
     // Validate OTP
-    if (!otp || otp.length !== 4) {
-      setOtpError('Please enter a valid 4-digit OTP');
+    if (!otp || (otp.length !== 4 && otp.length !== 6)) {
+      setOtpError('Please enter a valid verification code');
       return;
     }
 
-    // Check if OTP is the test code
-    if (otp !== '0000') {
-      setOtpError('Invalid OTP. Use 0000 for testing.');
-      return;
-    }
+    // Removing client-side restriction to allow both test code (0000) and actual OTPs
+    // if (otp !== '0000') {
+    //   setOtpError('Invalid OTP. Use 0000 for testing.');
+    //   return;
+    // }
 
     setIsLoading(true);
 
