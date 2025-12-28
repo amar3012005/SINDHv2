@@ -108,11 +108,11 @@ const MyApplications = () => {
       setFilteredApps(applications);
     } else if (selectedFilter === 'applied') {
       setFilteredApps(applications.filter(app =>
-        ['applied', 'accepted', 'working', 'WORKING', 'PAYMENT_PENDING', 'APPLIED', 'ACCEPTED'].includes(app.status)
+        ['applied', 'accepted', 'working', 'in-progress', 'payment_pending'].includes(app.status?.toLowerCase())
       ));
     } else if (selectedFilter === 'completed') {
       setFilteredApps(applications.filter(app =>
-        ['completed', 'paid', 'COMPLETED', 'PAID', 'FINISHED'].includes(app.status)
+        ['completed', 'paid', 'finished'].includes(app.status?.toLowerCase())
       ));
     }
   }, [selectedFilter, applications]);
@@ -286,7 +286,7 @@ const MyApplications = () => {
                         </div>
                       )}
                     </div>
-                    {['accepted', 'ACCEPTED'].includes(app.status) &&
+                    {['accepted'].includes(app.status?.toLowerCase()) &&
                       new Date(app.job?.startDate) <= new Date() ? (
                       <button
                         onClick={(e) => handleStartWork(e, app._id)}
@@ -485,7 +485,7 @@ const MyApplications = () => {
                 </div>
 
                 {/* Withdraw Button - only for applied/accepted */}
-                {['applied', 'APPLIED'].includes(selectedApp.status) && (
+                {['applied'].includes(selectedApp.status?.toLowerCase()) && (
                   <button
                     onClick={async () => {
                       try {
@@ -518,7 +518,7 @@ const MyApplications = () => {
                 )}
 
                 {/* Start Work Button - shows when accepted AND startDate reached */}
-                {['accepted', 'ACCEPTED'].includes(selectedApp.status) &&
+                {['accepted'].includes(selectedApp.status?.toLowerCase()) &&
                   new Date(selectedApp.job?.startDate) <= new Date() && (
                     <button
                       onClick={(e) => handleStartWork(e, selectedApp._id)}
@@ -529,7 +529,7 @@ const MyApplications = () => {
                   )}
 
                 {/* Waiting for start date */}
-                {['accepted', 'ACCEPTED'].includes(selectedApp.status) &&
+                {['accepted'].includes(selectedApp.status?.toLowerCase()) &&
                   new Date(selectedApp.job?.startDate) > new Date() && (
                     <div className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
                       ⏳ Work starts on {new Date(selectedApp.job?.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
@@ -537,7 +537,7 @@ const MyApplications = () => {
                   )}
 
                 {/* WORK DONE Button - shows when working AND not yet confirmed */}
-                {['working', 'WORKING'].includes(selectedApp.status) &&
+                {['working', 'in-progress'].includes(selectedApp.status?.toLowerCase()) &&
                   !selectedApp.workerConfirmedFinish && (
                     <button
                       onClick={async () => {
@@ -566,15 +566,15 @@ const MyApplications = () => {
                   )}
 
                 {/* Waiting for employer confirmation */}
-                {(['working', 'WORKING'].includes(selectedApp.status) && selectedApp.workerConfirmedFinish) ||
-                  ['payment_pending', 'PAYMENT_PENDING'].includes(selectedApp.status) && (
+                {((['working', 'in-progress'].includes(selectedApp.status?.toLowerCase()) && selectedApp.workerConfirmedFinish) ||
+                  ['payment_pending'].includes(selectedApp.status?.toLowerCase())) && (
                     <div className="w-full py-4 bg-yellow-50 border-2 border-yellow-200 text-yellow-700 rounded-2xl font-black uppercase text-xs tracking-widest text-center">
                       ⏳ Waiting for employer to confirm & pay additional...
                     </div>
                   )}
 
                 {/* Completed */}
-                {['completed', 'COMPLETED', 'paid', 'PAID'].includes(selectedApp.status) && (
+                {['completed', 'paid', 'finished'].includes(selectedApp.status?.toLowerCase()) && (
                   <div className="w-full py-3 bg-green-100 text-green-700 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
                     🎉 Job Completed!
                   </div>

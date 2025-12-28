@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
-import { getApiUrlSync } from '../../config/api.js';
+import { buildApiUrl } from '../../utils/apiUtils';
 import { toast } from 'react-toastify';
 
 const PostedJobs = () => {
@@ -45,8 +45,7 @@ const PostedJobs = () => {
 
       try {
         setLoading(true);
-        const apiUrl = getApiUrlSync();
-        const response = await fetch(`${apiUrl}/jobs/employer/${user.id}`);
+        const response = await fetch(buildApiUrl(`/jobs/employer/${user.id}`));
         if (response.ok) {
           const data = await response.json();
           setJobs(data);
@@ -72,8 +71,7 @@ const PostedJobs = () => {
 
       try {
         setLoadingApplications(true);
-        const apiUrl = getApiUrlSync();
-        const response = await fetch(`${apiUrl}/jobs/${selectedJob._id}/applications`);
+        const response = await fetch(buildApiUrl(`/jobs/${selectedJob._id}/applications`));
         if (response.ok) {
           const data = await response.json();
 
@@ -118,8 +116,7 @@ const PostedJobs = () => {
       // Simulate payment processing delay
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const apiUrl = getApiUrlSync();
-      const response = await fetch(`${apiUrl}/job-applications/${pendingPaymentApp._id}/status`, {
+      const response = await fetch(buildApiUrl(`/job-applications/${pendingPaymentApp._id}/status`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'accepted' })
@@ -148,8 +145,7 @@ const PostedJobs = () => {
 
   const handleRevokeApplicant = async (applicationId) => {
     try {
-      const apiUrl = getApiUrlSync();
-      const response = await fetch(`${apiUrl}/job-applications/${applicationId}/status`, {
+      const response = await fetch(buildApiUrl(`/job-applications/${applicationId}/status`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'applied' })
@@ -175,8 +171,7 @@ const PostedJobs = () => {
   const handleStartWork = async (e, applicationId) => {
     if (e) e.stopPropagation(); // Prevent opening modal
     try {
-      const apiUrl = getApiUrlSync();
-      const response = await fetch(`${apiUrl}/job-applications/${applicationId}/start-work`, {
+      const response = await fetch(buildApiUrl(`/job-applications/${applicationId}/start-work`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -216,8 +211,7 @@ const PostedJobs = () => {
 
     setIsProcessingFinish(true);
     try {
-      const apiUrl = getApiUrlSync();
-      const response = await fetch(`${apiUrl}/job-applications/${selectedAppForPayment._id}/employer-finish`, {
+      const response = await fetch(buildApiUrl(`/job-applications/${selectedAppForPayment._id}/employer-finish`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ additionalCharges: additionalAmount })
@@ -255,9 +249,11 @@ const PostedJobs = () => {
       config = { label: 'Active', color: 'bg-blue-50 text-blue-600 border-blue-100' };
     } else if (s === 'ACCEPTED' || s === 'accepted') {
       config = { label: 'Accepted', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
-    } else if (s === 'WORKING' || s === 'IN-PROGRESS' || s === 'working') {
+    } else if (s === 'WORKING' || s === 'IN-PROGRESS') {
       config = { label: 'Working', color: 'bg-orange-50 text-orange-600 border-orange-100' };
-    } else if (s === 'COMPLETED' || s === 'FINISHED' || s === 'completed') {
+    } else if (s === 'PAYMENT_PENDING' || s === 'PAYMENT-PENDING') {
+      config = { label: 'Payment Pending', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' };
+    } else if (s === 'COMPLETED' || s === 'FINISHED') {
       config = { label: 'Completed', color: 'bg-purple-50 text-purple-600 border-purple-100' };
     } else if (s === 'PAID') {
       config = { label: 'Paid', color: 'bg-green-50 text-green-600 border-green-100' };
@@ -381,7 +377,7 @@ const PostedJobs = () => {
                         </div>
                       )}
                     </div>
-                    {['ACCEPTED', 'accepted'].includes(job.status) &&
+                    {['accepted'].includes(job.status?.toLowerCase()) &&
                       job.acceptedApplicationId &&
                       new Date(job.startDate) <= new Date() ? (
                       <button
@@ -564,7 +560,7 @@ const PostedJobs = () => {
                 <div className="relative">
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider">Applicants & Management</p>
-                    {applications.length > 0 && !applications.some(a => ['accepted', 'working', 'in-progress', 'completed'].includes(a.status?.toLowerCase())) && (
+                    {applications.length > 0 && !applications.some(a => ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(a.status?.toLowerCase())) && (
                       <span className="bg-[#FF7124]/10 text-[#FF7124] px-2 py-0.5 rounded text-[10px] font-black uppercase">
                         {applications.length} APPLIED
                       </span>
@@ -575,17 +571,17 @@ const PostedJobs = () => {
                     <div className="flex items-center justify-center py-12">
                       <div className="w-8 h-8 border-4 border-[#3B4883]/20 border-t-[#FF7124] rounded-full animate-spin" />
                     </div>
-                  ) : applications.some(a => ['accepted', 'working', 'in-progress', 'completed'].includes(a.status?.toLowerCase())) ? (
+                  ) : applications.some(a => ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(a.status?.toLowerCase())) ? (
                     // Workflow Progress View
                     <div className="space-y-6">
                       {(() => {
-                        const app = applications.find(a => ['accepted', 'working', 'in-progress', 'completed'].includes(a.status?.toLowerCase()));
+                        const app = applications.find(a => ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(a.status?.toLowerCase()));
                         const status = app.status?.toLowerCase();
 
                         const statusSteps = [
                           { label: 'Applied', done: true },
-                          { label: 'Accepted', done: ['accepted', 'working', 'in-progress', 'completed'].includes(status) },
-                          { label: 'Working', done: ['working', 'in-progress', 'completed'].includes(status) },
+                          { label: 'Accepted', done: ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(status) },
+                          { label: 'Working', done: ['working', 'in-progress', 'payment_pending', 'completed'].includes(status) },
                           { label: 'Completed', done: status === 'completed' }
                         ];
 
@@ -599,7 +595,7 @@ const PostedJobs = () => {
                                   {statusSteps.map((step, idx) => {
                                     const isActive = (status === 'applied' && idx === 0) ||
                                       (status === 'accepted' && idx === 1) ||
-                                      ((status === 'working' || status === 'in-progress') && idx === 2) ||
+                                      ((status === 'working' || status === 'in-progress' || status === 'payment_pending') && idx === 2) ||
                                       (status === 'completed' && idx === 3);
 
                                     return (
@@ -639,10 +635,8 @@ const PostedJobs = () => {
                                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors ${status === 'working' || status === 'in-progress'
                                     ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
                                     : status === 'completed'
-                                      ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                                      : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                                     }`}>
-                                    {status === 'in-progress' ? 'Working' : status}
+                                    {status === 'in-progress' ? 'Working' : (status === 'payment_pending' ? 'Payment Pending' : status)}
                                   </span>
                                   {app.paymentStatus === 'paid' || app.paymentStatus === 'base_paid' ? (
                                     <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
@@ -675,9 +669,9 @@ const PostedJobs = () => {
                                 </>
                               )}
 
-                              {(status === 'working' || status === 'in-progress') && (
+                              {(status === 'working' || status === 'in-progress' || status === 'payment_pending') && (
                                 <div className="space-y-3">
-                                  {app.workerConfirmedFinish ? (
+                                  {status === 'payment_pending' || app.workerConfirmedFinish ? (
                                     <button
                                       onClick={() => {
                                         setSelectedAppForPayment(app);
@@ -721,7 +715,7 @@ const PostedJobs = () => {
                     <div className="space-y-3">
                       {applications.map((app) => {
                         const status = app.status?.toLowerCase();
-                        const isAccepted = ['accepted', 'working', 'in-progress', 'completed'].includes(status);
+                        const isAccepted = ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(status);
 
                         return (
                           <div
@@ -760,11 +754,13 @@ const PostedJobs = () => {
                                 {isAccepted && (
                                   <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${status === 'working' || status === 'in-progress'
                                     ? 'bg-orange-50 text-orange-600 border border-orange-100'
-                                    : status === 'completed'
-                                      ? 'bg-purple-50 text-purple-600 border border-purple-100'
-                                      : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                    : status === 'payment_pending'
+                                      ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
+                                      : status === 'completed'
+                                        ? 'bg-purple-50 text-purple-600 border border-purple-100'
+                                        : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                     }`}>
-                                    {status === 'in-progress' ? 'Working' : status}
+                                    {status === 'in-progress' ? 'Working' : (status === 'payment_pending' ? 'Payment Pending' : status)}
                                   </span>
                                 )}
                                 {!isAccepted && (
