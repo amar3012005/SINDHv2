@@ -1,13 +1,10 @@
 import axios from 'axios';
-
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'http://localhost:10000/api'
-  : 'http://localhost:10000/api';
+import { buildApiUrl } from './apiUtils';
 
 export const fetchUserProfile = async (userId, userType) => {
   try {
     const endpoint = userType === 'worker' ? `/workers/${userId}` : `/employers/${userId}`;
-    const response = await axios.get(`${API_BASE_URL}${endpoint}`);
+    const response = await axios.get(buildApiUrl(endpoint));
     return response.data;
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -17,10 +14,10 @@ export const fetchUserProfile = async (userId, userType) => {
 
 export const fetchUserJobs = async (userId, userType) => {
   try {
-    const endpoint = userType === 'worker' 
+    const endpoint = userType === 'worker'
       ? `/jobs/worker/${userId}/accepted-jobs`
       : `/jobs/employer/${userId}/posted-jobs`;
-    const response = await axios.get(`${API_BASE_URL}${endpoint}`);
+    const response = await axios.get(buildApiUrl(endpoint));
     return response.data;
   } catch (error) {
     console.error('Error fetching user jobs:', error);

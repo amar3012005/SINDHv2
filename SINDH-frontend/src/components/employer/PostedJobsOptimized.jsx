@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  MapPin, 
-  DollarSign, 
-  Users, 
+import {
+  Plus,
+  MapPin,
+  DollarSign,
+  Users,
   Eye,
   RefreshCw,
   Briefcase,
@@ -14,15 +14,17 @@ import {
   X,
   Award,
   ArrowLeft,
-  Menu
+  Menu,
+  Building
 } from 'lucide-react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { useTranslation } from 'react-i18next';
 import 'swiper/css';
+import { buildApiUrl } from '../../utils/apiUtils';
 
 const PostedJobs = () => {
   const { t, i18n } = useTranslation();
-  
+
   // State management
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState({});
@@ -49,13 +51,8 @@ const PostedJobs = () => {
     i18n.changeLanguage(next.toLowerCase());
   };
 
-  // API URL function
-  const getApiUrl = () => {
-    if (process.env.NODE_ENV === 'production') {
-      return process.env.REACT_APP_API_URL || 'http://localhost:10000/api';
-    }
-    return 'http://localhost:10000/api';
-  };
+  // Use centralized API URL helper
+  const getApiUrl = (endpoint = '') => buildApiUrl(endpoint);
 
   // Optimized job statistics calculation with memoization
   const jobStatsWithApplications = useMemo(() => {
@@ -63,7 +60,7 @@ const PostedJobs = () => {
 
     const jobsWithStats = jobs.map(job => {
       const jobApplications = applications[job._id] || [];
-      
+
       // Pre-calculate all stats for this job to avoid repeated calculations
       const stats = {
         applications: jobApplications,
@@ -127,7 +124,7 @@ const PostedJobs = () => {
       }
 
       // Fetch jobs
-      const jobsResponse = await fetch(`${getApiUrl()}/jobs/employer/${user.id}`);
+      const jobsResponse = await fetch(getApiUrl(`/jobs/employer/${user.id}`));
       if (!jobsResponse.ok) {
         throw new Error('Failed to fetch jobs');
       }
@@ -136,8 +133,8 @@ const PostedJobs = () => {
 
       // Fetch applications in parallel for better performance
       if (jobsData.length > 0) {
-        const applicationPromises = jobsData.map(job => 
-          fetch(`${getApiUrl()}/applications/job/${job._id}`)
+        const applicationPromises = jobsData.map(job =>
+          fetch(getApiUrl(`/applications/job/${job._id}`))
             .then(res => res.ok ? res.json() : [])
             .then(apps => ({ jobId: job._id, applications: apps }))
             .catch(() => ({ jobId: job._id, applications: [] }))
@@ -162,7 +159,7 @@ const PostedJobs = () => {
   // Load data on mount and handle success message from URL
   useEffect(() => {
     fetchJobsAndApplications();
-    
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('success') === 'true') {
       setShowSuccess(true);
@@ -182,7 +179,7 @@ const PostedJobs = () => {
   // Memoized job card component for optimal performance
   const JobCard = React.memo(({ job }) => {
     const stats = job.stats;
-    
+
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -209,7 +206,7 @@ const PostedJobs = () => {
               )}
             </div>
           </div>
-          
+
           {/* Color indicators */}
           <div className="mt-3 flex items-center justify-center gap-4 px-2">
             <div className="flex items-center gap-1.5">
@@ -308,14 +305,14 @@ const PostedJobs = () => {
 
           {/* Action Buttons */}
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => handleViewApplications(job)}
               className="flex-1 flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all text-sm font-medium shadow-lg hover:shadow-xl"
             >
               <Users className="w-4 h-4 mr-2" />
               Manage ({stats.totalApplications})
             </button>
-            
+
             <button
               onClick={() => window.location.href = `/job/${job._id}`}
               className="flex items-center justify-center px-3 py-2.5 bg-white/10 text-white rounded-lg border border-white/20 hover:bg-white/15 transition-all text-sm"
@@ -366,14 +363,14 @@ const PostedJobs = () => {
 
       {/* Navigation Controls */}
       <div className="absolute top-4 right-4 flex items-center gap-3 z-30">
-        <button 
-          onClick={toggleLang} 
+        <button
+          onClick={toggleLang}
           className="px-2.5 py-1 rounded-full text-sm bg-white/10 border border-white/15 text-white/90 hover:bg-white/15"
         >
           {isHindi ? 'HI' : 'EN'}
         </button>
-        <button 
-          onClick={() => setShowPageMenu(v => !v)} 
+        <button
+          onClick={() => setShowPageMenu(v => !v)}
           className="p-3 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition-colors"
         >
           <Menu className="w-6 h-6 text-white" />
@@ -405,20 +402,19 @@ const PostedJobs = () => {
               Manage your job postings and track applications
             </p>
           </div>
-          
+
           <div className="flex items-center gap-3 mt-4 sm:mt-0">
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className={`w-11 h-11 rounded-full transition-all duration-300 flex items-center justify-center ${
-                refreshing 
-                  ? 'bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 cursor-not-allowed' 
+              className={`w-11 h-11 rounded-full transition-all duration-300 flex items-center justify-center ${refreshing
+                  ? 'bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 cursor-not-allowed'
                   : 'bg-gradient-to-br from-slate-600 via-slate-700 to-gray-800 hover:from-blue-600 hover:via-indigo-700 hover:to-purple-700 hover:scale-105'
-              }`}
+                }`}
             >
               <RefreshCw className={`w-5 h-5 text-white ${refreshing ? 'animate-spin' : ''}`} />
             </button>
-            
+
             <button
               onClick={() => window.location.href = '/employer/post-job'}
               className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:scale-105"
@@ -541,12 +537,11 @@ const PostedJobs = () => {
                     <div key={application._id} className="bg-white/5 border border-white/10 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium text-white">{application.worker?.name || 'Worker'}</h4>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          application.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          application.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                          application.status === 'accepted' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span className={`px-2 py-1 rounded-full text-xs ${application.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            application.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                              application.status === 'accepted' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                          }`}>
                           {application.status?.charAt(0).toUpperCase() + application.status?.slice(1)}
                         </span>
                       </div>

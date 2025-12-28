@@ -1,39 +1,39 @@
 // Dynamic backend detection utility
 const detectBackend = async () => {
   // Check if we're in production environment - primarily rely on environment variables
-  const isProduction = process.env.NODE_ENV === 'production' || 
-                      process.env.REACT_APP_ENVIRONMENT === 'production';
-  
+  const isProduction = process.env.NODE_ENV === 'production' ||
+    process.env.REACT_APP_ENVIRONMENT === 'production';
+
   // Use strict mobile detection
-  const isMobileApp = window.Capacitor?.isNativePlatform?.() || 
-                      !!(window.Capacitor || window.cordova);
-  
+  const isMobileApp = window.Capacitor?.isNativePlatform?.() ||
+    !!(window.Capacitor || window.cordova);
+
   // Development mode override: Allow mobile apps to connect to local backend
   if (isMobileApp && !isProduction && process.env.REACT_APP_FORCE_LOCAL_BACKEND === 'true') {
     const localBackendUrl = (process.env.REACT_APP_LOCAL_BACKEND_URL || 'http://10.0.2.2:10000').replace('/api', '');
     console.log(`📱 Mobile dev mode: using Android emulator localhost at ${localBackendUrl}`);
     return localBackendUrl;
   }
-  
+
   // For production mobile apps, use Render backend
   if (isProduction) {
     console.log('🚀 Using production backend: https://sindh-backend.onrender.com');
     return 'https://sindh-backend.onrender.com';
   }
-  
+
   // Try to connect to local backend first in development
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
-    
+
     const response = await fetch('http://localhost:10000/api/health', {
       method: 'GET',
       signal: controller.signal,
       headers: { 'Content-Type': 'application/json' }
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     if (response.ok) {
       console.log('🔗 Using local backend: http://localhost:10000');
       return 'http://localhost:10000';
@@ -41,7 +41,7 @@ const detectBackend = async () => {
   } catch (error) {
     console.log('🌐 Local backend not available, using production backend');
   }
-  
+
   // Fallback to production backend
   console.log('⚠️ Falling back to production backend: https://sindh-backend.onrender.com');
   return 'https://sindh-backend.onrender.com';

@@ -6,10 +6,12 @@ import { useUser } from '../context/UserContext';
 import { synchronizeUserData } from '../utils/authSyncUtils';
 import axios from 'axios';
 
-// Debug flag - only log in development
+import { buildApiUrl } from '../utils/apiUtils';
+
 const debug = process.env.NODE_ENV !== 'production';
 
-const API_BASE_URL = 'http://localhost:10000/api';
+// Centralized API URL usage instead of hardcoded localhost
+const getApiUrl = (endpoint) => buildApiUrl(endpoint);
 
 const AuthenticationPrompt = ({ isOpen, onClose, onAuthenticationSuccess, from }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -60,13 +62,13 @@ const AuthenticationPrompt = ({ isOpen, onClose, onAuthenticationSuccess, from }
         const endpoint = userType === 'worker' ? '/auth/workers/login' : '/auth/employers/login';
         if (debug) {
           console.log('Attempting login with:', {
-            url: `${API_BASE_URL}${endpoint}`,
+            url: buildApiUrl(endpoint),
             phoneNumber,
             userType
           });
         }
 
-        const response = await axios.post(`${API_BASE_URL}${endpoint}`, {
+        const response = await axios.post(buildApiUrl(endpoint), {
           phoneNumber
         });
 
@@ -81,18 +83,18 @@ const AuthenticationPrompt = ({ isOpen, onClose, onAuthenticationSuccess, from }
             type: userType,
             phoneNumber: response.data.data.phoneNumber
           };
-          
+
           if (debug) {
             console.log('Storing user data:', userData);
           }
           localStorage.setItem('user', JSON.stringify(userData));
-          
+
           // Call success callback and close modal
           onAuthenticationSuccess?.();
           onClose?.();
-          
+
           toast.success('Login successful!');
-          
+
           // Redirect based on user type
           if (userType === 'worker') {
             navigate('/jobs');

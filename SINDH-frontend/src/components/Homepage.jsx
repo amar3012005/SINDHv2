@@ -598,7 +598,7 @@ function Homepage() {
 
   const fetchShaktiScore = async (workerId) => {
     try {
-      const response = await fetch(buildApiUrl(`/api/workers/${workerId}/shakti-score`));
+      const response = await fetch(buildApiUrl(`/workers/${workerId}/shakti-score`));
       if (!response.ok) {
         throw new Error('Failed to fetch Shakti score');
       }
