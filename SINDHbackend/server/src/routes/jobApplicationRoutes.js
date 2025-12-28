@@ -502,12 +502,13 @@ router.get('/worker/:workerId/current', asyncHandler(async (req, res) => {
 
   const query = {
     worker: workerId,
-    status: { $in: ['applied', 'accepted', 'in-progress', 'APPLIED', 'ACCEPTED', 'WORKING'] }
+    status: { $in: ['applied', 'accepted', 'working', 'in-progress', 'APPLIED', 'ACCEPTED', 'WORKING'] }
   };
 
   const applications = await JobApplication.find(query)
     .populate('job')
     .populate('worker')
+    .populate('employer')
     .sort({ appliedAt: -1 });
 
   logger.info(`Found ${applications.length} current applications for worker ${workerId} using query: ${JSON.stringify(query)}`);
@@ -1802,15 +1803,24 @@ router.post('/:applicationId/worker-finish', asyncHandler(async (req, res) => {
     throw new ValidationError(`Cannot finish work. Current status: ${application.status}. Must be 'working'.`);
   }
 
-  // Mark worker as confirmed finish
+  // Mark worker as confirmed finish and set status to PAYMENT_PENDING
+  application.status = 'PAYMENT_PENDING';
   application.workerConfirmedFinish = true;
   application.workerConfirmedFinishAt = new Date();
   application.statusHistory.push({
-    status: 'working',
+    status: 'PAYMENT_PENDING',
     changedAt: new Date(),
     note: 'Worker confirmed work is complete'
   });
   await application.save();
+
+  // Also update the associated Job's status to PAYMENT_PENDING
+  const jobToUpdate = await Job.findById(application.job._id || application.job);
+  if (jobToUpdate) {
+    jobToUpdate.status = 'PAYMENT_PENDING';
+    await jobToUpdate.save();
+    logger.info(`✅ Job ${jobToUpdate._id} status updated to PAYMENT_PENDING`);
+  }
 
   // Notify employer that worker finished
   const Notification = require('../models/Notification');
@@ -1861,8 +1871,8 @@ router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => 
     throw new NotFoundError('Application not found');
   }
 
-  if (application.status !== 'working') {
-    throw new ValidationError(`Cannot complete work. Current status: ${application.status}. Must be 'working'.`);
+  if (application.status !== 'PAYMENT_PENDING') {
+    throw new ValidationError(`Cannot complete work. Current status: ${application.status}. Must be 'PAYMENT_PENDING'.`);
   }
 
   if (!application.workerConfirmedFinish) {

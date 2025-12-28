@@ -344,7 +344,7 @@ router.get('/', async (req, res) => {
     if (status && status !== 'active,in-progress') {
       query.status = status;
     } else {
-      query.status = { $in: ['active', 'in-progress'] };
+      query.status = { $in: ['active', 'POSTED', 'APPLIED', 'in-progress'] };
     }
 
     if (skills) {
@@ -792,9 +792,27 @@ router.get('/employer/:employerId', async (req, res) => {
       employer: employerId
     })
       .populate('employer', 'name company')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json(jobs || []);
+    // Fetch accepted applications for these jobs
+    const jobIds = jobs.map(j => j._id);
+    const acceptedApplications = await JobApplication.find({
+      job: { $in: jobIds },
+      status: { $in: ['accepted', 'working', 'WORKING'] }
+    }).select('_id job');
+
+    const appMap = {};
+    acceptedApplications.forEach(app => {
+      appMap[app.job.toString()] = app._id;
+    });
+
+    const enhancedJobs = jobs.map(job => ({
+      ...job,
+      acceptedApplicationId: appMap[job._id.toString()] || null
+    }));
+
+    res.json(enhancedJobs);
 
   } catch (error) {
     logger.error('Error fetching employer jobs', { error: error.message, stack: error.stack });

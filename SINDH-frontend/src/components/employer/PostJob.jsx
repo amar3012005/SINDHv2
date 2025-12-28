@@ -8,6 +8,7 @@ import {
   Users,
   FileText,
   CheckCircle,
+  Clock,
   ArrowRight,
   ArrowLeft,
   Loader,
@@ -354,7 +355,8 @@ const PostJob = () => {
           </div>
         </div>
       );
-      // Payment
+    } else if (currentPhase === 2) {
+      // LOCATION & TIMING
       const renderPaymentFields = () => (
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -539,6 +541,16 @@ const PostJob = () => {
             <p className="text-sm text-[#202124]/70 mb-4 line-clamp-2 font-medium">
               {formData.description}
             </p>
+
+            {/* Job Timing */}
+            {(formData.startDate || formData.startTime) && (
+              <div className="mb-4 flex items-center gap-2 text-[#FF7124] text-xs font-black uppercase tracking-wider">
+                <Clock className="w-4 h-4" />
+                <span>
+                  {formData.startDate} {formData.startTime} - {formData.endTime}
+                </span>
+              </div>
+            )}
 
             {/* Bottom Row: Location & Employment Type */}
             <div className="flex items-center justify-between">

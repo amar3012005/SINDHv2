@@ -53,10 +53,10 @@ export default function FindWork() {
       const data = await response.json();
       console.log('Fetched jobs:', data);
 
-      // Filter active jobs
+      // Filter active jobs - include both old 'active' and new standard uppercase statuses
       const activeJobs = Array.isArray(data)
-        ? data.filter(job => job.status === 'active')
-        : data.jobs?.filter(job => job.status === 'active') || [];
+        ? data.filter(job => ['active', 'POSTED', 'APPLIED'].includes(job.status))
+        : data.jobs?.filter(job => ['active', 'POSTED', 'APPLIED'].includes(job.status)) || [];
 
       setJobs(activeJobs);
     } catch (err) {

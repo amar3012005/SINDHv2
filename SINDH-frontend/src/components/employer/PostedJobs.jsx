@@ -10,7 +10,9 @@ import {
   X,
   Building,
   CheckCircle,
-  CreditCard
+  CreditCard,
+  ChevronRight,
+  DollarSign
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
@@ -170,7 +172,8 @@ const PostedJobs = () => {
   };
 
   // Handle Start Work (employer triggers)
-  const handleStartWork = async (applicationId) => {
+  const handleStartWork = async (e, applicationId) => {
+    if (e) e.stopPropagation(); // Prevent opening modal
     try {
       const apiUrl = getApiUrlSync();
       const response = await fetch(`${apiUrl}/job-applications/${applicationId}/start-work`, {
@@ -180,10 +183,23 @@ const PostedJobs = () => {
 
       if (response.ok) {
         toast.success('🚀 Work started!');
+        // Update applications locally if any
         const updatedApps = applications.map(app =>
           app._id === applicationId ? { ...app, status: 'working' } : app
         );
         setApplications(updatedApps);
+
+        // Update jobs locally to reflect 'WORKING' status
+        setJobs(prevJobs => prevJobs.map(job => {
+          if (job.acceptedApplicationId === applicationId) {
+            return { ...job, status: 'WORKING' };
+          }
+          return job;
+        }));
+
+        if (selectedJob && selectedJob.acceptedApplicationId === applicationId) {
+          setSelectedJob({ ...selectedJob, status: 'WORKING' });
+        }
       } else {
         const error = await response.json();
         toast.error(error.message || 'Failed to start work');
@@ -232,19 +248,24 @@ const PostedJobs = () => {
   const activeJobs = jobs.filter(j => j.status === 'POSTED' || j.status === 'APPLIED').length;
 
   const getStatusBadge = (status) => {
-    const statusMap = {
-      'POSTED': { bg: 'bg-[#10b981]', text: 'NEW' },
-      'APPLIED': { bg: 'bg-[#FF7124]', text: 'ACTIVE' },
-      'accepted': { bg: 'bg-[#3B4883]', text: 'ACCEPTED' },
-      'in-progress': { bg: 'bg-[#8b5cf6]', text: 'WORKING' },
-      'COMPLETED': { bg: 'bg-gray-500', text: 'COMPLETE' },
-      'default': { bg: 'bg-gray-400', text: status }
-    };
+    const s = status?.toUpperCase();
+    let config = { label: status, color: 'bg-slate-100 text-slate-600 border-slate-200' };
 
-    const config = statusMap[status] || statusMap.default;
+    if (s === 'POSTED' || s === 'APPLIED') {
+      config = { label: 'Active', color: 'bg-blue-50 text-blue-600 border-blue-100' };
+    } else if (s === 'ACCEPTED' || s === 'accepted') {
+      config = { label: 'Accepted', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
+    } else if (s === 'WORKING' || s === 'IN-PROGRESS' || s === 'working') {
+      config = { label: 'Working', color: 'bg-orange-50 text-orange-600 border-orange-100' };
+    } else if (s === 'COMPLETED' || s === 'FINISHED' || s === 'completed') {
+      config = { label: 'Completed', color: 'bg-purple-50 text-purple-600 border-purple-100' };
+    } else if (s === 'PAID') {
+      config = { label: 'Paid', color: 'bg-green-50 text-green-600 border-green-100' };
+    }
+
     return (
-      <span className={`${config.bg} text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider`}>
-        {config.text || status}
+      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${config.color}`}>
+        {config.label}
       </span>
     );
   };
@@ -252,100 +273,138 @@ const PostedJobs = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-16 h-16 border-4 border-[#3B4883]/20 border-t-[#FF7124] rounded-full animate-spin" />
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 border-4 border-[#3B4883]/10 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-[#FF7124] rounded-full border-t-transparent animate-spin"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#202124]">
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-white border-b-2 border-[#3B4883]/10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-black text-[#3B4883] uppercase tracking-tight">
-                My Posted Jobs
-              </h1>
-              <p className="text-xs text-[#202124]/50 mt-1">{totalJobs} jobs · {activeJobs} active</p>
+    <div className="min-h-screen bg-white text-[#202124] relative overflow-hidden pb-20">
+      {/* Background matching MyApplications */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0"
+          style={{ background: 'linear-gradient(180deg, #FFFFFF 0%, #E8DFD5 100%)' }}
+        />
+        <div
+          className="absolute inset-0 opacity-100"
+          style={{ background: 'radial-gradient(1200px 600px at 50% 0%, rgba(59, 72, 131, 0.08), transparent 70%)' }}
+        />
+      </div>
+
+      <div className="relative z-10 max-w-4xl mx-auto">
+        {/* Header Section */}
+        <div className="px-6 pt-8 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl md:text-3xl font-black text-[#3B4883] tracking-tight uppercase">
+              |MY_POSTED_JOBS
+            </h1>
+            <div className="flex items-center gap-3">
+              <div className="bg-white/80 backdrop-blur-sm border-2 border-[#3B4883]/10 rounded-2xl px-4 py-2 shadow-sm text-right">
+                <p className="text-[10px] font-bold text-[#3B4883]/60 uppercase leading-none mb-1">Active Jobs</p>
+                <p className="text-sm font-black text-[#3B4883]">{activeJobs} / {totalJobs}</p>
+              </div>
+              <button
+                onClick={() => navigate('/employer/post-job')}
+                className="w-12 h-12 bg-[#FF7124] text-white rounded-2xl flex items-center justify-center hover:bg-[#e66420] transition-all active:scale-95 shadow-lg shadow-[#FF7124]/20"
+              >
+                <Plus className="w-6 h-6" />
+              </button>
             </div>
-            <button
-              onClick={() => navigate('/employer/post-job')}
-              className="flex items-center gap-2 px-4 py-2 bg-[#FF7124] text-white rounded-xl font-bold text-sm hover:bg-[#e66420] transition-all active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              POST
-            </button>
           </div>
+        </div>
+
+        {/* List Section */}
+        <div className="px-6">
+          {jobs.length === 0 ? (
+            <div className="text-center py-20 opacity-60">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Briefcase className="w-8 h-8 text-slate-400" />
+              </div>
+              <p className="text-[#3B4883] font-bold">No jobs posted yet</p>
+              <button
+                onClick={() => navigate('/employer/post-job')}
+                className="mt-4 text-sm font-bold text-[#FF7124] hover:underline"
+              >
+                Post Your First Job
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              {jobs.map((job, index) => (
+                <motion.div
+                  key={job._id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                  className="border-b border-[#3B4883]/10 py-5 hover:bg-[#E8DFD5]/20 transition-all cursor-pointer group"
+                  onClick={() => setSelectedJob(job)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1 pr-4">
+                      <h3 className="text-base font-bold text-[#272D4E] uppercase tracking-wide group-hover:text-[#FF7124] transition-colors line-clamp-1">
+                        {job.title}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs">
+                          <MapPin className="w-3 h-3 text-[#3B4883]/40" />
+                          <span>{job.location?.village}, {job.location?.district}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs">
+                          <Users className="w-3 h-3 text-[#3B4883]/40" />
+                          <span>{job.applicantCount || 0} applicants</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-black text-[#FF7124] block">
+                        ₹{job.salary || job.baseAmount}
+                      </span>
+                      <div className="mt-1 flex justify-end">
+                        {getStatusBadge(job.status)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] font-bold text-[#202124]/40 uppercase tracking-widest mt-3">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5 text-[#3B4883]/40">
+                        <Clock className="w-3 h-3" />
+                        <span>Posted on {new Date(job.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {job.category && (
+                        <div className="bg-[#3B4883]/5 px-2 py-0.5 rounded text-[#3B4883]/60 border border-[#3B4883]/10">
+                          {job.category}
+                        </div>
+                      )}
+                    </div>
+                    {['ACCEPTED', 'accepted'].includes(job.status) &&
+                      job.acceptedApplicationId &&
+                      new Date(job.startDate) <= new Date() ? (
+                      <button
+                        onClick={(e) => handleStartWork(e, job.acceptedApplicationId)}
+                        className="px-4 py-1.5 bg-green-600 text-white rounded-lg font-bold uppercase text-[10px] tracking-wider hover:bg-green-700 transition-all active:scale-95 shadow-sm"
+                      >
+                        🚀 START WORK
+                      </button>
+                    ) : (
+                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform text-[#3B4883]/20" />
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Jobs List */}
-      <div className="max-w-4xl mx-auto px-6 py-6">
-        {jobs.length === 0 ? (
-          <div className="text-center py-20">
-            <Briefcase className="w-16 h-16 mx-auto mb-4 text-[#3B4883]/30" />
-            <p className="text-[#202124]/60 font-bold mb-4">No jobs posted yet</p>
-            <button
-              onClick={() => navigate('/employer/post-job')}
-              className="px-6 py-3 bg-[#FF7124] text-white rounded-xl font-bold hover:bg-[#e66420]"
-            >
-              Post Your First Job
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-0">
-            {jobs.map((job) => (
-              <motion.div
-                key={job._id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="border-b-2 border-[#3B4883]/10 py-6 cursor-pointer hover:bg-[#E8DFD5]/30 transition-all px-4 -mx-4"
-                onClick={() => setSelectedJob(job)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-[#272D4E] uppercase tracking-wide mb-1">
-                      {job.title}
-                    </h3>
-                    <div className="flex items-center gap-3 text-sm text-[#202124]/60">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-4 h-4" />
-                        {job.location?.village}, {job.location?.district}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {new Date(job.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-black text-[#FF7124]">₹{job.salary || job.baseAmount}</p>
-                    {getStatusBadge(job.status)}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="flex items-center gap-1 text-[#3B4883]">
-                    <Users className="w-4 h-4" />
-                    <span className="font-bold">{job.applicantCount || 0} applied</span>
-                  </span>
-                  {job.category && (
-                    <span className="px-3 py-1 bg-[#3B4883] text-white rounded-full font-bold uppercase">
-                      {job.category}
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Applicants Modal */}
-      <AnimatePresence>
+      {/* Modal - Applicants Sheet */}
+      < AnimatePresence >
         {selectedJob && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -357,18 +416,20 @@ const PostedJobs = () => {
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              className="bg-white w-full max-w-2xl rounded-t-[2rem] sm:rounded-[1.5rem] shadow-2xl relative overflow-hidden max-h-[85vh] flex flex-col"
+              className="bg-white w-full max-w-2xl rounded-t-[2rem] sm:rounded-[1.5rem] shadow-2xl relative overflow-hidden max-h-[90vh] flex flex-col"
             >
-              {/* Header */}
+              {/* Modal Header Card */}
               <div className="relative bg-gradient-to-br from-[#E8DFD5] to-[#DBBBA7] p-6 pb-8 shrink-0">
                 <div className="flex justify-between items-start mb-4">
+                  {/* Price Card */}
                   <div className="bg-white px-4 py-2 rounded-xl shadow-sm">
-                    <p className="text-xs text-[#3B4883]/60 font-bold uppercase mb-0.5">Payment</p>
+                    <p className="text-xs text-[#3B4883]/60 font-bold uppercase mb-0.5">Budget</p>
                     <p className="text-2xl font-black text-[#FF7124]">
                       ₹{selectedJob.salary || selectedJob.baseAmount}
                     </p>
                   </div>
 
+                  {/* Actions & Status */}
                   <div className="flex flex-col items-end gap-2">
                     <button
                       onClick={() => setSelectedJob(null)}
@@ -380,23 +441,19 @@ const PostedJobs = () => {
                   </div>
                 </div>
 
-                <h2 className="text-xl font-black text-[#3B4883] mb-3 uppercase tracking-tight">
+                <h2 className="text-xl font-black text-[#3B4883] mb-2 uppercase tracking-tight leading-tight">
                   {selectedJob.title}
                 </h2>
 
-                <div className="flex items-start gap-3 text-sm flex-wrap">
-                  <div className="flex items-center gap-1.5 text-[#3B4883]/70">
-                    <Users className="w-4 h-4 shrink-0" />
-                    <span className="font-bold">{selectedJob.applicantCount || 0} applied</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[#3B4883]/70">
-                    <Building className="w-4 h-4 shrink-0" />
-                    <span className="font-bold">{selectedJob.companyName || 'Company'}</span>
+                <div className="flex items-start gap-4 text-sm flex-wrap pb-2">
+                  <div className="flex items-center gap-1.5 text-[#3B4883]/70 font-bold">
+                    <MapPin className="w-4 h-4 shrink-0" />
+                    <span>{selectedJob.location?.village}, {selectedJob.location?.district}</span>
                   </div>
                   {(selectedJob.startDate || selectedJob.startTime) && (
-                    <div className="flex items-center gap-1.5 text-[#FF7124]">
+                    <div className="flex items-center gap-1.5 text-[#FF7124] font-bold">
                       <Clock className="w-4 h-4 shrink-0" />
-                      <span className="font-bold">
+                      <span>
                         {selectedJob.startDate ? new Date(selectedJob.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
                         {selectedJob.startTime ? ` @ ${selectedJob.startTime}` : ''}
                       </span>
@@ -405,284 +462,332 @@ const PostedJobs = () => {
                 </div>
 
                 {selectedJob.category && (
-                  <div className="absolute -bottom-3 left-6">
-                    <span className="inline-block px-4 py-1.5 bg-[#3B4883] text-white text-xs font-black uppercase tracking-wider rounded-full shadow-md">
+                  <div className="absolute -bottom-3 left-6 z-10">
+                    <span className="inline-block px-4 py-1.5 bg-[#3B4883] text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg border-2 border-white">
                       {selectedJob.category}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto p-6 relative">
+              {/* Modal Body / Applicants List */}
+              <div className="flex-1 overflow-y-auto p-6 pt-8 relative bg-[#FFFFFF]">
                 {/* Payment Simulation Overlay */}
                 <AnimatePresence>
                   {pendingPaymentApp && (
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="absolute inset-0 z-30 bg-white p-8 flex flex-col items-center justify-center text-center"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-[40] bg-[#3B4883]/60 backdrop-blur-md p-8 flex flex-col items-center justify-center text-center"
                     >
-                      <div className="w-20 h-20 bg-[#FF7124]/10 rounded-full flex items-center justify-center mb-6 text-[#FF7124]">
-                        <CreditCard className="w-10 h-10" />
-                      </div>
-                      <h3 className="text-2xl font-black text-[#3B4883] uppercase mb-2">Secure Payment</h3>
-                      <p className="text-[#3B4883]/60 font-bold mb-8">
-                        Confirm payment of <span className="text-[#FF7124]">₹{selectedJob.salary || selectedJob.baseAmount}</span> to accept <span className="text-[#FF7124]">{pendingPaymentApp.worker?.name || pendingPaymentApp.workerDetails?.name}</span>
-                      </p>
+                      <motion.div
+                        initial={{ scale: 0.9, y: 20 }}
+                        animate={{ scale: 1, y: 0 }}
+                        className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full border-4 border-white/20"
+                      >
+                        <div className="w-20 h-20 bg-[#FF7124]/10 rounded-3xl flex items-center justify-center mb-6 text-[#FF7124] mx-auto rotate-3">
+                          <CreditCard className="w-10 h-10" />
+                        </div>
+                        <h3 className="text-2xl font-black text-[#3B4883] uppercase mb-2">Secure Payment</h3>
+                        <p className="text-[#3B4883]/60 font-bold mb-8">
+                          Confirm payment for <span className="text-[#FF7124]">{pendingPaymentApp.worker?.name || pendingPaymentApp.workerDetails?.name}</span>
+                        </p>
 
-                      <div className="w-full space-y-3">
-                        <button
-                          onClick={handleConfirmPayment}
-                          disabled={isPaying}
-                          className="w-full py-4 bg-[#FF7124] text-white rounded-2xl font-black uppercase tracking-wider hover:bg-[#e66420] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg shadow-[#FF7124]/20"
-                        >
-                          {isPaying ? (
-                            <>
-                              <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                              PROCESSING...
-                            </>
-                          ) : (
-                            `PAY ₹${selectedJob.salary || selectedJob.baseAmount}`
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setPendingPaymentApp(null)}
-                          disabled={isPaying}
-                          className="w-full py-4 border-2 border-[#3B4883]/10 text-[#3B4883]/60 rounded-2xl font-black uppercase tracking-wider hover:bg-[#3B4883]/5 transition-all"
-                        >
-                          CANCEL
-                        </button>
-                      </div>
-
-                      <p className="mt-8 text-[10px] text-[#3B4883]/40 font-black uppercase tracking-widest flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M2.166 4.9L10 .3l7.834 4.6a1 1 0 01.5.866v7.468a1 1 0 01-.5.866L10 18.7l-7.834-4.6a1 1 0 01-.5-.866V5.766a1 1 0 01.5-.866zM9 11V7a1 1 0 112 0v4a1 1 0 11-2 0zm1 4a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                        </svg>
-                        SSL SECURE TRANSACTION
-                      </p>
+                        <div className="space-y-3">
+                          <button
+                            onClick={handleConfirmPayment}
+                            disabled={isPaying}
+                            className="w-full py-4 bg-[#FF7124] text-white rounded-2xl font-black uppercase tracking-wider hover:bg-[#e66420] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg shadow-[#FF7124]/20"
+                          >
+                            {isPaying ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                                PROCESSING...
+                              </div>
+                            ) : (
+                              `PAY ₹${selectedJob.salary || selectedJob.baseAmount}`
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setPendingPaymentApp(null)}
+                            disabled={isPaying}
+                            className="w-full py-4 border-2 border-[#3B4883]/10 text-[#3B4883]/60 rounded-2xl font-black uppercase tracking-wider hover:bg-[#3B4883]/5 transition-all"
+                          >
+                            CANCEL
+                          </button>
+                        </div>
+                      </motion.div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-4">Choose Applicant</p>
-
-                {loadingApplications ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="w-8 h-8 border-4 border-[#3B4883]/20 border-t-[#FF7124] rounded-full animate-spin" />
-                  </div>
-                ) : applications.some(a => ['accepted', 'in-progress', 'completed'].includes(a.status)) ? (
-                  // Show Application Status View for the accepted worker
-                  <div className="space-y-6">
-                    {(() => {
-                      const acceptedApp = applications.find(a => ['accepted', 'in-progress', 'completed'].includes(a.status));
-                      const statusSteps = [
-                        { label: 'APPLIED', completed: true, active: acceptedApp.status === 'applied' },
-                        { label: 'ACCEPTED', completed: ['accepted', 'in-progress', 'completed'].includes(acceptedApp.status), active: acceptedApp.status === 'accepted' },
-                        { label: 'WORKING', completed: ['in-progress', 'completed'].includes(acceptedApp.status), active: acceptedApp.status === 'in-progress' },
-                        { label: 'COMPLETED', completed: acceptedApp.status === 'completed', active: acceptedApp.status === 'completed' }
-                      ];
-
-                      return (
-                        <>
-                          <div className="bg-[#3B4883]/10 rounded-2xl p-6">
-                            <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-6 text-center">Application Progress</p>
-                            <div className="flex items-center justify-between relative px-2">
-                              {/* Connector Lines */}
-                              <div className="absolute top-[18px] left-[10%] right-[10%] h-0.5 bg-[#3B4883]/10 -z-0" />
-                              <div
-                                className="absolute top-[18px] left-[10%] h-0.5 bg-[#FF7124] transition-all duration-500 -z-0"
-                                style={{ width: `${(statusSteps.filter(s => s.completed).length - 1) * 26.6}%` }}
-                              />
-
-                              {statusSteps.map((step, idx) => (
-                                <div key={idx} className="flex flex-col items-center gap-2 relative z-10 w-1/4">
-                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${step.completed ? 'bg-[#FF7124] border-[#FF7124] text-white' :
-                                    step.active ? 'bg-white border-[#FF7124] text-[#FF7124]' :
-                                      'bg-white border-[#3B4883]/10 text-[#3B4883]/30'
-                                    }`}>
-                                    {step.completed && !step.active && idx < statusSteps.length - 1 ? (
-                                      <CheckCircle className="w-5 h-5" />
-                                    ) : (
-                                      <span className="font-black text-sm">{idx + 1}</span>
-                                    )}
-                                  </div>
-                                  <span className={`text-[10px] font-black uppercase tracking-tighter ${step.completed || step.active ? 'text-[#FF7124]' : 'text-[#3B4883]/30'
-                                    }`}>
-                                    {step.label}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-[#E8DFD5]/30 rounded-2xl p-4">
-                              <p className="text-[10px] font-black text-[#3B4883]/50 uppercase mb-1">Worker</p>
-                              <p className="font-black text-[#3B4883] uppercase">{acceptedApp.worker?.name || acceptedApp.workerDetails?.name}</p>
-                              <p className="text-xs font-bold text-[#3B4883]/60">{acceptedApp.worker?.phone || acceptedApp.workerDetails?.phone}</p>
-                            </div>
-                            <div className="bg-[#E8DFD5]/30 rounded-2xl p-4 text-right">
-                              <p className="text-[10px] font-black text-[#3B4883]/50 uppercase mb-1">Status</p>
-                              <p className="font-black text-[#FF7124] uppercase">{acceptedApp.status}</p>
-                              <p className="text-xs font-bold text-[#3B4883]/60">Payment: Pending</p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col gap-3 pt-4">
-                            {acceptedApp.status === 'accepted' && (
-                              <button
-                                onClick={() => handleRevokeApplicant(acceptedApp._id)}
-                                className="w-full py-4 border-2 border-[#FF7124] text-[#FF7124] rounded-2xl font-black uppercase tracking-wider hover:bg-[#FF7124] hover:text-white transition-all active:scale-95"
-                              >
-                                Revoke Acceptance
-                              </button>
-                            )}
-                            <button
-                              className="w-full py-4 bg-[#3B4883] text-white rounded-2xl font-black uppercase tracking-wider opacity-50 cursor-not-allowed"
-                              disabled
-                            >
-                              More Actions Coming Soon
-                            </button>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                ) : applications.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Users className="w-12 h-12 mx-auto mb-3 text-[#3B4883]/30" />
-                    <p className="text-[#202124]/50 text-sm">No applications yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {applications.map((app) => (
-                      <div
-                        key={app._id}
-                        className="bg-gradient-to-br from-white to-[#F8F5F2] border-2 border-[#3B4883]/10 rounded-xl p-4 hover:border-[#FF7124]/30 transition-all"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h4 className="font-black text-[#3B4883] text-lg uppercase tracking-tight">
-                              {app.worker?.name || app.workerDetails?.name || 'Worker'}
-                            </h4>
-                            <div className="flex items-center gap-3 mt-2 text-xs">
-                              <div className="flex items-center gap-1.5 bg-[#10b981]/10 px-3 py-1.5 rounded-full border border-[#10b981]/20">
-                                <svg className="w-4 h-4 text-[#10b981]" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                </svg>
-                                <span className="font-black text-[#10b981]">
-                                  Shakti: {app.worker?.shaktiScore || app.workerDetails?.shaktiScore || 85}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-1 text-green-600">
-                                <MapPin className="w-3 h-3" />
-                                <span className="font-bold">~{app.distanceFromWork ? app.distanceFromWork.toFixed(1) : 10}km</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons based on status */}
-                          <div className="flex flex-col gap-2 items-end">
-                            {/* Applied - show Accept button */}
-                            {(app.status === 'applied' || app.status === 'APPLIED') && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAcceptClick(app);
-                                }}
-                                className="px-6 py-2 bg-[#FF7124] text-white rounded-xl font-bold uppercase text-xs hover:bg-[#e66420] transition-all active:scale-95 whitespace-nowrap"
-                              >
-                                Accept
-                              </button>
-                            )}
-
-                            {/* Accepted - show Start Work or waiting */}
-                            {(app.status === 'accepted' || app.status === 'ACCEPTED') && (
-                              <>
-                                {new Date(selectedJob?.startDate) <= new Date() ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStartWork(app._id);
-                                    }}
-                                    className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-green-700 transition-all active:scale-95 whitespace-nowrap"
-                                  >
-                                    🚀 Start Work
-                                  </button>
-                                ) : (
-                                  <div className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl font-bold uppercase text-[10px] text-center">
-                                    Starts {new Date(selectedJob?.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                  </div>
-                                )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRevokeApplicant(app._id);
-                                  }}
-                                  className="px-4 py-2 border-2 border-[#FF7124] text-[#FF7124] rounded-xl font-bold uppercase text-xs hover:bg-[#FF7124] hover:text-white transition-all active:scale-95 whitespace-nowrap"
-                                >
-                                  Revoke
-                                </button>
-                              </>
-                            )}
-
-                            {/* Working - show status or Work Finished button */}
-                            {(app.status === 'working' || app.status === 'in-progress' || app.status === 'WORKING') && (
-                              <>
-                                {app.workerConfirmedFinish ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedAppForPayment(app);
-                                      setShowAdditionalChargesModal(true);
-                                    }}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs hover:bg-blue-700 transition-all active:scale-95 whitespace-nowrap"
-                                  >
-                                    ✅ Work Finished
-                                  </button>
-                                ) : (
-                                  <div className="px-4 py-2 bg-orange-100 text-orange-600 rounded-xl font-bold uppercase text-[10px] text-center">
-                                    🔨 Working...
-                                  </div>
-                                )}
-                              </>
-                            )}
-
-                            {/* Completed */}
-                            {(app.status === 'completed' || app.status === 'COMPLETED') && (
-                              <div className="px-4 py-2 bg-green-100 text-green-700 rounded-xl font-bold uppercase text-xs">
-                                🎉 Completed
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs text-[#202124]/50">
-                          <span>Applied: {new Date(app.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                          {(app.worker?.phone || app.workerDetails?.phone) && (
-                            <>
-                              <span>•</span>
-                              <span>{app.worker?.phone || app.workerDetails?.phone}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                {/* Job Description */}
+                {selectedJob.description && (
+                  <div className="mb-6">
+                    <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-2">Description</p>
+                    <p className="text-sm text-[#202124]/80 leading-relaxed font-medium">
+                      {selectedJob.description}
+                    </p>
                   </div>
                 )}
+
+                {/* Job Info Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-8">
+                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
+                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Work Timing</p>
+                    <p className="text-xs font-black text-[#3B4883]">
+                      {selectedJob.startDate ? new Date(selectedJob.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Flexible'}
+                      {selectedJob.startTime ? ` @ ${selectedJob.startTime}` : ''}
+                    </p>
+                  </div>
+                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
+                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Location Type</p>
+                    <p className="text-xs font-black text-[#3B4883] uppercase">
+                      {selectedJob.location?.type || 'On-site'}
+                    </p>
+                  </div>
+                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
+                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Posted On</p>
+                    <p className="text-xs font-black text-[#3B4883]">
+                      {selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Recently'}
+                    </p>
+                  </div>
+                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
+                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Urgency</p>
+                    <p className={`text-xs font-black uppercase ${selectedJob.urgency === 'High' || selectedJob.urgency === 'Urgent' ? 'text-[#FF7124]' : 'text-[#3B4883]'}`}>
+                      {selectedJob.urgency || 'Normal'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider">Applicants & Management</p>
+                    {applications.length > 0 && !applications.some(a => ['accepted', 'working', 'in-progress', 'completed'].includes(a.status?.toLowerCase())) && (
+                      <span className="bg-[#FF7124]/10 text-[#FF7124] px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                        {applications.length} APPLIED
+                      </span>
+                    )}
+                  </div>
+
+                  {loadingApplications ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="w-8 h-8 border-4 border-[#3B4883]/20 border-t-[#FF7124] rounded-full animate-spin" />
+                    </div>
+                  ) : applications.some(a => ['accepted', 'working', 'in-progress', 'completed'].includes(a.status?.toLowerCase())) ? (
+                    // Workflow Progress View
+                    <div className="space-y-6">
+                      {(() => {
+                        const app = applications.find(a => ['accepted', 'working', 'in-progress', 'completed'].includes(a.status?.toLowerCase()));
+                        const status = app.status?.toLowerCase();
+
+                        const statusSteps = [
+                          { label: 'Applied', done: true },
+                          { label: 'Accepted', done: ['accepted', 'working', 'in-progress', 'completed'].includes(status) },
+                          { label: 'Working', done: ['working', 'in-progress', 'completed'].includes(status) },
+                          { label: 'Completed', done: status === 'completed' }
+                        ];
+
+                        return (
+                          <>
+                            <div className="bg-[#3B4883]/5 border-2 border-[#3B4883]/5 rounded-3xl p-6 mb-2">
+                              {/* Progress Track */}
+                              <div className="relative">
+                                <div className="absolute top-4 left-0 right-0 h-0.5 bg-[#3B4883]/10" />
+                                <div className="relative flex justify-between">
+                                  {statusSteps.map((step, idx) => {
+                                    const isActive = (status === 'applied' && idx === 0) ||
+                                      (status === 'accepted' && idx === 1) ||
+                                      ((status === 'working' || status === 'in-progress') && idx === 2) ||
+                                      (status === 'completed' && idx === 3);
+
+                                    return (
+                                      <div key={idx} className="flex flex-col items-center gap-1 z-10 w-1/4">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-500 ${step.done
+                                          ? idx === 3 ? 'bg-purple-600 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'
+                                          : 'bg-white border-2 border-[#3B4883]/10 text-[#3B4883]/30'
+                                          } ${isActive ? 'scale-125 ring-4 ring-[#FF7124]/20' : ''}`}>
+                                          {step.done ? '✓' : idx + 1}
+                                        </div>
+                                        <p className={`text-[9px] font-black uppercase mt-1 tracking-wider ${isActive ? 'text-[#FF7124]' : step.done ? 'text-emerald-600' : 'text-[#3B4883]/30'
+                                          }`}>
+                                          {step.label}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="bg-[#3B4883] p-6 rounded-3xl text-white shadow-xl relative overflow-hidden group">
+                              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-700" />
+                              <div className="relative z-10">
+                                <div className="flex items-center gap-4 mb-4">
+                                  <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center font-black text-[#FF7124] text-2xl border border-white/20">
+                                    {app.worker?.name?.charAt(0) || 'W'}
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">Assigned Worker</p>
+                                    <h4 className="text-xl font-black uppercase leading-tight">{app.worker?.name || app.workerDetails?.name}</h4>
+                                    <p className="text-xs font-bold text-white/60">{app.worker?.phone || app.workerDetails?.phone}</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-2 mb-2">
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors ${status === 'working' || status === 'in-progress'
+                                    ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                                    : status === 'completed'
+                                      ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                                      : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                    }`}>
+                                    {status === 'in-progress' ? 'Working' : status}
+                                  </span>
+                                  {app.paymentStatus === 'paid' || app.paymentStatus === 'base_paid' ? (
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                      {app.paymentStatus === 'base_paid' ? 'Base Paid' : 'Fully Paid'}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3 pt-2">
+                              {/* Actions */}
+                              {status === 'accepted' && (
+                                <>
+                                  {new Date(selectedJob?.startDate) <= new Date() ? (
+                                    <button
+                                      onClick={(e) => handleStartWork(e, app._id)}
+                                      className="w-full py-4 bg-green-600 text-white rounded-2xl font-black uppercase tracking-wider hover:bg-green-700 transition-all active:scale-95 shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                                    >
+                                      🚀 START WORK
+                                    </button>
+                                  ) : (
+                                    <div className="w-full py-4 bg-gray-50 border-2 border-dashed border-gray-200 text-gray-400 rounded-2xl font-black uppercase tracking-wider text-center text-xs">
+                                      ⏳ Work starts on {new Date(selectedJob?.startDate).toLocaleDateString()}
+                                    </div>
+                                  )}
+                                  <button onClick={() => handleRevokeApplicant(app._id)} className="w-full py-4 border-2 border-[#FF7124]/20 text-[#FF7124] rounded-2xl font-black uppercase tracking-wider hover:bg-[#FF7124] hover:text-white transition-all text-xs">
+                                    Revoke Acceptance
+                                  </button>
+                                </>
+                              )}
+
+                              {(status === 'working' || status === 'in-progress') && (
+                                <div className="space-y-3">
+                                  {app.workerConfirmedFinish ? (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedAppForPayment(app);
+                                        setShowAdditionalChargesModal(true);
+                                      }}
+                                      className="w-full py-4 bg-[#FF7124] text-white rounded-2xl font-black uppercase tracking-wider hover:bg-[#e66420] transition-all active:scale-95 shadow-lg shadow-[#FF7124]/20 flex items-center justify-center gap-2"
+                                    >
+                                      ✅ Complete & Finalize Pay
+                                    </button>
+                                  ) : (
+                                    <div className="w-full py-4 bg-orange-50 text-orange-600 border-2 border-orange-100 rounded-2xl font-black uppercase tracking-wider text-center text-xs flex items-center justify-center gap-2">
+                                      🔨 Work in Progress...
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {status === 'completed' && (
+                                <div className="w-full py-6 bg-emerald-50 text-emerald-600 border-2 border-emerald-100 rounded-3xl font-black uppercase tracking-wider text-center flex items-center justify-center gap-3 shadow-sm">
+                                  <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                    <CheckCircle className="w-6 h-6" />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="leading-none">Job Completed</p>
+                                    <p className="text-[10px] opacity-60 normal-case font-bold mt-1">Worker has been fully paid</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : applications.length === 0 ? (
+                    <div className="text-center py-16 bg-[#3B4883]/5 rounded-3xl border-2 border-dashed border-[#3B4883]/10">
+                      <Users className="w-12 h-12 mx-auto mb-3 text-[#3B4883]/20" />
+                      <p className="font-bold text-[#3B4883]/40 uppercase text-xs tracking-widest">No applications yet</p>
+                    </div>
+                  ) : (
+                    // Multiple Applicants Selection List
+                    <div className="space-y-3">
+                      {applications.map((app) => {
+                        const status = app.status?.toLowerCase();
+                        const isAccepted = ['accepted', 'working', 'in-progress', 'completed'].includes(status);
+
+                        return (
+                          <div
+                            key={app._id}
+                            className={`p-4 bg-white border-2 rounded-2xl transition-all cursor-pointer shadow-sm group ${isAccepted
+                              ? 'border-emerald-200 bg-emerald-50/30'
+                              : 'border-[#3B4883]/5 hover:border-[#FF7124]/30'
+                              }`}
+                            onClick={() => {
+                              // Only show payment modal for 'applied' status
+                              if (status === 'applied' || status === 'pending') {
+                                handleAcceptClick(app);
+                              }
+                              // For accepted/working, the workflow view is already shown above
+                            }}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl transition-colors ${isAccepted
+                                  ? 'bg-emerald-100 text-emerald-600'
+                                  : 'bg-[#F8F5F2] text-[#FF7124] group-hover:bg-[#FF7124] group-hover:text-white'
+                                  }`}>
+                                  {app.worker?.name?.charAt(0) || 'W'}
+                                </div>
+                                <div>
+                                  <p className="font-black text-[#3B4883] uppercase">{app.worker?.name || app.workerDetails?.name}</p>
+                                  <div className="flex items-center gap-2 text-xs font-bold text-[#3B4883]/40">
+                                    <span className="flex items-center gap-1 text-green-600">
+                                      <MapPin className="w-3 h-3" /> ~{app.distanceFromWork ? app.distanceFromWork.toFixed(1) : 10}km
+                                    </span>
+                                    <span>• Shakti: {app.worker?.shaktiScore || 85}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isAccepted && (
+                                  <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${status === 'working' || status === 'in-progress'
+                                    ? 'bg-orange-50 text-orange-600 border border-orange-100'
+                                    : status === 'completed'
+                                      ? 'bg-purple-50 text-purple-600 border border-purple-100'
+                                      : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                    }`}>
+                                    {status === 'in-progress' ? 'Working' : status}
+                                  </span>
+                                )}
+                                {!isAccepted && (
+                                  <ChevronRight className="w-5 h-5 text-[#3B4883]/20 group-hover:text-[#FF7124] transition-colors" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+      </AnimatePresence >
 
-      {/* Additional Charges Modal */}
-      <AnimatePresence>
+      {/* Additional Charges - Re-styled */}
+      < AnimatePresence >
         {showAdditionalChargesModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -692,58 +797,46 @@ const PostedJobs = () => {
                 setSelectedAppForPayment(null);
                 setAdditionalAmount(0);
               }}
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
             />
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl p-6 max-w-sm w-full relative z-10 shadow-2xl"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-[2rem] p-8 max-w-sm w-full relative z-10 shadow-2xl"
             >
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CreditCard className="w-8 h-8 text-blue-600" />
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-[#FF7124]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <DollarSign className="w-10 h-10 text-[#FF7124]" />
                 </div>
-                <h3 className="text-xl font-black text-[#3B4883] uppercase mb-2">
-                  Additional Charges
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Enter any additional amount to pay the worker:
-                </p>
+                <h3 className="text-2xl font-black text-[#3B4883] uppercase tracking-tight mb-2">Final Payment</h3>
+                <p className="text-sm font-bold text-[#3B4883]/40">Add extra amount for good work or materials:</p>
               </div>
 
-              <div className="mb-6">
-                <div className="flex items-center border-2 border-[#3B4883]/20 rounded-xl overflow-hidden focus-within:border-[#FF7124]">
-                  <span className="px-4 py-3 bg-gray-50 text-xl font-bold text-gray-500">₹</span>
+              <div className="mb-8">
+                <div className="relative group">
+                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-[#3B4883]/20 transition-colors group-focus-within:text-[#FF7124]">₹</span>
                   <input
                     type="number"
                     value={additionalAmount}
                     onChange={(e) => setAdditionalAmount(Math.max(0, Number(e.target.value)))}
+                    className="w-full bg-[#F8F5F2] border-2 border-transparent focus:border-[#FF7124] focus:bg-white rounded-2xl py-5 pl-12 pr-6 text-3xl font-black text-[#3B4883] outline-none transition-all text-center"
                     placeholder="0"
-                    className="flex-1 px-4 py-3 text-xl font-bold text-[#3B4883] outline-none"
                     min="0"
                   />
                 </div>
-                <p className="text-xs text-gray-400 mt-2 text-center">
-                  Leave as 0 if no additional payment needed
-                </p>
               </div>
 
               <div className="space-y-3">
                 <button
                   onClick={handleEmployerFinish}
                   disabled={isProcessingFinish}
-                  className="w-full py-4 bg-[#FF7124] text-white rounded-xl font-black uppercase tracking-wider hover:bg-[#e66420] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-5 bg-[#FF7124] text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-[#e66420] transition-all active:scale-95 disabled:grayscale flex items-center justify-center gap-3"
                 >
                   {isProcessingFinish ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Processing...
-                    </>
+                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <>
-                      {additionalAmount > 0 ? `Pay ₹${additionalAmount} & Complete` : 'Complete Job'}
-                    </>
+                    'Finalize & Pay'
                   )}
                 </button>
                 <button
@@ -752,17 +845,16 @@ const PostedJobs = () => {
                     setSelectedAppForPayment(null);
                     setAdditionalAmount(0);
                   }}
-                  disabled={isProcessingFinish}
-                  className="w-full py-3 border-2 border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-wider hover:bg-gray-50 transition-all"
+                  className="w-full py-3 text-[10px] font-black text-[#3B4883]/30 uppercase tracking-widest hover:text-[#FF7124] transition-colors"
                 >
-                  Cancel
+                  Go Back
                 </button>
               </div>
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
-    </div>
+      </AnimatePresence >
+    </div >
   );
 };
 

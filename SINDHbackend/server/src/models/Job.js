@@ -123,7 +123,7 @@ const jobSchema = new mongoose.Schema({
   // Unified status system for job lifecycle
   status: {
     type: String,
-    enum: ['POSTED', 'APPLIED', 'ACCEPTED', 'WORKING', 'PAYMENT_PENDING', 'PAID', 'FINISHED', 'CANCELLED'],
+    enum: ['POSTED', 'APPLIED', 'ACCEPTED', 'WORKING', 'PAYMENT_PENDING', 'PAID', 'FINISHED', 'COMPLETED', 'CANCELLED'],
     default: 'POSTED',
     description: 'Current status of the job in its lifecycle'
   },

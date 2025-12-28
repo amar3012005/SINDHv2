@@ -108,7 +108,7 @@ const MyApplications = () => {
       setFilteredApps(applications);
     } else if (selectedFilter === 'applied') {
       setFilteredApps(applications.filter(app =>
-        ['applied', 'accepted', 'in-progress', 'APPLIED', 'ACCEPTED', 'WORKING'].includes(app.status)
+        ['applied', 'accepted', 'working', 'WORKING', 'PAYMENT_PENDING', 'APPLIED', 'ACCEPTED'].includes(app.status)
       ));
     } else if (selectedFilter === 'completed') {
       setFilteredApps(applications.filter(app =>
@@ -125,8 +125,10 @@ const MyApplications = () => {
       config = { label: 'Applied', color: 'bg-blue-50 text-blue-600 border-blue-100' };
     } else if (s === 'ACCEPTED') {
       config = { label: 'Accepted', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
-    } else if (s === 'WORKING' || s === 'IN-PROGRESS') {
-      config = { label: 'In Progress', color: 'bg-orange-50 text-orange-600 border-orange-100' };
+    } else if (s === 'WORKING') {
+      config = { label: 'Working', color: 'bg-orange-50 text-orange-600 border-orange-100' };
+    } else if (s === 'PAYMENT_PENDING') {
+      config = { label: 'Payment Pending', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' };
     } else if (s === 'COMPLETED' || s === 'FINISHED') {
       config = { label: 'Completed', color: 'bg-purple-50 text-purple-600 border-purple-100' };
     } else if (s === 'PAID') {
@@ -138,6 +140,29 @@ const MyApplications = () => {
         {config.label}
       </span>
     );
+  };
+
+  const handleStartWork = async (e, applicationId) => {
+    e.stopPropagation(); // Prevent opening modal
+    try {
+      const response = await fetch(buildApiUrl(`/job-applications/${applicationId}/start-work`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        toast.success('🚀 Work started!');
+        fetchData(); // Refresh data
+        if (selectedApp && selectedApp._id === applicationId) {
+          setSelectedApp({ ...selectedApp, status: 'working' });
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to start work');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to start work');
+    }
   };
 
   if (loading) {
@@ -261,7 +286,17 @@ const MyApplications = () => {
                         </div>
                       )}
                     </div>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    {['accepted', 'ACCEPTED'].includes(app.status) &&
+                      new Date(app.job?.startDate) <= new Date() ? (
+                      <button
+                        onClick={(e) => handleStartWork(e, app._id)}
+                        className="px-4 py-1.5 bg-green-600 text-white rounded-lg font-bold uppercase text-[10px] tracking-wider hover:bg-green-700 transition-all active:scale-95 shadow-sm"
+                      >
+                        🚀 START WORK
+                      </button>
+                    ) : (
+                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -271,7 +306,7 @@ const MyApplications = () => {
       </div>
 
       {/* Aesthetic Modal Template to match style */}
-      <AnimatePresence>
+      < AnimatePresence >
         {selectedApp && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
@@ -319,12 +354,12 @@ const MyApplications = () => {
                 </div>
 
                 {/* Job Title */}
-                <h2 className="text-xl font-black text-[#3B4883] mb-3 uppercase tracking-tight">
+                <h2 className="text-xl font-black text-[#3B4883] mb-2 uppercase tracking-tight leading-tight">
                   {selectedApp.job?.title}
                 </h2>
 
                 {/* Distance, Company & Location */}
-                <div className="flex items-start gap-3 text-sm flex-wrap">
+                <div className="flex items-start gap-3 text-sm flex-wrap pb-2">
                   <div className="flex items-center gap-1.5 text-green-600">
                     <MapPin className="w-4 h-4 shrink-0" />
                     <span className="font-bold">~{selectedApp.distanceFromWork ? selectedApp.distanceFromWork.toFixed(1) : 10}km</span>
@@ -344,15 +379,15 @@ const MyApplications = () => {
 
                 {/* Category Badge */}
                 {selectedApp.job?.category && (
-                  <div className="absolute -bottom-3 left-6">
-                    <span className="inline-block px-4 py-1.5 bg-[#3B4883] text-white text-xs font-black uppercase tracking-wider rounded-full shadow-md">
+                  <div className="absolute -bottom-3 left-6 z-10">
+                    <span className="inline-block px-4 py-1.5 bg-[#3B4883] text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg border-2 border-white">
                       {selectedApp.job.category}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="p-6 space-y-5">
+              <div className="p-6 pt-8 space-y-5">
                 {/* Job Description */}
                 {selectedApp.job?.description && (
                   <div>
@@ -376,15 +411,15 @@ const MyApplications = () => {
                         const statusMap = {
                           'Applied': ['applied', 'APPLIED'],
                           'Accepted': ['accepted', 'ACCEPTED'],
-                          'Working': ['in-progress', 'WORKING', 'working'],
-                          'Completed': ['completed', 'COMPLETED', 'paid', 'PAID']
+                          'Working': ['working', 'WORKING'],
+                          'Completed': ['payment_pending', 'PAYMENT_PENDING', 'completed', 'COMPLETED', 'paid', 'PAID']
                         };
 
                         const isActive = statusMap[step].includes(selectedApp.status);
                         const isPast = idx < (
                           ['applied', 'APPLIED'].includes(selectedApp.status) ? 0 :
                             ['accepted', 'ACCEPTED'].includes(selectedApp.status) ? 1 :
-                              ['in-progress', 'WORKING', 'working'].includes(selectedApp.status) ? 2 : 3
+                              ['working', 'WORKING'].includes(selectedApp.status) ? 2 : 3
                         );
 
                         return (
@@ -486,28 +521,10 @@ const MyApplications = () => {
                 {['accepted', 'ACCEPTED'].includes(selectedApp.status) &&
                   new Date(selectedApp.job?.startDate) <= new Date() && (
                     <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(buildApiUrl(`/job-applications/${selectedApp._id}/start-work`), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' }
-                          });
-                          if (response.ok) {
-                            toast.success('🚀 Work started!');
-                            setSelectedApp({ ...selectedApp, status: 'working' });
-                            fetchData(); // Refresh data
-                          } else {
-                            const error = await response.json();
-                            toast.error(error.message || 'Failed to start work');
-                          }
-                        } catch (error) {
-                          console.error(error);
-                          toast.error('Failed to start work');
-                        }
-                      }}
+                      onClick={(e) => handleStartWork(e, selectedApp._id)}
                       className="w-full py-3 bg-green-600 text-white rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-green-700 transition-all active:scale-95"
                     >
-                      🚀 Start Work
+                      🚀 START WORK
                     </button>
                   )}
 
@@ -519,10 +536,9 @@ const MyApplications = () => {
                     </div>
                   )}
 
-                {/* Work Finished Button - shows when working AND endDate passed AND not yet confirmed */}
-                {['working', 'in-progress', 'WORKING'].includes(selectedApp.status) &&
-                  !selectedApp.workerConfirmedFinish &&
-                  new Date(selectedApp.job?.endDate) <= new Date() && (
+                {/* WORK DONE Button - shows when working AND not yet confirmed */}
+                {['working', 'WORKING'].includes(selectedApp.status) &&
+                  !selectedApp.workerConfirmedFinish && (
                     <button
                       onClick={async () => {
                         try {
@@ -532,7 +548,7 @@ const MyApplications = () => {
                           });
                           if (response.ok) {
                             toast.success('✅ Work marked as complete!');
-                            setSelectedApp({ ...selectedApp, workerConfirmedFinish: true });
+                            setSelectedApp({ ...selectedApp, workerConfirmedFinish: true, status: 'PAYMENT_PENDING' });
                             fetchData(); // Refresh data
                           } else {
                             const error = await response.json();
@@ -543,25 +559,17 @@ const MyApplications = () => {
                           toast.error('Failed to mark work finished');
                         }
                       }}
-                      className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-blue-700 transition-all active:scale-95"
+                      className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200 flex items-center justify-center gap-2"
                     >
-                      ✅ Work Finished
+                      ✅ WORK DONE
                     </button>
                   )}
 
-                {/* Working in progress - before end date */}
-                {['working', 'in-progress', 'WORKING'].includes(selectedApp.status) &&
-                  new Date(selectedApp.job?.endDate) > new Date() && (
-                    <div className="w-full py-3 bg-orange-100 text-orange-600 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
-                      🔨 Work in Progress • Ends {new Date(selectedApp.job?.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                    </div>
-                  )}
-
                 {/* Waiting for employer confirmation */}
-                {['working', 'in-progress', 'WORKING'].includes(selectedApp.status) &&
-                  selectedApp.workerConfirmedFinish && (
-                    <div className="w-full py-3 bg-yellow-100 text-yellow-700 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
-                      ⏳ Waiting for employer to confirm and pay...
+                {(['working', 'WORKING'].includes(selectedApp.status) && selectedApp.workerConfirmedFinish) ||
+                  ['payment_pending', 'PAYMENT_PENDING'].includes(selectedApp.status) && (
+                    <div className="w-full py-4 bg-yellow-50 border-2 border-yellow-200 text-yellow-700 rounded-2xl font-black uppercase text-xs tracking-widest text-center">
+                      ⏳ Waiting for employer to confirm & pay additional...
                     </div>
                   )}
 

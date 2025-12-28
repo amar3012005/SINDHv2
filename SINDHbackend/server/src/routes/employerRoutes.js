@@ -61,12 +61,19 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   console.log('🔍 Checking for existing employer with phone:', phone);
   let employer = await Employer.findOne({ phone });
-  if (employer) {
-    console.log('❌ Employer already exists with phone:', phone);
+
+  if (employer && employer.name !== 'Temporary' && employer.location?.pincode) {
+    console.log('❌ Employer already exists and is fully registered with phone:', phone);
     logger.warn(`Employer already exists with phone: ${phone}`);
     throw new ValidationError('Employer already exists with this phone number');
   }
-  console.log('✅ No existing employer found, proceeding with registration');
+
+  if (employer) {
+    console.log('🔄 Updating existing temporary employer found with phone:', phone);
+  } else {
+    console.log('✅ No existing employer found, proceeding with creating new registration');
+    employer = new Employer({ phone });
+  }
 
   // Format location address
   const formattedLocationAddress =
@@ -107,41 +114,38 @@ router.post('/register', asyncHandler(async (req, res) => {
     registrationNumber: company?.registrationNumber || ''
   };
 
-  // Create employer with Phase-1 defaults
-  employer = new Employer({
-    name,
-    phone,
-    email: email || '',
-    age: age || 25,
-    company: formattedCompany,
-    location: {
-      village: location.village || '',
-      district: location.district || '',
-      state: location.state || '',
-      pincode: location.pincode || '',
-      address: formattedLocationAddress,
-      ...(validatedCoordinates && { coordinates: validatedCoordinates })
-    },
-    businessDescription: businessDescription || '',
-    workerType: workerType || 'Daily wage workers',
-    verificationDocuments: {
-      aadharNumber: verificationDocuments?.aadharNumber || 'not provided',
-      panNumber: verificationDocuments?.panNumber || '',
-      businessLicense: verificationDocuments?.businessLicense || ''
-    },
-    // Phase-1 specific fields
-    phase: 1,
-    termsAccepted: true,
-    termsAcceptedAt: new Date(),
-    // Other fields
-    documents: req.body.documents || [],
-    preferredLanguages: req.body.preferredLanguages || [],
-    rating: req.body.rating || { average: 0, count: 0 },
-    reviews: req.body.reviews || [],
-    verificationStatus: req.body.verificationStatus || 'pending'
-  });
+  // Update employer fields with Phase-1 data
+  employer.name = name;
+  employer.email = email || '';
+  employer.age = age || 25;
+  employer.company = formattedCompany;
+  employer.location = {
+    village: location.village || '',
+    district: location.district || '',
+    state: location.state || '',
+    pincode: location.pincode || '',
+    address: formattedLocationAddress,
+    ...(validatedCoordinates && { coordinates: validatedCoordinates })
+  };
+  employer.businessDescription = businessDescription || '';
+  employer.workerType = workerType || 'Daily wage workers';
+  employer.verificationDocuments = {
+    aadharNumber: verificationDocuments?.aadharNumber || 'not provided',
+    panNumber: verificationDocuments?.panNumber || '',
+    businessLicense: verificationDocuments?.businessLicense || ''
+  };
+  employer.phase = 1;
+  employer.termsAccepted = true;
+  employer.termsAcceptedAt = new Date();
 
-  console.log('🔧 Creating Phase-1 employer with data:', JSON.stringify({
+  // Update other optional fields
+  if (req.body.documents) employer.documents = req.body.documents;
+  if (req.body.preferredLanguages) employer.preferredLanguages = req.body.preferredLanguages;
+  if (req.body.rating) employer.rating = req.body.rating;
+  if (req.body.reviews) employer.reviews = req.body.reviews;
+  if (req.body.verificationStatus) employer.verificationStatus = req.body.verificationStatus;
+
+  console.log('🔧 Saving Phase-1 employer with data:', JSON.stringify({
     name: employer.name,
     phone: employer.phone,
     email: employer.email,

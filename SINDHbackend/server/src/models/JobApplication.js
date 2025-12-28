@@ -18,7 +18,7 @@ const jobApplicationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['applied', 'accepted', 'rejected', 'declined', 'in-progress', 'working', 'completed', 'payment_pending', 'paid', 'finished', 'cancelled'],
+    enum: ['applied', 'accepted', 'rejected', 'declined', 'in-progress', 'working', 'WORKING', 'completed', 'COMPLETED', 'payment_pending', 'PAYMENT_PENDING', 'paid', 'PAID', 'finished', 'FINISHED', 'cancelled'],
     default: 'applied'
   },
   updatedAt: {
@@ -135,7 +135,7 @@ const jobApplicationSchema = new mongoose.Schema({
   },
   paymentStatus: {
     type: String,
-    enum: ['pending', 'paid', 'cancelled'],
+    enum: ['pending', 'paid', 'base_paid', 'cancelled'],
     default: 'pending'
   },
   paymentDate: {
