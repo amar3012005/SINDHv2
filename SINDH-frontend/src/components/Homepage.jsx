@@ -14,6 +14,7 @@ import '../styles/homepage-light.css';
 
 
 function Homepage() {
+  // Main Homepage Component
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -933,18 +934,7 @@ function Homepage() {
 
             {/* Adaptive layout for worker/employer */}
             {user?.type === 'employer' ? (
-              <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-stretch">
-                {/* Big CTA card */}
-                <motion.div whileHover={{ y: -2 }} className="md:col-span-2 rounded-2xl bg-white border-2 border-[#3B4883]/10 p-6 md:p-10 flex flex-col justify-between shadow-xl hover:shadow-2xl transition-all backdrop-blur-md">
-                  <div>
-
-                    <h3 className="mt-2 text-2xl md:text-4xl font-extrabold text-[#272D4E]">{t('home.employer.hero.title', { ns: 'home' })}</h3>
-                    <p className="mt-2 text-sm md:text-base text-[#202124]/70">{t('home.employer.hero.body', { ns: 'home' })}</p>
-                  </div>
-                  <div className="mt-6">
-                    <button onClick={handlePostJob} className="px-6 md:px-8 py-3 md:py-4 rounded-xl bg-gradient-to-r from-[#FF7124] to-[#e66420] text-white font-semibold hover:from-[#e66420] hover:to-[#d55a1c] hover:shadow-[0_6px_24px_rgba(255,113,36,0.3)] transition-all shadow-md">{t('home.employer.hero.button', { ns: 'home' })}</button>
-                  </div>
-                </motion.div>
+              <div className="mt-14 max-w-2xl mx-auto">
                 {/* Stat tiles */}
                 <div className="grid grid-cols-2 gap-3 md:gap-4">
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">

@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Phone, Lock, ArrowRight, Loader, Shield } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { api } from '../config/api';
+import { auth } from '../config/firebase'; // Import auth from your new firebase config
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { loginUser } = useUser();
 
-  // Get user type from URL params or default to worker
   const searchParams = new URLSearchParams(location.search);
   const initialType = searchParams.get('type') || 'worker';
 
@@ -22,13 +24,23 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [phoneError, setPhoneError] = useState('');
   const [otpError, setOtpError] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState(null);
 
-  // Handle sending OTP
+  // Set up reCAPTCHA
+  useEffect(() => {
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      'size': 'invisible',
+      'callback': (response) => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+        console.log("reCAPTCHA solved");
+      }
+    });
+  }, []);
+
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setPhoneError('');
 
-    // Validate phone number
     if (!phoneNumber || phoneNumber.length !== 10) {
       setPhoneError('Please enter a valid 10-digit mobile number');
       return;
@@ -37,65 +49,49 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const endpoint = userType === 'worker'
-        ? '/auth/worker/request-otp'
-        : '/auth/employer/request-otp';
+      const formattedPhoneNumber = `+91${phoneNumber}`;
+      const appVerifier = window.recaptchaVerifier;
 
-      const response = await api.post(endpoint, { phone: phoneNumber });
+      const result = await signInWithPhoneNumber(auth, formattedPhoneNumber, appVerifier);
+      setConfirmationResult(result);
+      setOtpSent(true);
+      toast.success('OTP sent successfully!');
 
-      if (response.data.success) {
-        if (response.data.otp) {
-          toast.success(`OTP sent: ${response.data.otp}`);
-        } else {
-          toast.success('OTP sent successfully! Use 0000 for testing.');
-        }
-        setOtpSent(true);
-      }
     } catch (error) {
       console.error('Error sending OTP:', error);
-      toast.error(error.response?.data?.message || 'Failed to send OTP. Please try again.');
+      toast.error('Failed to send OTP. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle verifying OTP
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
     setOtpError('');
 
-    // Validate OTP
-    if (!otp || (otp.length !== 4 && otp.length !== 6)) {
-      setOtpError('Please enter a valid verification code');
+    if (!otp || otp.length !== 6) {
+      setOtpError('Please enter a valid 6-digit verification code');
       return;
     }
-
-    // Removing client-side restriction to allow both test code (0000) and actual OTPs
-    // if (otp !== '0000') {
-    //   setOtpError('Invalid OTP. Use 0000 for testing.');
-    //   return;
-    // }
 
     setIsLoading(true);
 
     try {
-      const endpoint = userType === 'worker'
-        ? '/auth/worker/verify-otp'
-        : '/auth/employer/verify-otp';
+      const userCredential = await confirmationResult.confirm(otp);
+      const user = userCredential.user;
+      const idToken = await user.getIdToken();
 
+      // Send idToken to your backend for verification and session creation
+      const endpoint = '/auth/firebase-login';
       const response = await api.post(endpoint, {
-        phone: phoneNumber,
-        otp
+        token: idToken,
+        userType: userType
       });
 
       const data = response.data;
 
-      // If user is new or requires registration, redirect to registration
       if (data.isNewUser || data.requiresRegistration) {
-        toast.info('Welcome! Please complete your registration to get started.', {
-          autoClose: 4000
-        });
-
+        toast.info('Welcome! Please complete your registration.', { autoClose: 4000 });
         navigate(`/${userType}/form-register`, {
           state: { phoneNumber },
           replace: true
@@ -103,37 +99,26 @@ const Login = () => {
         return;
       }
 
-      // Successful login - existing user with complete profile
       if (data.success) {
         const userData = {
-          ...data.data.employer || data.data.worker || data.data,
+          ...data.data,
           type: userType,
           isLoggedIn: 1,
           lastLogin: new Date().toISOString()
         };
 
-        // Clear any existing data
-        localStorage.removeItem('user');
-        localStorage.removeItem('userType');
-        localStorage.removeItem('token');
-        localStorage.removeItem('authToken');
-
-        // Set new user data and token
         localStorage.setItem('userType', userType);
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('token', data.token);
         localStorage.setItem('authToken', data.token);
 
-        // Store employer profile separately if employer
         if (userType === 'employer') {
           localStorage.setItem('employerProfile', JSON.stringify(userData));
           localStorage.setItem('employerId', userData.id || userData._id);
         }
 
-        // Update context
         loginUser(userData);
 
-        // Create welcome notification
         import('../services/notificationService').then(({ createNotification, NOTIFICATION_TYPES }) => {
           createNotification({
             type: NOTIFICATION_TYPES.WELCOME,
@@ -147,7 +132,6 @@ const Login = () => {
 
         toast.success('Login successful!');
 
-        // Smart redirect based on user type
         if (userType === 'employer') {
           navigate('/employer/posted-jobs');
         } else {
@@ -158,41 +142,18 @@ const Login = () => {
       }
     } catch (error) {
       console.error('OTP verification error:', error);
-
-      // Handle 404 - new user needs registration
-      if (error.response?.status === 404) {
-        toast.info('Welcome! Please complete your registration to get started.', {
-          autoClose: 4000
-        });
-        navigate(`/${userType}/form-register`, {
-          state: { phoneNumber }
-        });
-        return;
-      }
-
-      // Handle 400 - bad request (invalid OTP, etc.)
-      if (error.response?.status === 400) {
-        const errorMsg = error.response.data?.message || 'Invalid request. Please check your input.';
-        setOtpError(errorMsg);
-        toast.error(errorMsg);
-        return;
-      }
-
-      // Handle network errors
-      if (!error.response) {
-        toast.error('Network error. Please check your connection and try again.');
-        return;
-      }
-
       const errorMessage = error.response?.data?.message || error.message || 'Error verifying OTP. Please try again.';
+      setOtpError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+
   return (
     <div className="min-h-screen bg-white relative overflow-hidden flex items-center justify-center px-4 py-12 devanagari">
+      <div id="recaptcha-container"></div>
       {/* Background with subtle gradient matching homepage */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div

@@ -414,56 +414,23 @@ const PostedJobs = () => {
               exit={{ y: '100%' }}
               className="bg-white w-full max-w-2xl rounded-t-[2rem] sm:rounded-[1.5rem] shadow-2xl relative overflow-hidden max-h-[90vh] flex flex-col"
             >
-              {/* Modal Header Card */}
-              <div className="relative bg-gradient-to-br from-[#E8DFD5] to-[#DBBBA7] p-6 pb-8 shrink-0">
-                <div className="flex justify-between items-start mb-4">
-                  {/* Price Card */}
-                  <div className="bg-white px-4 py-2 rounded-xl shadow-sm">
-                    <p className="text-xs text-[#3B4883]/60 font-bold uppercase mb-0.5">Budget</p>
-                    <p className="text-2xl font-black text-[#FF7124]">
-                      ₹{selectedJob.salary || selectedJob.baseAmount}
-                    </p>
-                  </div>
-
-                  {/* Actions & Status */}
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      onClick={() => setSelectedJob(null)}
-                      className="p-2 hover:bg-white/50 rounded-full transition-colors"
-                    >
-                      <X className="w-5 h-5 text-[#3B4883]" />
-                    </button>
+              {/* Modal Header Card - Compact Redesign */}
+              <div className="relative bg-white border-b border-[#3B4883]/10 p-4 shrink-0 flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-4">
+                  <div className="flex items-center gap-2 mb-1">
                     {getStatusBadge(selectedJob.status)}
+                    <span className="text-xs font-bold text-[#3B4883]/60">#{selectedJob._id.slice(-4)}</span>
                   </div>
+                  <h2 className="text-lg font-black text-[#3B4883] uppercase tracking-tight leading-tight truncate">
+                    {selectedJob.title}
+                  </h2>
                 </div>
-
-                <h2 className="text-xl font-black text-[#3B4883] mb-2 uppercase tracking-tight leading-tight">
-                  {selectedJob.title}
-                </h2>
-
-                <div className="flex items-start gap-4 text-sm flex-wrap pb-2">
-                  <div className="flex items-center gap-1.5 text-[#3B4883]/70 font-bold">
-                    <MapPin className="w-4 h-4 shrink-0" />
-                    <span>{selectedJob.location?.village}, {selectedJob.location?.district}</span>
-                  </div>
-                  {(selectedJob.startDate || selectedJob.startTime) && (
-                    <div className="flex items-center gap-1.5 text-[#FF7124] font-bold">
-                      <Clock className="w-4 h-4 shrink-0" />
-                      <span>
-                        {selectedJob.startDate ? new Date(selectedJob.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
-                        {selectedJob.startTime ? ` @ ${selectedJob.startTime}` : ''}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {selectedJob.category && (
-                  <div className="absolute -bottom-3 left-6 z-10">
-                    <span className="inline-block px-4 py-1.5 bg-[#3B4883] text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg border-2 border-white">
-                      {selectedJob.category}
-                    </span>
-                  </div>
-                )}
+                <button
+                  onClick={() => setSelectedJob(null)}
+                  className="w-10 h-10 bg-[#F8F5F2] rounded-full flex items-center justify-center hover:bg-[#E8DFD5] transition-colors shrink-0"
+                >
+                  <X className="w-5 h-5 text-[#3B4883]" />
+                </button>
               </div>
 
               {/* Modal Body / Applicants List */}
@@ -518,44 +485,7 @@ const PostedJobs = () => {
                   )}
                 </AnimatePresence>
 
-                {/* Job Description */}
-                {selectedJob.description && (
-                  <div className="mb-6">
-                    <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-2">Description</p>
-                    <p className="text-sm text-[#202124]/80 leading-relaxed font-medium">
-                      {selectedJob.description}
-                    </p>
-                  </div>
-                )}
 
-                {/* Job Info Grid */}
-                <div className="grid grid-cols-2 gap-3 mb-8">
-                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
-                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Work Timing</p>
-                    <p className="text-xs font-black text-[#3B4883]">
-                      {selectedJob.startDate ? new Date(selectedJob.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Flexible'}
-                      {selectedJob.startTime ? ` @ ${selectedJob.startTime}` : ''}
-                    </p>
-                  </div>
-                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
-                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Location Type</p>
-                    <p className="text-xs font-black text-[#3B4883] uppercase">
-                      {selectedJob.location?.type || 'On-site'}
-                    </p>
-                  </div>
-                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
-                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Posted On</p>
-                    <p className="text-xs font-black text-[#3B4883]">
-                      {selectedJob.createdAt ? new Date(selectedJob.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Recently'}
-                    </p>
-                  </div>
-                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
-                    <p className="text-[10px] font-bold text-[#3B4883]/50 uppercase mb-1">Urgency</p>
-                    <p className={`text-xs font-black uppercase ${selectedJob.urgency === 'High' || selectedJob.urgency === 'Urgent' ? 'text-[#FF7124]' : 'text-[#3B4883]'}`}>
-                      {selectedJob.urgency || 'Normal'}
-                    </p>
-                  </div>
-                </div>
 
                 <div className="relative">
                   <div className="flex items-center justify-between mb-4">
@@ -627,7 +557,27 @@ const PostedJobs = () => {
                                   <div>
                                     <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">Assigned Worker</p>
                                     <h4 className="text-xl font-black uppercase leading-tight">{app.worker?.name || app.workerDetails?.name}</h4>
-                                    <p className="text-xs font-bold text-white/60">{app.worker?.phone || app.workerDetails?.phone}</p>
+                                    <p className="text-xs font-bold text-white/60 mb-2">{app.worker?.phone || app.workerDetails?.phone}</p>
+
+                                    {/* Minimalistic Timing Info */}
+                                    <div className="flex flex-col gap-0.5">
+                                      {app.startedAt && (
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-1 h-1 rounded-full bg-orange-400"></div>
+                                          <p className="text-[10px] uppercase font-bold text-white/40 tracking-wider">
+                                            Start: <span className="text-white/70">{new Date(app.startedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                          </p>
+                                        </div>
+                                      )}
+                                      {app.completedAt && (
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-1 h-1 rounded-full bg-emerald-400"></div>
+                                          <p className="text-[10px] uppercase font-bold text-white/40 tracking-wider">
+                                            End: <span className="text-white/70">{new Date(app.completedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
 
@@ -771,6 +721,37 @@ const PostedJobs = () => {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Job Info Grid (Moved to Bottom) */}
+                <div className="border-t-2 border-[#3B4883]/5 pt-6 mt-2">
+                  <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-3">Job Details</p>
+
+                  {/* Compact Info Row */}
+                  <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
+                    <div className="bg-[#F8F5F2] px-3 py-2 rounded-xl flex items-center gap-2 border border-[#3B4883]/5 min-w-max">
+                      <DollarSign className="w-3 h-3 text-[#FF7124]" />
+                      <span className="text-xs font-black text-[#3B4883]">₹{selectedJob.salary || selectedJob.baseAmount}</span>
+                    </div>
+                    <div className="bg-[#F8F5F2] px-3 py-2 rounded-xl flex items-center gap-2 border border-[#3B4883]/5 min-w-max">
+                      <MapPin className="w-3 h-3 text-[#3B4883]/60" />
+                      <span className="text-xs font-black text-[#3B4883]">{selectedJob.location?.village || 'On-site'}</span>
+                    </div>
+                    <div className="bg-[#F8F5F2] px-3 py-2 rounded-xl flex items-center gap-2 border border-[#3B4883]/5 min-w-max">
+                      <Clock className="w-3 h-3 text-[#3B4883]/60" />
+                      <span className="text-xs font-black text-[#3B4883]">
+                        {selectedJob.startDate ? new Date(selectedJob.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Flexible'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedJob.description && (
+                    <div className="bg-[#F8F5F2]/50 p-3 rounded-xl border border-[#3B4883]/5">
+                      <p className="text-xs text-[#202124]/70 leading-relaxed font-medium line-clamp-3">
+                        {selectedJob.description}
+                      </p>
                     </div>
                   )}
                 </div>
