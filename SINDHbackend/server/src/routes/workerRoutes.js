@@ -69,8 +69,21 @@ router.post('/register', asyncHandler(async (req, res) => {
     if (!age || age < 18 || age > 70) {
       throw new ValidationError('Valid age (18-70) is required for Phase-1 registration');
     }
-    if (!phone || phone.length !== 10) {
-      throw new ValidationError('Valid 10-digit phone number is required');
+    // Validate phone number (flexible for international numbers)
+    if (!phone) {
+      throw new ValidationError('Phone number is required');
+    }
+    // Check if it has country code format (+XX...)
+    if (phone.startsWith('+')) {
+      // International format: require at least 10 characters total
+      if (phone.length < 10) {
+        throw new ValidationError('Valid phone number is required');
+      }
+    } else {
+      // Legacy format without country code: require exactly 10 digits
+      if (phone.length !== 10) {
+        throw new ValidationError('Valid 10-digit phone number is required');
+      }
     }
     if (!preferredCategory) {
       throw new ValidationError('Preferred work category is required for Phase-1 registration');

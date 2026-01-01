@@ -337,8 +337,18 @@ router.post('/generate-token', asyncHandler(async (req, res) => {
 router.post('/worker/request-otp', asyncHandler(async (req, res) => {
   const { phone } = req.body;
 
-  if (!phone || phone.length !== 10) {
-    throw new ValidationError('Please provide a valid 10-digit phone number');
+  // Flexible phone validation for international numbers
+  if (!phone) {
+    throw new ValidationError('Please provide a phone number');
+  }
+  if (phone.startsWith('+')) {
+    if (phone.length < 10) {
+      throw new ValidationError('Please provide a valid phone number');
+    }
+  } else {
+    if (phone.length !== 10) {
+      throw new ValidationError('Please provide a valid 10-digit phone number');
+    }
   }
 
   // Check if worker exists
@@ -450,8 +460,18 @@ router.post('/worker/verify-otp', asyncHandler(async (req, res) => {
 router.post('/employer/request-otp', asyncHandler(async (req, res) => {
   const { phone } = req.body;
 
-  if (!phone || phone.length !== 10) {
-    throw new ValidationError('Please provide a valid 10-digit phone number');
+  // Flexible phone validation for international numbers
+  if (!phone) {
+    throw new ValidationError('Please provide a phone number');
+  }
+  if (phone.startsWith('+')) {
+    if (phone.length < 10) {
+      throw new ValidationError('Please provide a valid phone number');
+    }
+  } else {
+    if (phone.length !== 10) {
+      throw new ValidationError('Please provide a valid 10-digit phone number');
+    }
   }
 
   console.log(`📞 Employer OTP request for phone: \"${phone}\" (type: ${typeof phone}, length: ${phone.length})`);
