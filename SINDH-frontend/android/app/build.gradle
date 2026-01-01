@@ -122,6 +122,7 @@ dependencies {
 
     // Add the dependency for Firebase Analytics
     implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-auth'
 }
 
 apply from: 'capacitor.build.gradle'

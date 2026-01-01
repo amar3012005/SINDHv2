@@ -192,6 +192,15 @@ exports.register = async (req, res) => {
       profile: { name }
     });
 
+    if (req.device) {
+      user.devices.push({
+        deviceId: req.device.id,
+        platform: req.device.platform,
+        appVersion: req.device.version,
+        lastSeenAt: new Date()
+      });
+    }
+
     await user.save();
 
     // Generate JWT token
@@ -216,6 +225,27 @@ exports.register = async (req, res) => {
   }
 };
 
+// Helper to update device info
+const updateDeviceLogin = async (user, deviceInfo) => {
+  if (!deviceInfo || !deviceInfo.id) return;
+
+  const existingDeviceIndex = user.devices.findIndex(d => d.deviceId === deviceInfo.id);
+  
+  if (existingDeviceIndex > -1) {
+    user.devices[existingDeviceIndex].lastSeenAt = new Date();
+    user.devices[existingDeviceIndex].appVersion = deviceInfo.version;
+    user.devices[existingDeviceIndex].platform = deviceInfo.platform;
+  } else {
+    user.devices.push({
+      deviceId: deviceInfo.id,
+      platform: deviceInfo.platform,
+      appVersion: deviceInfo.version,
+      lastSeenAt: new Date()
+    });
+  }
+  await user.save();
+};
+
 // Login user
 exports.login = async (req, res) => {
   try {
@@ -231,6 +261,11 @@ exports.login = async (req, res) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Update device info if present
+    if (req.device) {
+      await updateDeviceLogin(user, req.device);
     }
 
     // Generate JWT token

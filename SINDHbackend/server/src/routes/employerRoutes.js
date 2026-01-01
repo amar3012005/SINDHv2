@@ -166,8 +166,10 @@ router.post('/register', asyncHandler(async (req, res) => {
       ...employer.toObject(),
       _id: employer._id.toString(),
       id: employer._id.toString(),
+      mongoId: employer._id.toString(), // Explicit MongoDB ID for firebase-login
       type: 'employer',
       role: 'employer',
+      phone: employer.phone, // Ensure phone is at top level for querying
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
       registrationDate: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
@@ -195,9 +197,11 @@ router.post('/register', asyncHandler(async (req, res) => {
 
     const finalFirestoreData = sanitizeForFirestore(firestoreData);
     await db.collection('users').doc(employer._id.toString()).set(finalFirestoreData, { merge: true });
+    logger.info(`✅ Employer saved to Firestore: phone=${employer.phone}, mongoId=${employer._id.toString()}`);
     console.log('💾 Employer saved to Firestore in real-time');
   } catch (fsError) {
     console.error('❌ Failed to save employer to Firestore:', fsError.message);
+    logger.error(`Firestore sync error for employer ${employer.phone}:`, fsError);
   }
 
   // Comment 6: Explicit logging of saved employer details for diagnostics

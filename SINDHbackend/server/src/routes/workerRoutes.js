@@ -166,8 +166,10 @@ router.post('/register', asyncHandler(async (req, res) => {
       ...worker.toObject(),
       _id: worker._id.toString(),
       id: worker._id.toString(),
+      mongoId: worker._id.toString(), // Explicit MongoDB ID for firebase-login
       type: 'worker',
       role: 'worker',
+      phone: worker.phone, // Ensure phone is at top level for querying
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
       registrationDate: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
@@ -195,9 +197,11 @@ router.post('/register', asyncHandler(async (req, res) => {
 
     const finalFirestoreData = sanitizeForFirestore(firestoreData);
     await db.collection('users').doc(worker._id.toString()).set(finalFirestoreData, { merge: true });
+    logger.info(`✅ Worker saved to Firestore: phone=${worker.phone}, mongoId=${worker._id.toString()}`);
     console.log('💾 Worker saved to Firestore in real-time');
   } catch (fsError) {
     console.error('❌ Failed to save worker to Firestore:', fsError.message);
+    logger.error(`Firestore sync error for worker ${worker.phone}:`, fsError);
     // We don't fail the whole request if Firestore fails, but we log it
   }
 

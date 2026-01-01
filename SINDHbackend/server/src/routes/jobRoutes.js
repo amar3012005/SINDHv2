@@ -33,28 +33,33 @@ router.post('/initiate-creation', async (req, res) => {
 router.get('/dual-status', asyncHandler(async (req, res) => {
   const { workerId, employerId, category, status } = req.query;
 
-  logger.info('📊 Fetching jobs with dual status system', { workerId, employerId, category, status });
+  logger.info('📊 Fetching jobs with dual status system', { 
+    workerId: workerId || 'none', 
+    employerId: employerId || 'none', 
+    category: category || 'any', 
+    status: status || 'all' 
+  });
 
   let query = {};
 
   // Filter by category if provided
-  if (category) {
+  if (category && category !== 'undefined') {
     query.category = category;
   }
 
-  // Filter by status if provided (can be workerStatus, employerStatus, or legacy status)
-  if (status) {
+  // Filter by status if provided
+  if (status && status !== 'undefined') {
     if (['active', 'applied', 'accepted', 'got paid'].includes(status)) {
       query.workerStatus = status;
     } else if (['active', 'accepted', 'paid'].includes(status)) {
       query.employerStatus = status;
     } else {
-      query.status = status; // Legacy status
+      query.status = status;
     }
   }
 
   // Filter by employer if provided
-  if (employerId) {
+  if (employerId && employerId !== 'undefined' && employerId !== 'null' && employerId.match(/^[0-9a-fA-F]{24}$/)) {
     query.employer = employerId;
   }
 
@@ -64,112 +69,119 @@ router.get('/dual-status', asyncHandler(async (req, res) => {
     .limit(50);
 
   // Enhance jobs with application information if workerId is provided
-  let enhancedJobs = jobs;
-  if (workerId) {
-    const jobIds = jobs.map(job => job._id);
-    const applications = await JobApplication.find({
-      job: { $in: jobIds },
-      worker: workerId
-    });
+  let enhancedJobs = [];
+  try {
+    if (workerId && workerId !== 'null' && workerId !== 'undefined' && workerId.match(/^[0-9a-fA-F]{24}$/)) {
+      const jobIds = jobs.map(job => job._id);
+      const applications = await JobApplication.find({
+        job: { $in: jobIds },
+        worker: workerId
+      });
 
-    logger.info(`🔍 Found ${applications.length} applications for worker ${workerId} across ${jobIds.length} jobs`);
-    applications.forEach(app => {
-      logger.info(`   📝 Application: job=${app.job}, status=${app.status}`);
-    });
+      logger.info(`🔍 Found ${applications.length} applications for worker ${workerId} across ${jobIds.length} jobs`);
 
-    const applicationMap = {};
-    applications.forEach(app => {
-      applicationMap[app.job.toString()] = app;
-    });
-
-    // Get actual applicant counts for all jobs by counting JobApplication documents
-    const applicantCounts = await JobApplication.aggregate([
-      { $match: { job: { $in: jobIds } } },
-      { $group: { _id: '$job', count: { $sum: 1 } } }
-    ]);
-
-    const countMap = {};
-    applicantCounts.forEach(item => {
-      countMap[item._id.toString()] = item.count;
-    });
-
-    enhancedJobs = jobs.map(job => {
-      const jobObj = job.toObject();
-      const application = applicationMap[job._id.toString()];
-
-      // Get real applicant count from database
-      const realApplicantCount = countMap[job._id.toString()] || 0;
-
-      // Map application status to dual status system
-      let workerStatus = jobObj.workerStatus || 'active';
-      let employerStatus = jobObj.employerStatus || 'active';
-
-      if (application) {
-        // Worker has applied, so worker status is 'applied'
-        workerStatus = 'applied';
-
-        // Map application status to employer status
-        switch (application.status) {
-          case 'pending':
-            employerStatus = 'active'; // Employer reviewing
-            break;
-          case 'accepted':
-          case 'in-progress':
-            employerStatus = 'accepted'; // Employer accepted worker
-            break;
-          case 'completed':
-            if (application.paymentStatus === 'paid') {
-              workerStatus = 'got paid'; // Worker got paid
-              employerStatus = 'paid'; // Employer paid
-            } else {
-              workerStatus = 'accepted'; // Work completed, waiting for payment
-              employerStatus = 'accepted';
-            }
-            break;
-          case 'rejected':
-          case 'cancelled':
-            workerStatus = 'applied'; // Keep as applied for history
-            employerStatus = 'active'; // Back to active for employer
-            break;
+      const applicationMap = {};
+      applications.forEach(app => {
+        if (app && app.job) {
+          applicationMap[app.job.toString()] = app;
         }
-      }
+      });
 
-      return {
-        ...jobObj,
-        // Override with real count from database
-        applicantCount: realApplicantCount,
-        // Dual status information
-        workerStatus,
-        employerStatus,
-        // Legacy fields for backward compatibility
-        applicationStatus: application ? application.status : null,
-        applicationId: application ? application._id : null,
-        appliedAt: application ? application.createdAt : null,
-        hasApplied: !!application,
-        // Include job reference for progress tracking
-        job: jobObj
-      };
-    });
-  } else {
-    // No workerId - still calculate real applicant counts
-    const jobIds = jobs.map(job => job._id);
-    const applicantCounts = await JobApplication.aggregate([
-      { $match: { job: { $in: jobIds } } },
-      { $group: { _id: '$job', count: { $sum: 1 } } }
-    ]);
+      // Get actual applicant counts for all jobs by counting JobApplication documents
+      const applicantCounts = await JobApplication.aggregate([
+        { $match: { job: { $in: jobIds } } },
+        { $group: { _id: '$job', count: { $sum: 1 } } }
+      ]);
 
-    const countMap = {};
-    applicantCounts.forEach(item => {
-      countMap[item._id.toString()] = item.count;
-    });
+      const countMap = {};
+      applicantCounts.forEach(item => {
+        if (item && item._id) {
+          countMap[item._id.toString()] = item.count;
+        }
+      });
 
-    enhancedJobs = jobs.map(job => {
-      const jobObj = job.toObject();
-      return {
-        ...jobObj,
-        applicantCount: countMap[job._id.toString()] || 0
-      };
-    });
+      enhancedJobs = jobs.map(job => {
+        if (!job) return null;
+        const jobObj = job.toObject();
+        const application = applicationMap[job._id.toString()];
+
+        // Get real applicant count from database
+        const realApplicantCount = countMap[job._id.toString()] || 0;
+
+        // Map application status to dual status system
+        let workerStatus = jobObj.workerStatus || 'active';
+        let employerStatus = jobObj.employerStatus || 'active';
+
+        if (application) {
+          // Worker has applied, so worker status is 'applied'
+          workerStatus = 'applied';
+
+          // Map application status to employer status
+          switch (application.status) {
+            case 'pending':
+              employerStatus = 'active'; // Employer reviewing
+              break;
+            case 'accepted':
+            case 'in-progress':
+              employerStatus = 'accepted'; // Employer accepted worker
+              break;
+            case 'completed':
+              if (application.paymentStatus === 'paid') {
+                workerStatus = 'got paid'; // Worker got paid
+                employerStatus = 'paid'; // Employer paid
+              } else {
+                workerStatus = 'accepted'; // Work completed, waiting for payment
+                employerStatus = 'accepted';
+              }
+              break;
+            case 'rejected':
+            case 'cancelled':
+              workerStatus = 'applied'; // Keep as applied for history
+              employerStatus = 'active'; // Back to active for employer
+              break;
+          }
+        }
+
+        return {
+          ...jobObj,
+          applicantCount: realApplicantCount,
+          workerStatus,
+          employerStatus,
+          applicationStatus: application ? application.status : null,
+          applicationId: application ? application._id : null,
+          appliedAt: application ? application.createdAt : null,
+          hasApplied: !!application
+        };
+      }).filter(Boolean);
+    } else {
+      // No workerId - still calculate real applicant counts
+      const jobIds = jobs.map(job => job._id);
+      
+      const applicantCounts = jobIds.length > 0 ? await JobApplication.aggregate([
+        { $match: { job: { $in: jobIds } } },
+        { $group: { _id: '$job', count: { $sum: 1 } } }
+      ]) : [];
+
+      const countMap = {};
+      applicantCounts.forEach(item => {
+        if (item && item._id) {
+          countMap[item._id.toString()] = item.count;
+        }
+      });
+
+      enhancedJobs = jobs.map(job => {
+        if (!job) return null;
+        const jobObj = job.toObject();
+        return {
+          ...jobObj,
+          applicantCount: countMap[job._id.toString()] || 0
+        };
+      }).filter(Boolean);
+    }
+  } catch (error) {
+    logger.error('Error enhancing jobs with dual status:', error);
+    // Fallback to basic jobs if enhancement fails
+    enhancedJobs = jobs.map(j => j ? j.toObject() : null).filter(Boolean);
   }
 
   logger.info(`📋 Found ${enhancedJobs.length} jobs with dual status`);

@@ -7,7 +7,9 @@ import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { api } from '../config/api';
 import { auth } from '../config/firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { Capacitor } from '@capacitor/core';
 
 
 const Login = () => {
@@ -26,6 +28,72 @@ const Login = () => {
   const [phoneError, setPhoneError] = useState('');
   const [otpError, setOtpError] = useState('');
   const [verificationId, setVerificationId] = useState('');
+  const [listeners, setListeners] = useState([]);
+
+  // Initialize reCAPTCHA for web
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      if (!window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible',
+            'callback': (response) => {
+              // reCAPTCHA solved
+            },
+            'expired-callback': () => {
+              // Response expired
+              toast.warn('reCAPTCHA expired. Please try again.');
+            }
+          });
+        } catch (error) {
+          console.error('Recaptcha init error:', error);
+        }
+      }
+    }
+  }, []);
+
+  // Setup Native OTP Listeners
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      setupNativeListeners();
+    }
+    return () => {
+      // Cleanup listeners on unmount
+      listeners.forEach(l => l?.remove());
+    };
+  }, []);
+
+  const setupNativeListeners = async () => {
+    try {
+      // 1. Code Sent Listener
+      const codeSentListener = await FirebaseAuthentication.addListener('phoneCodeSent', (event) => {
+        console.log('📱 Native OTP sent, ID:', event.verificationId);
+        setVerificationId(event.verificationId);
+        setOtpSent(true);
+        setIsLoading(false);
+        toast.success('OTP sent successfully!');
+      });
+
+      // 2. Auto-Verification Listener (Android only)
+      const autoVerifiedListener = await FirebaseAuthentication.addListener('phoneVerificationCompleted', async (event) => {
+        console.log('⚡ Phone verified automatically!', event.result.user);
+        setIsLoading(true);
+        await proceedWithAuth(event.result.user);
+      });
+
+      // 3. Verification Failed Listener
+      const failedListener = await FirebaseAuthentication.addListener('phoneVerificationFailed', (event) => {
+        console.error('❌ Native verification failed:', event.message);
+        setOtpError(event.message || 'Verification failed. Please try again.');
+        setIsLoading(false);
+        toast.error(event.message || 'Verification failed.');
+      });
+
+      setListeners([codeSentListener, autoVerifiedListener, failedListener]);
+    } catch (error) {
+      console.error('Error setting up native listeners:', error);
+    }
+  };
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
@@ -40,19 +108,40 @@ const Login = () => {
 
     try {
       const formattedPhoneNumber = `+91${phoneNumber}`;
+      console.log('📱 Attempting to send OTP to:', formattedPhoneNumber);
 
-      const { verificationId } = await FirebaseAuthentication.signInWithPhoneNumber({
-        phoneNumber: formattedPhoneNumber,
-      });
-
-      setVerificationId(verificationId);
-      setOtpSent(true);
-      toast.success('OTP sent successfully!');
+      if (Capacitor.isNativePlatform()) {
+        console.log('📱 Using Native Platform OTP flow');
+        // Native Android/iOS implementation - Listeners will handle the rest
+        const result = await FirebaseAuthentication.signInWithPhoneNumber({
+          phoneNumber: formattedPhoneNumber,
+        });
+        console.log('📱 Native signInWithPhoneNumber result:', result);
+      } else {
+        // Web implementation
+        if (!window.recaptchaVerifier) {
+          // Attempt re-init if missing
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+             'size': 'invisible'
+          });
+        }
+        const confirmationResult = await signInWithPhoneNumber(auth, formattedPhoneNumber, window.recaptchaVerifier);
+        window.confirmationResult = confirmationResult;
+        setVerificationId(confirmationResult.verificationId);
+        setOtpSent(true);
+        setIsLoading(false);
+        toast.success('OTP sent successfully!');
+      }
 
     } catch (error) {
       console.error('Error sending OTP:', error);
+      if (!Capacitor.isNativePlatform() && window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+          window.recaptchaVerifier = null;
+        } catch (e) { /* ignore */ }
+      }
       toast.error('Failed to send OTP. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -69,22 +158,42 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // Use the plugin to confirm the code
-      const result = await FirebaseAuthentication.signInWithPhoneNumber({
-        verificationId: verificationId,
-        verificationCode: otp,
-      });
+      let user;
 
-      const user = result.user;
+      if (Capacitor.isNativePlatform()) {
+        // Use the plugin to confirm the code manually
+        const result = await FirebaseAuthentication.confirmVerificationCode({
+          verificationId: verificationId,
+          verificationCode: otp,
+        });
+        user = result.user;
+      } else {
+         // Web verification
+         const confirmationResult = window.confirmationResult;
+         if (!confirmationResult) throw new Error('No verification session found');
+         const result = await confirmationResult.confirm(otp);
+         user = result.user;
+      }
 
-      // Get ID token using Firebase Authentication plugin's method
+      await proceedWithAuth(user);
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Error verifying OTP. Please try again.';
+      setOtpError(errorMessage);
+      toast.error(errorMessage);
+      setIsLoading(false);
+    }
+  };
+
+  const proceedWithAuth = async (user) => {
+    try {
+      // Get ID token using Firebase Authentication plugin's method or Web SDK
       let idToken;
-      try {
+      if (Capacitor.isNativePlatform()) {
         const tokenResult = await FirebaseAuthentication.getIdToken({ forceRefresh: true });
         idToken = tokenResult.token;
-      } catch (tokenError) {
-        console.error('Token retrieval error:', tokenError);
-        throw new Error('Failed to retrieve authentication token');
+      } else {
+        idToken = await user.getIdToken(true);
       }
 
       if (!idToken) throw new Error("Failed to retrieve ID Token");
@@ -99,9 +208,12 @@ const Login = () => {
       const data = response.data;
 
       if (data.isNewUser || data.requiresRegistration) {
+        // Use phone number from backend response if available, otherwise use local state
+        const verifiedPhone = data.phoneNumber || phoneNumber;
+        console.log(`🆕 New user detected - redirecting to registration with phone: ${verifiedPhone}`);
         toast.info('Welcome! Please complete your registration.', { autoClose: 4000 });
         navigate(`/${userType}/form-register`, {
-          state: { phoneNumber },
+          state: { phoneNumber: verifiedPhone },
           replace: true
         });
         return;
@@ -201,6 +313,9 @@ const Login = () => {
 
         {/* Login Card */}
         <div className="bg-white/90 backdrop-blur-xl border border-[#3B4883]/10 rounded-3xl p-8 shadow-2xl">
+          {/* Invisible reCAPTCHA container for Web */}
+          <div id="recaptcha-container"></div>
+
           {/* User Type Selection */}
           <div className="flex p-1 bg-[#3B4883]/5 rounded-2xl mb-8">
             <button

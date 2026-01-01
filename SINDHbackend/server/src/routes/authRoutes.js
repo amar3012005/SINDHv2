@@ -33,46 +33,124 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
     throw new ValidationError('Firebase ID token and user type are required.');
   }
 
+  logger.info(`🔐 Firebase login attempt for userType: ${userType}`);
+
   // Verify the ID token with Firebase Admin SDK
   const decodedToken = await admin.auth().verifyIdToken(token);
   const phone = decodedToken.phone_number.substring(3); // Remove +91
+  
+  logger.info(`📱 Verified phone number: ${phone}`);
 
-  let user;
-  let userTypeFound = userType;
-
-  // Query Firestore instead of MongoDB
+  // Check Firestore for existing user mapping
   const userRef = db.collection('users').where('phone', '==', phone).limit(1);
   const snapshot = await userRef.get();
 
   if (snapshot.empty) {
+    logger.info(`🆕 New user detected - phone ${phone} not found in Firestore`);
     return res.status(200).json({
       success: true,
       requiresRegistration: true,
       message: 'Please complete your registration.',
-      phoneNumber: phone
+      phoneNumber: phone,
+      userType
     });
   }
 
-  const userData = snapshot.docs[0].data();
-  const userId = snapshot.docs[0].id;
+  // User exists in Firestore - get their MongoDB ID and type
+  const firestoreDoc = snapshot.docs[0];
+  const firestoreData = firestoreDoc.data();
+  const mongoId = firestoreData.mongoId;
+  const userTypeFromFirestore = firestoreData.type || userType;
 
-  // If the user exists, generate a session token and return user data
-  const sessionToken = generateToken(userId, userData.type || userType);
-  
-  await db.collection('users').doc(userId).update({
+  logger.info(`✅ User found in Firestore - mongoId: ${mongoId}, type: ${userTypeFromFirestore}`);
+
+  // Fetch full profile from MongoDB based on user type
+  let userProfile;
+  if (userTypeFromFirestore === 'worker') {
+    const worker = await Worker.findById(mongoId);
+    if (!worker) {
+      logger.warn(`⚠️ Worker mongoId ${mongoId} not found in MongoDB, treating as new user`);
+      return res.status(200).json({
+        success: true,
+        requiresRegistration: true,
+        message: 'Please complete your registration.',
+        phoneNumber: phone,
+        userType
+      });
+    }
+    
+    // Update login timestamp
+    worker.lastLogin = new Date();
+    worker.isLoggedIn = 1;
+    await worker.save();
+
+    userProfile = {
+      id: worker._id.toString(),
+      _id: worker._id.toString(),
+      name: worker.name,
+      phone: worker.phone,
+      phoneNumber: worker.phone,
+      location: worker.location,
+      preferredCategory: worker.preferredCategory,
+      expectedSalary: worker.expectedSalary,
+      skills: worker.skills,
+      experience: worker.experience,
+      languages: worker.languages,
+      age: worker.age,
+      gender: worker.gender,
+      type: 'worker',
+      phase: worker.phase || 1
+    };
+  } else if (userTypeFromFirestore === 'employer') {
+    const employer = await Employer.findById(mongoId);
+    if (!employer) {
+      logger.warn(`⚠️ Employer mongoId ${mongoId} not found in MongoDB, treating as new user`);
+      return res.status(200).json({
+        success: true,
+        requiresRegistration: true,
+        message: 'Please complete your registration.',
+        phoneNumber: phone,
+        userType
+      });
+    }
+    
+    // Update login timestamp
+    employer.lastLogin = new Date();
+    employer.isLoggedIn = 1;
+    await employer.save();
+
+    userProfile = {
+      id: employer._id.toString(),
+      _id: employer._id.toString(),
+      name: employer.name,
+      phone: employer.phone,
+      phoneNumber: employer.phone,
+      companyName: employer.companyName,
+      location: employer.location,
+      type: 'employer',
+      phase: employer.phase || 1
+    };
+  } else {
+    throw new ValidationError('Invalid user type');
+  }
+
+  // Update Firestore last login
+  await db.collection('users').doc(firestoreDoc.id).update({
     lastLogin: admin.firestore.FieldValue.serverTimestamp(),
     isLoggedIn: 1
   });
+
+  // Generate JWT token with MongoDB ID
+  const sessionToken = generateToken(mongoId, userTypeFromFirestore);
+
+  logger.info(`✅ Firebase login successful for ${userProfile.name} (${userTypeFromFirestore})`);
 
   res.json({
     success: true,
     message: 'Login successful',
     token: sessionToken,
     requiresRegistration: false,
-    data: {
-      id: userId,
-      ...userData
-    }
+    data: userProfile
   });
 
 }));

@@ -14,6 +14,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Device Recognition Middleware
+app.use((req, res, next) => {
+  const deviceId = req.headers['x-device-id'];
+  const appVersion = req.headers['x-app-version'];
+  const platform = req.headers['x-platform'];
+
+  if (deviceId) {
+    // Log device info (in production this would be stored/updated in DB)
+    console.log(`📱 Device Connected: ID=${deviceId}, Platform=${platform}, Version=${appVersion}`);
+    
+    // Attach device info to request object for downstream controllers
+    req.device = {
+      id: deviceId,
+      version: appVersion,
+      platform: platform
+    };
+  }
+  next();
+});
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URL, {
   useNewUrlParser: true,
@@ -77,7 +97,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'User-Type', 'User-ID'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'User-Type', 'User-ID', 'X-Device-Id', 'X-App-Version', 'X-App-Build', 'X-Platform'],
   preflightContinue: false,
   optionsSuccessStatus: 200
 };

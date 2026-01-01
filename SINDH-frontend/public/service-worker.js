@@ -46,8 +46,15 @@ self.addEventListener('activate', event => {
 // Fetch event strategy (Network first, falling back to cache)
 self.addEventListener('fetch', event => {
   const { request } = event;
-  // Skip non-GET requests and unsupported schemes (e.g., chrome-extension)
-  if (request.method !== 'GET' || !/^https?:/i.test(request.url)) {
+  
+  // Skip non-GET requests
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  // Skip unsupported schemes (chrome-extension, etc.)
+  const url = new URL(request.url);
+  if (!['http:', 'https:'].includes(url.protocol)) {
     return;
   }
 

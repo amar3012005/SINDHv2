@@ -102,6 +102,13 @@ const userSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  devices: [{
+    deviceId: { type: String, required: true },
+    platform: String,
+    appVersion: String,
+    lastSeenAt: { type: Date, default: Date.now },
+    status: { type: String, enum: ['active', 'blocked'], default: 'active' }
+  }],
   createdAt: {
     type: Date,
     default: Date.now
