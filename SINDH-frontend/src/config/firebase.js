@@ -1,20 +1,32 @@
 
-// src/config/firebase.js
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { 
+    initializeFirestore, 
+    persistentLocalCache, 
+    persistentMultipleTabManager 
+} from 'firebase/firestore';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDiBlshtYxqX1EgC7w-4f0KHxZgpq4AAoU",
-    authDomain: "foodles-c5afe.firebaseapp.com",
-    projectId: "foodles-c5afe",
-    storageBucket: "foodles-c5afe.firebasestorage.app",
-    messagingSenderId: "310452872150",
-    appId: "1:310452872150:web:a65deac53c6ce222ddfa77",
-    measurementId: "G-F0BQ1635W2"
+    apiKey: "AIzaSyBCxd098zKwbvt_RCj15iiifRkzaJZqc8I",
+    authDomain: "sindh-8c91b.firebaseapp.com",
+    projectId: "sindh-8c91b",
+    storageBucket: "sindh-8c91b.firebasestorage.app",
+    messagingSenderId: "265383518270",
+    appId: "1:265383518270:web:d235c345b678e9f0"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Export auth instance
+// Initialize Firebase services
 export const auth = getAuth(app);
+
+// Initialize Firestore with modern persistence (v11+)
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+    })
+});
+
+export default app;

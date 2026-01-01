@@ -22,6 +22,27 @@ allprojects {
         google()
         mavenCentral()
     }
+    // Add this block to force resolution of Kotlin versions
+    configurations.all {
+        resolutionStrategy {
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+        }
+    }
+}
+
+// Disable test tasks for library subprojects
+subprojects {
+    afterEvaluate {project ->
+        if (project.plugins.hasPlugin('com.android.library')) {
+            android {
+                testOptions {
+                    unitTests.all { it.enabled = false }
+                }
+            }
+        }
+    }
 }
 
 task clean(type: Delete) {

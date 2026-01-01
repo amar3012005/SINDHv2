@@ -28,3 +28,9 @@ Thumbs.db
 # Debug
 *.pid
 *.seed
+
+# Secrets
+*.json
+!package.json
+!package-lock.json
+!render.yaml

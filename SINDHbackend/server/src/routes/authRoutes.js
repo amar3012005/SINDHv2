@@ -1,5 +1,7 @@
+
 const express = require('express');
 const router = express.Router();
+const { admin, db } = require('../config/firebase');
 const Worker = require('../models/Worker');
 const Employer = require('../models/Employer');
 const JobApplication = require('../models/JobApplication');
@@ -13,7 +15,9 @@ const {
   asyncHandler
 } = require('../middleware/errorHandler');
 
-// Generate JWT token
+// Initialize Firebase Admin SDK
+// Admin is initialized in ../config/firebase.js
+
 const generateToken = (userId, role) => {
   return jwt.sign(
     { userId, role },
@@ -21,6 +25,58 @@ const generateToken = (userId, role) => {
     { expiresIn: '7d' }
   );
 };
+
+router.post('/firebase-login', asyncHandler(async (req, res) => {
+  const { token, userType } = req.body;
+
+  if (!token || !userType) {
+    throw new ValidationError('Firebase ID token and user type are required.');
+  }
+
+  // Verify the ID token with Firebase Admin SDK
+  const decodedToken = await admin.auth().verifyIdToken(token);
+  const phone = decodedToken.phone_number.substring(3); // Remove +91
+
+  let user;
+  let userTypeFound = userType;
+
+  // Query Firestore instead of MongoDB
+  const userRef = db.collection('users').where('phone', '==', phone).limit(1);
+  const snapshot = await userRef.get();
+
+  if (snapshot.empty) {
+    return res.status(200).json({
+      success: true,
+      requiresRegistration: true,
+      message: 'Please complete your registration.',
+      phoneNumber: phone
+    });
+  }
+
+  const userData = snapshot.docs[0].data();
+  const userId = snapshot.docs[0].id;
+
+  // If the user exists, generate a session token and return user data
+  const sessionToken = generateToken(userId, userData.type || userType);
+  
+  await db.collection('users').doc(userId).update({
+    lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+    isLoggedIn: 1
+  });
+
+  res.json({
+    success: true,
+    message: 'Login successful',
+    token: sessionToken,
+    requiresRegistration: false,
+    data: {
+      id: userId,
+      ...userData
+    }
+  });
+
+}));
+
 
 // Worker login
 router.post('/workers/login', asyncHandler(async (req, res) => {
@@ -306,13 +362,13 @@ router.post('/employer/request-otp', asyncHandler(async (req, res) => {
     throw new ValidationError('Please provide a valid 10-digit phone number');
   }
 
-  console.log(`📞 Employer OTP request for phone: "${phone}" (type: ${typeof phone}, length: ${phone.length})`);
+  console.log(`📞 Employer OTP request for phone: \"${phone}\" (type: ${typeof phone}, length: ${phone.length})`);
 
   // Find or create employer (minimal data for Phase-1)
   let employer = await Employer.findOne({ phone });
 
   if (!employer) {
-    console.log(`🆕 Creating temporary employer for phone: "${phone}"`);
+    console.log(`🆕 Creating temporary employer for phone: \"${phone}\"`);
     // Create a minimal temporary employer for OTP (Phase-1)
     employer = new Employer({
       phone,
@@ -355,11 +411,11 @@ router.post('/employer/verify-otp', asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number and OTP are required');
   }
 
-  console.log(`🔍 Searching for employer with phone: "${phone}" (type: ${typeof phone}, length: ${phone.length})`);
+  console.log(`🔍 Searching for employer with phone: \"${phone}\" (type: ${typeof phone}, length: ${phone.length})`);
   const employer = await Employer.findOne({ phone });
 
   if (!employer) {
-    console.log(`❌ Employer not found with phone: "${phone}"`);
+    console.log(`❌ Employer not found with phone: \"${phone}\"`);
     // Let's see what employers exist
     const allEmployers = await Employer.find({}, 'phone name').limit(5);
     console.log('📋 Existing employers:', allEmployers.map(e => ({ phone: e.phone, name: e.name })));
@@ -377,7 +433,7 @@ router.post('/employer/verify-otp', asyncHandler(async (req, res) => {
   await employer.save();
 
   // Check if employer has completed registration (Phase-1 fields)
-  // An employer is considered "new" only if they have the temporary name
+  // An employer is considered \"new\" only if they have the temporary name
   const isNewUser = employer.name === 'Temporary';
 
   // An employer requires registration if:

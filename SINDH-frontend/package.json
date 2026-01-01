@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@capacitor-firebase/authentication": "^6.3.1",
     "@capacitor/android": "^7.4.2",
     "@capacitor/camera": "^7.0.1",
     "@capacitor/core": "^7.4.2",

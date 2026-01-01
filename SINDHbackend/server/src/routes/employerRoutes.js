@@ -1,3 +1,4 @@
+const { admin, db } = require('../config/firebase');
 const express = require('express');
 const router = express.Router();
 const Employer = require('../models/Employer');
@@ -157,7 +158,47 @@ router.post('/register', asyncHandler(async (req, res) => {
   await employer.validate();
   console.log('✅ Validation passed');
   await employer.save();
-  console.log('💾 Employer saved to database');
+  console.log('💾 Employer saved to MongoDB');
+
+  // SAVE TO FIRESTORE IN REAL-TIME
+  try {
+    const firestoreData = {
+      ...employer.toObject(),
+      _id: employer._id.toString(),
+      id: employer._id.toString(),
+      type: 'employer',
+      role: 'employer',
+      migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+      registrationDate: admin.firestore.FieldValue.serverTimestamp(),
+      lastLogin: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // Remove internal Mongoose fields
+    delete firestoreData.__v;
+    
+    // Sanitize for Firestore (ensure no ObjectIds)
+    const sanitizeForFirestore = (obj) => {
+      if (obj === null || obj === undefined) return obj;
+      if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
+      if (obj._bsontype === 'ObjectID' || (obj.constructor && obj.constructor.name === 'ObjectId')) return obj.toString();
+      if (obj instanceof Date) return obj;
+      if (typeof obj === 'object') {
+        const sanitized = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === '_v' || key === '__v') continue;
+          sanitized[key] = sanitizeForFirestore(value);
+        }
+        return sanitized;
+      }
+      return obj;
+    };
+
+    const finalFirestoreData = sanitizeForFirestore(firestoreData);
+    await db.collection('users').doc(employer._id.toString()).set(finalFirestoreData, { merge: true });
+    console.log('💾 Employer saved to Firestore in real-time');
+  } catch (fsError) {
+    console.error('❌ Failed to save employer to Firestore:', fsError.message);
+  }
 
   // Comment 6: Explicit logging of saved employer details for diagnostics
   console.log('📋 Saved Employer Details:');

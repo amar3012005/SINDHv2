@@ -6,8 +6,9 @@ import { Phone, Lock, ArrowRight, Loader, Shield } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { api } from '../config/api';
-import { auth } from '../config/firebase'; // Import auth from your new firebase config
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+
 
 const Login = () => {
   const navigate = useNavigate();
@@ -24,18 +25,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [phoneError, setPhoneError] = useState('');
   const [otpError, setOtpError] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState(null);
-
-  // Set up reCAPTCHA
-  useEffect(() => {
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      'size': 'invisible',
-      'callback': (response) => {
-        // reCAPTCHA solved, allow signInWithPhoneNumber.
-        console.log("reCAPTCHA solved");
-      }
-    });
-  }, []);
+  const [verificationId, setVerificationId] = useState('');
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
@@ -50,10 +40,12 @@ const Login = () => {
 
     try {
       const formattedPhoneNumber = `+91${phoneNumber}`;
-      const appVerifier = window.recaptchaVerifier;
 
-      const result = await signInWithPhoneNumber(auth, formattedPhoneNumber, appVerifier);
-      setConfirmationResult(result);
+      const { verificationId } = await FirebaseAuthentication.signInWithPhoneNumber({
+        phoneNumber: formattedPhoneNumber,
+      });
+
+      setVerificationId(verificationId);
       setOtpSent(true);
       toast.success('OTP sent successfully!');
 
@@ -77,9 +69,25 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const userCredential = await confirmationResult.confirm(otp);
-      const user = userCredential.user;
-      const idToken = await user.getIdToken();
+      // Use the plugin to confirm the code
+      const result = await FirebaseAuthentication.signInWithPhoneNumber({
+        verificationId: verificationId,
+        verificationCode: otp,
+      });
+
+      const user = result.user;
+
+      // Get ID token using Firebase Authentication plugin's method
+      let idToken;
+      try {
+        const tokenResult = await FirebaseAuthentication.getIdToken({ forceRefresh: true });
+        idToken = tokenResult.token;
+      } catch (tokenError) {
+        console.error('Token retrieval error:', tokenError);
+        throw new Error('Failed to retrieve authentication token');
+      }
+
+      if (!idToken) throw new Error("Failed to retrieve ID Token");
 
       // Send idToken to your backend for verification and session creation
       const endpoint = '/auth/firebase-login';
@@ -153,7 +161,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-white relative overflow-hidden flex items-center justify-center px-4 py-12 devanagari">
-      <div id="recaptcha-container"></div>
       {/* Background with subtle gradient matching homepage */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div

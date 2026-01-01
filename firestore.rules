@@ -1,0 +1,46 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function: check if user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Helper function: check if user owns the document
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // Users collection (workers & employers)
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
+    
+    // Jobs collection
+    match /jobs/{jobId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        request.resource.data.employerId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'employer'
+      );
+      allow update, delete: if isSignedIn() && resource.data.employerId == request.auth.uid;
+    }
+    
+    // Applications collection
+    match /applications/{appId} {
+      allow read: if isSignedIn() && (
+        resource.data.workerId == request.auth.uid ||
+        resource.data.employerId == request.auth.uid
+      );
+      allow create: if isSignedIn() && request.resource.data.workerId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.workerId == request.auth.uid ||
+        resource.data.employerId == request.auth.uid
+      );
+    }
+  }
+}
+

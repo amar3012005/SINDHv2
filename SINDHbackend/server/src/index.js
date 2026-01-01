@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
-const connectDB = require('./config/db');
+const { admin, db } = require('./config/firebase');
 const workerRoutes = require('./routes/workerRoutes');
 const Worker = require('./models/Worker');
 const employerRoutes = require('./routes/employerRoutes');
@@ -58,8 +57,7 @@ const getCorsOrigins = () => {
 // Initialize server with database connection
 const initializeServer = async () => {
   try {
-    // First, ensure MongoDB is running
-    await connectDB();
+    // Firebase is already initialized in ./config/firebase.js
 
     // CORS configuration - Allow frontend connections including mobile apps
     const corsOptions = {
@@ -151,21 +149,13 @@ const initializeServer = async () => {
         req.headers.origin?.startsWith('ionic://');
 
       // Check actual database connection state
-      const dbState = mongoose.connection.readyState;
-      const dbStateMap = {
-        0: 'disconnected',
-        1: 'connected',
-        2: 'connecting',
-        3: 'disconnecting'
-      };
-      const dbStatus = dbStateMap[dbState] || 'unknown';
-      const isHealthy = dbState === 1; // Only "connected" is healthy
+      const isHealthy = db !== null;
 
       const responseData = {
         status: isHealthy ? 'ok' : 'unhealthy',
         timestamp: new Date().toISOString(),
         services: {
-          database: dbStatus,
+          database: isHealthy ? 'connected' : 'disconnected',
           server: 'running'
         },
         environment: process.env.NODE_ENV || 'development',
@@ -189,7 +179,8 @@ const initializeServer = async () => {
       res.status(200).json(responseData);
     });
 
-    // Ensure indexes (fix legacy aadhar unique index issue)
+    // Index ensure skipped for Firestore
+    /*
     try {
       if (Worker && typeof Worker.ensureIndexes === 'function') {
         Worker.ensureIndexes();
@@ -197,6 +188,7 @@ const initializeServer = async () => {
     } catch (e) {
       console.warn('Worker index ensure skipped:', e?.message);
     }
+    */
 
     // CATCH-ALL REQUEST LOGGER - Debug employer registration
     app.use((req, res, next) => {

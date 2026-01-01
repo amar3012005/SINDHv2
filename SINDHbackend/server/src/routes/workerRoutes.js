@@ -1,3 +1,4 @@
+const { admin, db } = require('../config/firebase');
 const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
@@ -157,7 +158,49 @@ router.post('/register', asyncHandler(async (req, res) => {
   await worker.validate();
   console.log('✅ Validation passed');
   await worker.save();
-  console.log('💾 Worker saved to database');
+  console.log('💾 Worker saved to MongoDB');
+
+  // SAVE TO FIRESTORE IN REAL-TIME
+  try {
+    const firestoreData = {
+      ...worker.toObject(),
+      _id: worker._id.toString(),
+      id: worker._id.toString(),
+      type: 'worker',
+      role: 'worker',
+      migratedAt: admin.firestore.FieldValue.serverTimestamp(),
+      registrationDate: admin.firestore.FieldValue.serverTimestamp(),
+      lastLogin: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // Remove internal Mongoose fields
+    delete firestoreData.__v;
+    
+    // Sanitize for Firestore (ensure no ObjectIds)
+    const sanitizeForFirestore = (obj) => {
+      if (obj === null || obj === undefined) return obj;
+      if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
+      if (obj._bsontype === 'ObjectID' || (obj.constructor && obj.constructor.name === 'ObjectId')) return obj.toString();
+      if (obj instanceof Date) return obj;
+      if (typeof obj === 'object') {
+        const sanitized = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === '_v' || key === '__v') continue;
+          sanitized[key] = sanitizeForFirestore(value);
+        }
+        return sanitized;
+      }
+      return obj;
+    };
+
+    const finalFirestoreData = sanitizeForFirestore(firestoreData);
+    await db.collection('users').doc(worker._id.toString()).set(finalFirestoreData, { merge: true });
+    console.log('💾 Worker saved to Firestore in real-time');
+  } catch (fsError) {
+    console.error('❌ Failed to save worker to Firestore:', fsError.message);
+    // We don't fail the whole request if Firestore fails, but we log it
+  }
+
   logger.info(`Worker registered successfully: ${worker.name}`);
   console.log('🎉 Worker created:', worker);
 

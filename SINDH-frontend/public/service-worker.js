@@ -1,4 +1,4 @@
-const CACHE_NAME = 'foodles-cache-v1';
+const CACHE_NAME = 'sindh-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',

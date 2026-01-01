@@ -3,7 +3,7 @@
   "appName": "SINDH Jobs",
   "webDir": "build",
   "server": {
-    "androidScheme": "http"
+    "androidScheme": "https"
   },
   "plugins": {
     "StatusBar": {
@@ -25,6 +25,12 @@
     },
     "SafeArea": {
       "enabled": true
+    },
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": [
+        "phone"
+      ]
     }
   },
   "cordova": {},
