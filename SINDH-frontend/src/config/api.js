@@ -17,6 +17,7 @@
  */
 
 import axios from 'axios';
+import { getDeviceId, getAppInfo } from '../utils/device';
 
 // Debug flag - only log in development to prevent information leakage
 const debug = process.env.NODE_ENV !== 'production';
@@ -276,9 +277,31 @@ const checkConnection = async () => {
 checkConnection();
 
 // Add request logging for debugging
-api.interceptors.request.use(request => {
+api.interceptors.request.use(async request => {
   // Update baseURL to reflect latest API_URL changes from async detection or mobile dev override
   request.baseURL = API_URL;
+
+  // Add Device Headers
+  try {
+    const deviceId = await getDeviceId();
+    if (deviceId) {
+      request.headers['X-Device-Id'] = deviceId;
+    }
+
+    const appInfo = await getAppInfo();
+    if (appInfo) {
+      request.headers['X-App-Version'] = appInfo.version;
+      request.headers['X-App-Build'] = appInfo.build;
+    }
+
+    // Add Platform header if not already present (axios usually adds User-Agent, but explicit Platform helps)
+    if (window.Capacitor) {
+      request.headers['X-Platform'] = window.Capacitor.getPlatform();
+    }
+  } catch (error) {
+    // Fail silently, don't block the request if device info fails
+    if (debug) console.warn('Failed to attach device headers:', error);
+  }
 
   if (debug) {
     console.log('📤 Making request to:', {

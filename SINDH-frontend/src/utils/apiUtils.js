@@ -34,6 +34,7 @@
  * }
  */
 import { getApiUrl as getApiUrlAsyncImport, getApiUrlSync } from '../config/api.js';
+import { getDeviceId, getAppInfo } from '../utils/device';
 
 // Centralized API URL utilities
 export const getApiUrl = getApiUrlSync; // Synchronous version for immediate use
@@ -55,6 +56,24 @@ export const apiFetch = async (endpoint, options = {}) => {
     },
     credentials: 'include',
   };
+
+  // Add Device Headers
+  try {
+    const deviceId = await getDeviceId();
+    if (deviceId) {
+      defaultOptions.headers['X-Device-Id'] = deviceId;
+    }
+    const appInfo = await getAppInfo();
+    if (appInfo) {
+      defaultOptions.headers['X-App-Version'] = appInfo.version;
+      defaultOptions.headers['X-App-Build'] = appInfo.build;
+    }
+    if (window.Capacitor) {
+      defaultOptions.headers['X-Platform'] = window.Capacitor.getPlatform();
+    }
+  } catch (e) {
+    // Ignore device info errors
+  }
 
   const finalOptions = {
     ...defaultOptions,
