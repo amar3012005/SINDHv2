@@ -60,21 +60,33 @@ router.post('/register', asyncHandler(async (req, res) => {
     throw new ValidationError('You must accept the Terms of Service to register');
   }
 
-  console.log('🔍 Checking for existing employer with phone:', phone);
-  let employer = await Employer.findOne({ phone });
-
-  if (employer && employer.name !== 'Temporary' && employer.location?.pincode) {
-    console.log('❌ Employer already exists and is fully registered with phone:', phone);
-    logger.warn(`Employer already exists with phone: ${phone}`);
+  console.log('🔍 Checking for existing employer with phone in Firestore:', phone);
+  
+  // PRIMARY CHECK: Check Firestore first
+  const firestoreUserRef = db.collection('users').where('phone', '==', phone).limit(1);
+  const firestoreSnapshot = await firestoreUserRef.get();
+  
+  if (!firestoreSnapshot.empty) {
+    console.log('❌ Employer already exists in Firestore with phone:', phone);
+    logger.warn(`Employer already exists in Firestore: ${phone}`);
     throw new ValidationError('Employer already exists with this phone number');
   }
 
-  if (employer) {
-    console.log('🔄 Updating existing temporary employer found with phone:', phone);
-  } else {
-    console.log('✅ No existing employer found, proceeding with creating new registration');
-    employer = new Employer({ phone });
+  // SECONDARY CHECK: Try MongoDB, but handle timeout gracefully
+  try {
+    let existingEmployer = await Employer.findOne({ phone }).maxTimeMS(2000);
+    if (existingEmployer && existingEmployer.name !== 'Temporary' && existingEmployer.location?.pincode) {
+      console.log('❌ Employer already exists in MongoDB with phone:', phone);
+      throw new ValidationError('Employer already exists with this phone number');
+    }
+    if (existingEmployer) {
+      console.log('🔄 Found existing temporary employer in MongoDB, will upgrade to full profile');
+    }
+  } catch (mongoError) {
+    console.warn('⚠️ MongoDB check failed or timed out, proceeding with Firestore only:', mongoError.message);
   }
+
+  console.log('✅ Proceeding with registration/update');
 
   // Format location address
   const formattedLocationAddress =
@@ -104,126 +116,87 @@ router.post('/register', asyncHandler(async (req, res) => {
     }
   }
 
-  // Format company data with Phase-1 defaults
-  // Handle both company.name and top-level companyName from frontend
-  const companyNameValue = req.body.companyName || company?.name || '';
-  const formattedCompany = {
-    name: companyNameValue,
-    type: company?.type || '',
-    industry: company?.industry || [],
-    description: company?.description || '',
-    registrationNumber: company?.registrationNumber || ''
+  console.log('🔧 Creating employer object data');
+  const employerDataRaw = {
+    name: name.trim(),
+    email: email || '',
+    phone: phone,
+    age: age || 25,
+    company: formattedCompany,
+    location: {
+      village: location.village || '',
+      district: location.district || '',
+      state: location.state || '',
+      pincode: location.pincode || '',
+      address: formattedLocationAddress,
+      ...(validatedCoordinates && { coordinates: validatedCoordinates })
+    },
+    businessDescription: businessDescription || '',
+    workerType: workerType || 'Daily wage workers',
+    verificationDocuments: {
+      aadharNumber: verificationDocuments?.aadharNumber || 'not provided',
+      panNumber: verificationDocuments?.panNumber || '',
+      businessLicense: verificationDocuments?.businessLicense || ''
+    },
+    phase: 1,
+    termsAccepted: true,
+    termsAcceptedAt: new Date(),
+    type: 'employer',
+    isLoggedIn: 1,
+    lastLogin: new Date()
   };
 
-  // Update employer fields with Phase-1 data
-  employer.name = name;
-  employer.email = email || '';
-  employer.age = age || 25;
-  employer.company = formattedCompany;
-  employer.location = {
-    village: location.village || '',
-    district: location.district || '',
-    state: location.state || '',
-    pincode: location.pincode || '',
-    address: formattedLocationAddress,
-    ...(validatedCoordinates && { coordinates: validatedCoordinates })
-  };
-  employer.businessDescription = businessDescription || '';
-  employer.workerType = workerType || 'Daily wage workers';
-  employer.verificationDocuments = {
-    aadharNumber: verificationDocuments?.aadharNumber || 'not provided',
-    panNumber: verificationDocuments?.panNumber || '',
-    businessLicense: verificationDocuments?.businessLicense || ''
-  };
-  employer.phase = 1;
-  employer.termsAccepted = true;
-  employer.termsAcceptedAt = new Date();
-
-  // Update other optional fields
-  if (req.body.documents) employer.documents = req.body.documents;
-  if (req.body.preferredLanguages) employer.preferredLanguages = req.body.preferredLanguages;
-  if (req.body.rating) employer.rating = req.body.rating;
-  if (req.body.reviews) employer.reviews = req.body.reviews;
-  if (req.body.verificationStatus) employer.verificationStatus = req.body.verificationStatus;
-
-  console.log('🔧 Saving Phase-1 employer with data:', JSON.stringify({
-    name: employer.name,
-    phone: employer.phone,
-    email: employer.email,
-    phase: employer.phase,
-    shaktiScore: employer.shaktiScore,
-    profileCompleteness: employer.profileCompleteness
-  }, null, 2));
-
-  await employer.validate();
-  console.log('✅ Validation passed');
-  await employer.save();
-  console.log('💾 Employer saved to MongoDB');
-
-  // SAVE TO FIRESTORE IN REAL-TIME
+  // STEP 1: SAVE TO FIRESTORE (Primary)
+  let savedEmployerId;
   try {
+    const firestoreRef = db.collection('users').doc();
+    savedEmployerId = firestoreRef.id;
+    
     const firestoreData = {
-      ...employer.toObject(),
-      _id: employer._id.toString(),
-      id: employer._id.toString(),
-      mongoId: employer._id.toString(), // Explicit MongoDB ID for firebase-login
-      type: 'employer',
-      role: 'employer',
-      phone: employer.phone, // Ensure phone is at top level for querying
+      ...employerDataRaw,
+      _id: savedEmployerId,
+      id: savedEmployerId,
+      mongoId: savedEmployerId,
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
       registrationDate: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
     };
     
-    // Remove internal Mongoose fields
-    delete firestoreData.__v;
-    
-    // Sanitize for Firestore (ensure no ObjectIds)
-    const sanitizeForFirestore = (obj) => {
-      if (obj === null || obj === undefined) return obj;
-      if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
-      if (obj._bsontype === 'ObjectID' || (obj.constructor && obj.constructor.name === 'ObjectId')) return obj.toString();
-      if (obj instanceof Date) return obj;
-      if (typeof obj === 'object') {
-        const sanitized = {};
-        for (const [key, value] of Object.entries(obj)) {
-          if (key === '_v' || key === '__v') continue;
-          sanitized[key] = sanitizeForFirestore(value);
-        }
-        return sanitized;
-      }
-      return obj;
-    };
-
-    const finalFirestoreData = sanitizeForFirestore(firestoreData);
-    await db.collection('users').doc(employer._id.toString()).set(finalFirestoreData, { merge: true });
-    logger.info(`✅ Employer saved to Firestore: phone=${employer.phone}, mongoId=${employer._id.toString()}`);
-    console.log('💾 Employer saved to Firestore in real-time');
+    await firestoreRef.set(firestoreData);
+    console.log('💾 Employer profile saved to Firestore (Primary):', savedEmployerId);
   } catch (fsError) {
-    console.error('❌ Failed to save employer to Firestore:', fsError.message);
-    logger.error(`Firestore sync error for employer ${employer.phone}:`, fsError);
+    console.error('❌ CRITICAL: Failed to save employer to Firestore:', fsError.message);
+    throw new AppError('Profile creation failed. Please try again.', 500);
   }
 
-  // Comment 6: Explicit logging of saved employer details for diagnostics
-  console.log('📋 Saved Employer Details:');
-  console.log('  - ID:', employer._id);
-  console.log('  - Phone:', employer.phone);
-  console.log('  - Coordinates:', employer.location?.coordinates);
-  logger.info(`Phase-1 Employer registered successfully: ${employer.name} | ID: ${employer._id} | Phone: ${employer.phone} | GPS: ${employer.location?.coordinates ? 'Yes' : 'No'} | ShaktiScore: ${employer.shaktiScore} | Profile: ${employer.profileCompleteness}%`);
-  console.log('🎉 Employer created:', employer);
+  // STEP 2: SAVE TO MONGODB (Optional/Background)
+  try {
+    // Attempt to update existing or create new
+    await Employer.findOneAndUpdate(
+      { phone },
+      { 
+        $set: {
+          ...employerDataRaw,
+          _id: new mongoose.Types.ObjectId(savedEmployerId.substring(0, 24).padEnd(24, '0'))
+        } 
+      },
+      { upsert: true, timeout: 3000 }
+    );
+    console.log('💾 Employer also saved to MongoDB');
+  } catch (mongoError) {
+    console.warn('⚠️ MongoDB save failed (timed out), but profile exists in Firestore:', mongoError.message);
+  }
+
+  logger.info(`Employer registered successfully in Firestore: ${name}`);
 
   const responseData = {
     success: true,
     message: 'Employer registered successfully',
     employer: {
-      ...employer.toObject(),
-      id: employer._id,
-      _id: employer._id,
-      type: 'employer',
-      isLoggedIn: 1,
-      phase: employer.phase,
-      shaktiScore: employer.shaktiScore,
-      profileCompleteness: employer.profileCompleteness
+      ...employerDataRaw,
+      id: savedEmployerId,
+      _id: savedEmployerId,
+      isLoggedIn: 1
     }
   };
 
