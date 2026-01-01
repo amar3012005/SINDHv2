@@ -51,13 +51,29 @@ router.post('/register', asyncHandler(async (req, res) => {
     phase = 1 // Default to Phase-1
   } = req.body;
 
-  console.log('🔍 Checking for existing worker with phone:', phone);
-  let worker = await Worker.findOne({ phone });
-  if (worker) {
-    console.log('❌ Worker already exists with phone:', phone);
-    logger.warn(`Worker already exists with phone: ${phone}`);
+  console.log('🔍 Checking for existing worker with phone in Firestore:', phone);
+  
+  // PRIMARY CHECK: Check Firestore first (since we are migrating to Firebase)
+  const firestoreUserRef = db.collection('users').where('phone', '==', phone).limit(1);
+  const firestoreSnapshot = await firestoreUserRef.get();
+  
+  if (!firestoreSnapshot.empty) {
+    console.log('❌ Worker already exists in Firestore with phone:', phone);
+    logger.warn(`Worker already exists in Firestore: ${phone}`);
     throw new ValidationError('Worker already exists with this phone number');
   }
+
+  // SECONDARY CHECK: Try MongoDB, but handle timeout/connection issues gracefully
+  try {
+    let worker = await Worker.findOne({ phone }).maxTimeMS(2000); // 2 second timeout
+    if (worker) {
+      console.log('❌ Worker already exists in MongoDB with phone:', phone);
+      throw new ValidationError('Worker already exists with this phone number');
+    }
+  } catch (mongoError) {
+    console.warn('⚠️ MongoDB check failed or timed out, proceeding with Firestore only:', mongoError.message);
+  }
+
   console.log('✅ No existing worker found, proceeding with registration');
 
   // Enhanced Phase-1 validation
@@ -120,9 +136,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     }
   };
 
-  // Phase-1: Minimal required fields with defaults
-  // Phase-2: All fields
-  worker = new Worker({
+  console.log('🔧 Creating worker object data');
+  const workerDataRaw = {
     name: name.trim(),
     age: parseInt(age) || 25,
     phone,
@@ -165,69 +180,55 @@ router.post('/register', asyncHandler(async (req, res) => {
       relation: ''
     },
     type: 'worker'
-  });
+  };
 
-  console.log('🔧 Creating worker object with phase:', phase);
-  await worker.validate();
-  console.log('✅ Validation passed');
-  await worker.save();
-  console.log('💾 Worker saved to MongoDB');
-
-  // SAVE TO FIRESTORE IN REAL-TIME
+  // STEP 1: SAVE TO FIRESTORE (Primary)
+  let savedWorkerId;
   try {
+    const firestoreRef = db.collection('users').doc();
+    savedWorkerId = firestoreRef.id;
+    
     const firestoreData = {
-      ...worker.toObject(),
-      _id: worker._id.toString(),
-      id: worker._id.toString(),
-      mongoId: worker._id.toString(), // Explicit MongoDB ID for firebase-login
+      ...workerDataRaw,
+      _id: savedWorkerId,
+      id: savedWorkerId,
+      mongoId: savedWorkerId, // Use Firestore ID as mongoId for consistency
       type: 'worker',
       role: 'worker',
-      phone: worker.phone, // Ensure phone is at top level for querying
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
       registrationDate: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
     };
     
-    // Remove internal Mongoose fields
-    delete firestoreData.__v;
-    
-    // Sanitize for Firestore (ensure no ObjectIds)
-    const sanitizeForFirestore = (obj) => {
-      if (obj === null || obj === undefined) return obj;
-      if (Array.isArray(obj)) return obj.map(sanitizeForFirestore);
-      if (obj._bsontype === 'ObjectID' || (obj.constructor && obj.constructor.name === 'ObjectId')) return obj.toString();
-      if (obj instanceof Date) return obj;
-      if (typeof obj === 'object') {
-        const sanitized = {};
-        for (const [key, value] of Object.entries(obj)) {
-          if (key === '_v' || key === '__v') continue;
-          sanitized[key] = sanitizeForFirestore(value);
-        }
-        return sanitized;
-      }
-      return obj;
-    };
-
-    const finalFirestoreData = sanitizeForFirestore(firestoreData);
-    await db.collection('users').doc(worker._id.toString()).set(finalFirestoreData, { merge: true });
-    logger.info(`✅ Worker saved to Firestore: phone=${worker.phone}, mongoId=${worker._id.toString()}`);
-    console.log('💾 Worker saved to Firestore in real-time');
+    await firestoreRef.set(firestoreData);
+    console.log('💾 Worker profile saved to Firestore (Primary):', savedWorkerId);
   } catch (fsError) {
-    console.error('❌ Failed to save worker to Firestore:', fsError.message);
-    logger.error(`Firestore sync error for worker ${worker.phone}:`, fsError);
-    // We don't fail the whole request if Firestore fails, but we log it
+    console.error('❌ CRITICAL: Failed to save to Firestore:', fsError.message);
+    throw new AppError('Profile creation failed. Please try again.', 500);
   }
 
-  logger.info(`Worker registered successfully: ${worker.name}`);
-  console.log('🎉 Worker created:', worker);
+  // STEP 2: SAVE TO MONGODB (Optional/Background)
+  let mongoWorker;
+  try {
+    mongoWorker = new Worker({
+      ...workerDataRaw,
+      _id: new mongoose.Types.ObjectId(savedWorkerId.substring(0, 24).padEnd(24, '0')) // Map Firestore ID to MongoDB format if possible
+    });
+    await mongoWorker.save({ timeout: 3000 });
+    console.log('💾 Worker also saved to MongoDB');
+  } catch (mongoError) {
+    console.warn('⚠️ MongoDB save failed (timed out), but profile exists in Firestore:', mongoError.message);
+  }
+
+  logger.info(`Worker registered successfully in Firestore: ${name}`);
 
   const responseData = {
     success: true,
     message: 'Worker registered successfully',
     worker: {
-      ...worker.toObject(),
-      id: worker._id,
-      _id: worker._id,
+      ...workerDataRaw,
+      id: savedWorkerId,
+      _id: savedWorkerId,
       type: 'worker',
       isLoggedIn: 1
     }
