@@ -37,21 +37,34 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
 
   // Verify the ID token with Firebase Admin SDK
   const decodedToken = await admin.auth().verifyIdToken(token);
-  const phone = decodedToken.phone_number.substring(3); // Remove +91
+  const fullPhoneNumber = decodedToken.phone_number; // Full number with country code (e.g., +49176...)
   
-  logger.info(`📱 Verified phone number: ${phone}`);
+  // Extract phone without country code for backward compatibility
+  // Try to match common country code patterns
+  let phoneWithoutCode = fullPhoneNumber;
+  const countryCodeMatch = fullPhoneNumber.match(/^\+(\d{1,4})/);
+  if (countryCodeMatch) {
+    phoneWithoutCode = fullPhoneNumber.substring(countryCodeMatch[0].length);
+  }
+  
+  logger.info(`📱 Verified phone number: ${fullPhoneNumber} (without code: ${phoneWithoutCode})`);
 
   // Check Firestore for existing user mapping
-  const userRef = db.collection('users').where('phone', '==', phone).limit(1);
-  const snapshot = await userRef.get();
+  // Try full phone number first (with country code), then without for backward compatibility
+  let snapshot = await db.collection('users').where('phone', '==', fullPhoneNumber).limit(1).get();
+  
+  if (snapshot.empty) {
+    // Try without country code for backward compatibility with old Indian numbers
+    snapshot = await db.collection('users').where('phone', '==', phoneWithoutCode).limit(1).get();
+  }
 
   if (snapshot.empty) {
-    logger.info(`🆕 New user detected - phone ${phone} not found in Firestore`);
+    logger.info(`🆕 New user detected - phone ${fullPhoneNumber} not found in Firestore`);
     return res.status(200).json({
       success: true,
       requiresRegistration: true,
       message: 'Please complete your registration.',
-      phoneNumber: phone,
+      phoneNumber: phoneWithoutCode, // Send without country code for registration form
       userType
     });
   }
@@ -74,7 +87,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
         success: true,
         requiresRegistration: true,
         message: 'Please complete your registration.',
-        phoneNumber: phone,
+        phoneNumber: phoneWithoutCode,
         userType
       });
     }
@@ -109,7 +122,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
         success: true,
         requiresRegistration: true,
         message: 'Please complete your registration.',
-        phoneNumber: phone,
+        phoneNumber: phoneWithoutCode,
         userType
       });
     }
