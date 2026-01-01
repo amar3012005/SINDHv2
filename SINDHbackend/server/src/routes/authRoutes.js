@@ -40,14 +40,15 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
   const fullPhoneNumber = decodedToken.phone_number; // Full number with country code (e.g., +49176...)
   
   // Extract phone without country code for backward compatibility
-  // Try to match common country code patterns
+  // Store both the full number (with country code) and just the local number
   let phoneWithoutCode = fullPhoneNumber;
   const countryCodeMatch = fullPhoneNumber.match(/^\+(\d{1,4})/);
   if (countryCodeMatch) {
+    // countryCodeMatch[0] contains the full match including '+' (e.g., '+49')
     phoneWithoutCode = fullPhoneNumber.substring(countryCodeMatch[0].length);
   }
   
-  logger.info(`📱 Verified phone number: ${fullPhoneNumber} (without code: ${phoneWithoutCode})`);
+  logger.info(`📱 Verified phone number: ${fullPhoneNumber} (local part: ${phoneWithoutCode})`);
 
   // Check Firestore for existing user mapping
   // Try full phone number first (with country code), then without for backward compatibility
@@ -64,7 +65,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
       success: true,
       requiresRegistration: true,
       message: 'Please complete your registration.',
-      phoneNumber: phoneWithoutCode, // Send without country code for registration form
+      phoneNumber: fullPhoneNumber, // Send full phone number with country code
       userType
     });
   }
@@ -87,7 +88,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
         success: true,
         requiresRegistration: true,
         message: 'Please complete your registration.',
-        phoneNumber: phoneWithoutCode,
+        phoneNumber: fullPhoneNumber,
         userType
       });
     }
@@ -122,7 +123,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
         success: true,
         requiresRegistration: true,
         message: 'Please complete your registration.',
-        phoneNumber: phoneWithoutCode,
+        phoneNumber: fullPhoneNumber,
         userType
       });
     }
