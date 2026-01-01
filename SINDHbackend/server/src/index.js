@@ -104,7 +104,20 @@ const initializeServer = async () => {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'User-Type', 'User-ID']
+      allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'User-Type', 
+        'User-ID',
+        'X-Device-Id',
+        'X-App-Version',
+        'X-App-Build',
+        'X-Platform',
+        'x-device-id',
+        'x-app-version',
+        'x-app-build',
+        'x-platform'
+      ]
     };
 
     app.use(cors(corsOptions));
