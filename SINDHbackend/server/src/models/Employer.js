@@ -187,6 +187,48 @@ const employerSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  wallet: {
+    totalBalance: {
+      type: Number,
+      default: 0
+    },
+    withdrawableBalance: {
+      type: Number,
+      default: 0
+    },
+    spentAmount: {
+      type: Number,
+      default: 0
+    },
+    transactionHistory: [{
+      type: {
+        type: String,
+        enum: ['credit', 'debit', 'escrow_hold', 'escrow_release'],
+        required: true
+      },
+      amount: {
+        type: Number,
+        required: true
+      },
+      description: String,
+      jobId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Job'
+      },
+      applicationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'JobApplication'
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
   }
 }, {
   timestamps: true

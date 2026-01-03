@@ -21,6 +21,7 @@ const Login = () => {
   const initialType = searchParams.get('type') || 'worker';
 
   const [userType, setUserType] = useState(initialType);
+  const [countryCode, setCountryCode] = useState('+49'); // Default to Germany
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
@@ -99,15 +100,22 @@ const Login = () => {
     e.preventDefault();
     setPhoneError('');
 
-    if (!phoneNumber || phoneNumber.length !== 10) {
-      setPhoneError('Please enter a valid 10-digit mobile number');
+    // Validate phone number length (flexible for international numbers)
+    if (!phoneNumber || phoneNumber.length < 6 || phoneNumber.length > 15) {
+      setPhoneError('Please enter a valid mobile number (6-15 digits)');
+      return;
+    }
+
+    // Validate country code
+    if (!countryCode || !countryCode.startsWith('+')) {
+      setPhoneError('Please enter a valid country code (e.g., +49, +91)');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const formattedPhoneNumber = `+91${phoneNumber}`;
+      const formattedPhoneNumber = `${countryCode}${phoneNumber}`;
       console.log('📱 Attempting to send OTP to:', formattedPhoneNumber);
 
       if (Capacitor.isNativePlatform()) {
@@ -122,7 +130,7 @@ const Login = () => {
         if (!window.recaptchaVerifier) {
           // Attempt re-init if missing
           window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-             'size': 'invisible'
+            'size': 'invisible'
           });
         }
         const confirmationResult = await signInWithPhoneNumber(auth, formattedPhoneNumber, window.recaptchaVerifier);
@@ -168,17 +176,38 @@ const Login = () => {
         });
         user = result.user;
       } else {
-         // Web verification
-         const confirmationResult = window.confirmationResult;
-         if (!confirmationResult) throw new Error('No verification session found');
-         const result = await confirmationResult.confirm(otp);
-         user = result.user;
+        // Web verification
+        const confirmationResult = window.confirmationResult;
+        if (!confirmationResult) throw new Error('No verification session found');
+        const result = await confirmationResult.confirm(otp);
+        user = result.user;
       }
 
       await proceedWithAuth(user);
     } catch (error) {
-      console.error('OTP verification error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Error verifying OTP. Please try again.';
+      console.error('OTP verification error detail:', error);
+
+      let errorMessage = 'Error verifying OTP. Please try again.';
+
+      if (error.code) {
+        // Firebase Auth error codes
+        switch (error.code) {
+          case 'auth/invalid-verification-code':
+            errorMessage = 'Invalid verification code. Please check and try again.';
+            break;
+          case 'auth/code-expired':
+            errorMessage = 'Verification code has expired. Please request a new one.';
+            break;
+          case 'auth/captcha-check-failed':
+            errorMessage = 'Recaptcha check failed. Please try again.';
+            break;
+          default:
+            errorMessage = error.message || errorMessage;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       setOtpError(errorMessage);
       toast.error(errorMessage);
       setIsLoading(false);
@@ -307,7 +336,7 @@ const Login = () => {
             Welcome Back
           </h2>
           <p className="text-[#202124]/60 font-medium">
-            Join the community built for India's growth
+            Connecting workers and employers worldwide
           </p>
         </div>
 
@@ -347,25 +376,55 @@ const Login = () => {
                 <label className="block text-sm font-bold text-[#202124] mb-2 px-1 uppercase tracking-wider">
                   Phone Number
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Phone className="w-5 h-5 text-[#3B4883]/40" />
+                <div className="flex gap-2">
+                  {/* Country Code Selector */}
+                  <div className="relative w-32">
+                    <select
+                      value={countryCode}
+                      onChange={(e) => {
+                        setCountryCode(e.target.value);
+                        setPhoneError('');
+                      }}
+                      className="w-full px-3 py-4 bg-white border-2 border-[#3B4883]/10 rounded-2xl text-lg font-semibold focus:outline-none focus:border-[#FF7124] focus:ring-4 focus:ring-[#FF7124]/10 appearance-none cursor-pointer"
+                    >
+                      <option value="+49">🇩🇪 +49</option>
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+33">🇫🇷 +33</option>
+                      <option value="+39">🇮🇹 +39</option>
+                      <option value="+34">🇪🇸 +34</option>
+                      <option value="+81">🇯🇵 +81</option>
+                      <option value="+86">🇨🇳 +86</option>
+                      <option value="+61">🇦🇺 +61</option>
+                      <option value="+55">🇧🇷 +55</option>
+                      <option value="+7">🇷🇺 +7</option>
+                      <option value="+27">🇿🇦 +27</option>
+                      <option value="+52">🇲🇽 +52</option>
+                      <option value="+82">🇰🇷 +82</option>
+                    </select>
                   </div>
-                  <input
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => {
-                      setPhoneNumber(e.target.value.replace(/\D/g, ''));
-                      setPhoneError('');
-                    }}
-                    placeholder="Enter 10-digit mobile number"
-                    className={`w-full pl-12 pr-4 py-4 bg-white border-2 rounded-2xl text-lg font-semibold placeholder:text-gray-300 focus:outline-none transition-all ${phoneError
-                      ? 'border-red-400 focus:border-red-500'
-                      : 'border-[#3B4883]/10 focus:border-[#FF7124] focus:ring-4 focus:ring-[#FF7124]/10'
-                      }`}
-                    maxLength="10"
-                    required
-                  />
+                  {/* Phone Number Input */}
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <Phone className="w-5 h-5 text-[#3B4883]/40" />
+                    </div>
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value.replace(/\D/g, ''));
+                        setPhoneError('');
+                      }}
+                      placeholder="Mobile number"
+                      className={`w-full pl-12 pr-4 py-4 bg-white border-2 rounded-2xl text-lg font-semibold placeholder:text-gray-300 focus:outline-none transition-all ${phoneError
+                        ? 'border-red-400 focus:border-red-500'
+                        : 'border-[#3B4883]/10 focus:border-[#FF7124] focus:ring-4 focus:ring-[#FF7124]/10'
+                        }`}
+                      maxLength="15"
+                      required
+                    />
+                  </div>
                 </div>
                 {phoneError && (
                   <p className="mt-2 text-red-500 text-sm font-medium animate-fadeIn pl-1">

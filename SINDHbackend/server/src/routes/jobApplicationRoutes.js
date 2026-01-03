@@ -807,12 +807,14 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
   // --- END LOGGING ---
 
   // Enhanced status validation with transition rules
-  const validStatuses = ['applied', 'accepted', 'rejected', 'in-progress', 'completed', 'cancelled'];
+  const validStatuses = ['applied', 'accepted', 'working', 'completed', 'paid', 'finished', 'rejected', 'cancelled'];
   const validTransitions = {
     'applied': ['accepted', 'rejected'],
-    'accepted': ['applied', 'in-progress', 'cancelled'],  // Allow reverting to 'applied' (revoke)
-    'in-progress': ['completed', 'cancelled'],
-    'completed': [], // Terminal state
+    'accepted': ['working', 'cancelled'],
+    'working': ['completed', 'cancelled'],
+    'completed': ['paid'],
+    'paid': ['finished'],
+    'finished': [], // Terminal state
     'rejected': [], // Terminal state
     'cancelled': [] // Terminal state
   };
@@ -910,10 +912,10 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     });
     logger.info(`✅ JobApplication ${applicationId} updated with payment info (baseAmountPaid: true)`);
 
-    // 2. Update Worker's wallet
+    // TWO-TIER WALLET LOGIC:
+    // 1. Update Worker's wallet
     const workerId = application.worker?._id || application.worker;
 
-    // TWO-TIER WALLET LOGIC:
     // On Acceptance: Credit 'totalBalance' (visible upcoming) but NOT 'withdrawableBalance'.
     const workerUpdate = await Worker.findByIdAndUpdate(
       workerId,
@@ -941,10 +943,33 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
       { new: true }
     );
 
+    // 2. Update Employer's wallet (Deduction/Hold)
+    const employerUpdate = await Employer.findByIdAndUpdate(
+      employerId,
+      {
+        $inc: {
+          'wallet.totalBalance': -paymentAmt,
+          'wallet.spentAmount': paymentAmt
+        },
+        $push: {
+          'wallet.transactionHistory': {
+            type: 'escrow_hold',
+            amount: paymentAmt,
+            description: `Payment held for job: ${application.job?.title}`,
+            jobId: application.job?._id,
+            applicationId: application._id,
+            createdAt: new Date()
+          }
+        }
+      },
+      { new: true }
+    );
+
     if (workerUpdate) {
       logger.info(`✅ Worker ${workerId} wallet updated. Pending balance: ₹${workerUpdate.wallet?.pendingBalance || 0}`);
-    } else {
-      logger.warn(`⚠️ Worker ${workerId} not found for wallet update`);
+    }
+    if (employerUpdate) {
+      logger.info(`✅ Employer ${employerId} wallet updated. New balance: ₹${employerUpdate.wallet?.totalBalance || 0}`);
     }
 
     // 3. Update Job document with accepted status  
@@ -1001,13 +1026,33 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
       { new: true }
     );
 
+    // 3. Refund Employer's wallet
+    let employerIdRevoke = application.job?.employer?._id || application.job?.employer;
+    await Employer.findByIdAndUpdate(
+      employerIdRevoke,
+      {
+        $inc: {
+          'wallet.totalBalance': paymentAmt,
+          'wallet.spentAmount': -paymentAmt
+        },
+        $push: {
+          'wallet.transactionHistory': {
+            type: 'credit',
+            amount: paymentAmt,
+            description: `Refund for revoked job: ${application.job?.title}`,
+            jobId: application.job?._id,
+            applicationId: application._id,
+            createdAt: new Date()
+          }
+        }
+      }
+    );
+
     if (workerUpdate) {
       logger.info(`✅ Worker ${workerId} wallet debited. New Total Balance: ₹${workerUpdate.wallet?.totalBalance || 0}`);
-    } else {
-      logger.warn(`⚠️ Worker ${workerId} not found for wallet debit`);
     }
 
-    // 3. Reset Job document status to 'posted' (so it appears in search again)
+    // 4. Reset Job document status to 'posted' (so it appears in search again)
     await Job.findByIdAndUpdate(application.job._id, {
       status: 'posted', // Back to posted
       acceptedAt: null,
@@ -1022,9 +1067,9 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
 
   if (!employer || !employer.name) {
     // If employer not fully populated, try fetching
-    const employerId = application.job.employer?._id || application.job.employer;
-    if (employerId) {
-      employer = await Employer.findById(employerId);
+    let empIdForNotify = application.job.employer?._id || application.job.employer;
+    if (empIdForNotify) {
+      employer = await Employer.findById(empIdForNotify);
     }
   }
 
@@ -1052,13 +1097,22 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     logger.error('❌ Error sending notification:', notificationError);
   }
 
-  // Handle payment processing for completed jobs
+  // Handle job lifecycle stages
   if (status === 'completed' && currentStatus !== 'completed') {
+    logger.info(`✅ Job ${applicationId} marked as COMPLETED. Moving to Work-Done state.`);
+  }
+
+  if (status === 'paid' && currentStatus !== 'paid') {
+    logger.info(`💰 Job ${applicationId} marked as PAID. Releasing funds to worker.`);
     try {
-      await processJobCompletion(application);
+      await processJobPayment(application);
     } catch (paymentError) {
-      logger.error('❌ Error processing job completion:', paymentError);
+      logger.error('❌ Error processing final payment:', paymentError);
     }
+  }
+
+  if (status === 'finished' && currentStatus !== 'finished') {
+    logger.info(`🏁 Job ${applicationId} marked as FINISHED.`);
   }
 
   logger.info(`✅ Application status updated successfully: ${applicationId} (${currentStatus} → ${status})`);
@@ -1186,168 +1240,44 @@ async function sendStatusNotification(status, application, employer) {
   }
 }
 
-// Helper function to process job completion
-async function processJobCompletion(application) {
+// Helper function to process final payment (Stage 2)
+async function processJobPayment(application) {
   try {
-    // Update payment status
-    const paymentAmount = application.job?.salary || application.paymentAmount || 0;
+    const paymentAmount = application.totalPayment || application.job?.salary || 0;
+    const workerId = application.worker?._id || application.worker;
+    const employerId = application.job?.employer?._id || application.job?.employer;
 
+    // 1. Update JobApplication status
     await JobApplication.findByIdAndUpdate(application._id, {
-      paymentStatus: 'pending',
-      paymentAmount: paymentAmount,
-      jobCompletedDate: new Date()
+      paymentStatus: 'paid',
+      paymentDate: new Date()
     });
 
-    // Update worker balance (if applicable)
-    if (application.worker && paymentAmount > 0) {
-      await updateWorkerBalance(application.worker._id || application.worker, paymentAmount);
-    }
+    // 2. Update Worker - Convert Pending to Withdrawable
+    await updateWorkerBalance(workerId);
 
-    logger.info(`✅ Job completion processed for application ${application._id}`);
+    // 3. Update Employer - Confirm release
+    await Employer.findByIdAndUpdate(employerId, {
+      $push: {
+        'wallet.transactionHistory': {
+          type: 'escrow_release',
+          amount: paymentAmount,
+          description: `Payment released for job: ${application.job?.title}`,
+          jobId: application.job?._id,
+          applicationId: application._id,
+          createdAt: new Date()
+        }
+      }
+    });
+
+    logger.info(`✅ Final payment processed for application ${application._id}`);
   } catch (error) {
-    logger.error('❌ Error processing job completion:', error);
+    logger.error('❌ Error in processJobPayment:', error);
     throw error;
   }
 }
 
-// Update job application status with improved worker balance sync
-router.patch('/:id/status', asyncHandler(async (req, res) => {
-  const { status, paymentAmount, notes } = req.body;
-  const applicationId = req.params.id;
-
-  logger.info(`Updating application ${applicationId} status to: ${status}`);
-
-  const application = await JobApplication.findById(applicationId)
-    .populate('job')
-    .populate('worker');
-
-  if (!application) {
-    logger.warn(`Application not found for status update: ${applicationId}`);
-    throw new NotFoundError('Application not found');
-  }
-
-  const oldStatus = application.status;
-  application.status = status;
-
-  application.statusHistory.push({
-    status: status,
-    changedAt: new Date(),
-    note: notes || `Status changed from ${oldStatus} to ${status}`
-  });
-
-  if (status === 'completed' && oldStatus !== 'completed') {
-    logger.info('Job marked as completed, processing payment...');
-
-    const finalPaymentAmount = paymentAmount || application.job?.salary || 15000;
-
-    application.paymentStatus = 'paid';
-    application.paymentAmount = finalPaymentAmount;
-    application.paymentDate = new Date();
-    application.jobCompletedDate = new Date();
-
-    await application.save();
-
-    await updateWorkerBalance(application.worker._id || application.worker);
-
-    await updateJobStatusIfCompleted(application.job._id);
-
-  } else if (status === 'accepted' && oldStatus !== 'accepted') {
-    // PAYMENT ACCEPTANCE FLOW
-    logger.info('🎉 Application accepted with payment!');
-
-    const paymentAmt = application.job?.salary || application.job?.baseAmount || 0;
-    const employerId = application.job?.employer;
-
-    // 1. Update JobApplication with payment info
-    application.baseAmount = paymentAmt;
-    application.baseAmountPaid = true;
-    application.baseAmountPaidAt = new Date();
-    application.basePaymentDetails = {
-      transactionId: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      paymentMethod: 'simulated',
-      paidBy: employerId
-    };
-    application.totalPayment = paymentAmt;
-    application.paymentStatus = 'base_paid';
-    application.acceptedAt = new Date();
-
-    await application.save();
-    logger.info(`✅ JobApplication ${applicationId} updated with payment info`);
-
-    // 2. Update Worker's wallet
-    const workerId = application.worker._id || application.worker;
-    const workerUpdate = await Worker.findByIdAndUpdate(
-      workerId,
-      {
-        $inc: {
-          'wallet.pendingBalance': paymentAmt,
-          'wallet.totalEarnings': paymentAmt,
-          activeJobs: 1
-        },
-        $set: {
-          'wallet.lastUpdated': new Date()
-        },
-        $push: {
-          'wallet.transactionHistory': {
-            type: 'credit',
-            amount: paymentAmt,
-            description: `Base payment for job: ${application.job?.title}`,
-            jobId: application.job?._id,
-            applicationId: application._id,
-            createdAt: new Date()
-          }
-        }
-      },
-      { new: true }
-    );
-
-    if (workerUpdate) {
-      logger.info(`✅ Worker wallet updated. New pending balance: ₹${workerUpdate.wallet?.pendingBalance}`);
-    }
-
-    // 3. Update Job document with accepted status
-    await Job.findByIdAndUpdate(application.job._id, {
-      status: 'accepted',
-      acceptedAt: new Date(),
-      acceptedWorker: workerId,
-      $set: {
-        'paymentInfo.baseAmountPaid': true,
-        'paymentInfo.paidAt': new Date(),
-        'paymentInfo.paidTo': workerId
-      }
-    });
-    logger.info(`✅ Job ${application.job._id} status updated to accepted`);
-
-  } else {
-    await application.save();
-  }
-
-  // Send notifications based on status change
-  try {
-    // Get employer for notifications
-    const employer = await Employer.findById(application.job.employer);
-
-    if (status === 'accepted' && oldStatus !== 'accepted') {
-      // Send payment success notification to both worker and employer
-      const paymentAmt = application.job?.salary || application.job?.baseAmount || 0;
-      await NotificationService.notifyPaymentSuccess(application, application.job, employer, paymentAmt);
-      logger.info(`✅ Payment success notifications sent for application ${applicationId}`);
-    } else {
-      // Send regular status notifications
-      await sendStatusNotification(status, application, employer);
-    }
-  } catch (notificationError) {
-    logger.error('❌ Error sending notifications:', notificationError);
-    // Don't throw - notification failures shouldn't break the flow
-  }
-
-  res.json({
-    success: true,
-    message: 'Application status updated successfully',
-    application: application,
-    paymentProcessed: status === 'accepted' && oldStatus !== 'accepted'
-  });
-}));
+// Status update logic consolidated in the main PATCH route above
 
 // Helper function to update job status when all applications are completed
 async function updateJobStatusIfCompleted(jobId) {
@@ -1407,17 +1337,15 @@ async function updateWorkerBalance(workerId) {
     if (!worker.wallet) worker.wallet = { totalBalance: 0, withdrawableBalance: 0 };
 
     // 1. Accepted Jobs (Pending Base Amount)
-    // Only count baseAmount here.
     const acceptedApps = await JobApplication.find({
       worker: workerId,
       status: 'accepted'
     }).populate('job');
 
     // 2. Completed Jobs (Fully Earned)
-    // These contribute to both Total and Withdrawable
     const completedApps = await JobApplication.find({
       worker: workerId,
-      status: 'completed'
+      status: { $in: ['completed', 'paid', 'COMPLETED', 'PAID', 'FINISHED'] }
     }).populate('job');
 
     let calculatedTotal = 0;
@@ -1425,7 +1353,6 @@ async function updateWorkerBalance(workerId) {
 
     // Add Pending (Accepted) Amounts
     acceptedApps.forEach(app => {
-      // Prefer tracking fields if available, else job salary
       const amount = app.baseAmount || app.job?.salary || 0;
       calculatedTotal += amount;
     });
@@ -1443,14 +1370,13 @@ async function updateWorkerBalance(workerId) {
     // Final Calculation
     worker.wallet.totalBalance = Math.max(0, calculatedTotal - totalWithdrawn);
     worker.wallet.withdrawableBalance = Math.max(0, calculatedWithdrawable - totalWithdrawn);
-    worker.wallet.pendingBalance = worker.wallet.totalBalance; // Legacy sync
-    worker.wallet.totalEarnings = calculatedTotal; // Lifetime earnings
+    worker.wallet.pendingBalance = worker.wallet.totalBalance - worker.wallet.withdrawableBalance;
+    worker.wallet.totalEarnings = calculatedTotal;
 
     worker.markModified('wallet');
     await worker.save();
 
     logger.info(`✅ Worker Wallet Recalculated: Total: ₹${worker.wallet.totalBalance}, Withdrawable: ₹${worker.wallet.withdrawableBalance}`);
-
   } catch (error) {
     logger.error('Error updating worker balance:', error);
   }

@@ -1,197 +1,139 @@
-import { getApiUrl } from './apiUtils.js';
+import { buildApiUrl } from './apiUtils.js';
+import { GoogleAuthProvider, signInWithPopup, signInWithPhoneNumber, RecaptchaVerifier } from 'firebase/auth';
+import { auth } from '../config/firebase'; // Correct path to firebase config
 
 /**
  * Authentication utility functions for managing user sessions
+ * STRICT FLOW: Firebase Auth -> Backend Validation -> Local Session
  */
 
-// Key for storing the current user in localStorage
 const USER_KEY = 'user';
+const TOKEN_KEY = 'token';
 const LAST_LOGIN_KEY = 'lastLogin';
 
-/**
- * Save user data to localStorage, ensuring only one user at a time
- * @param {Object} userData - The user data to save
- */
-export const saveUserData = (userData) => {
-  if (!userData) return;
-  
+// --- Session Management ---
+
+export const saveSession = (user, token) => {
+  if (!user || !token) return;
   try {
-    // Clear any existing user data first to ensure only one user at a time
-    clearUserData();
-    
-    // Save new user data
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(LAST_LOGIN_KEY, new Date().toISOString());
-    
-    console.log(`User saved to localStorage: ${userData.name} (${userData.type})`);
+    // Also set for legacy/safety if used elsewhere
+    sessionStorage.setItem(TOKEN_KEY, token);
+    console.log(`✅ Session saved for: ${user.name} (${user.type})`);
   } catch (error) {
-    console.error('Error saving user data:', error);
+    console.error('Failed to save session:', error);
   }
 };
 
-/**
- * Get the current logged-in user
- * @returns {Object|null} The user data or null if not logged in
- */
+export const clearSession = () => {
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(LAST_LOGIN_KEY);
+  sessionStorage.clear();
+};
+
 export const getCurrentUser = () => {
   try {
-    const userString = localStorage.getItem(USER_KEY);
-    return userString ? JSON.parse(userString) : null;
-  } catch (error) {
-    console.error('Error parsing user data:', error);
+    const userStr = localStorage.getItem(USER_KEY);
+    return userStr ? JSON.parse(userStr) : null;
+  } catch (e) {
     return null;
   }
 };
 
-/**
- * Get the user type (worker or employer)
- * @returns {string|null} The user type or null if not logged in
- */
-export const getUserType = () => {
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+
+export const isLoggedIn = () => !!getToken();
+
+export const logout = () => {
   const user = getCurrentUser();
-  return user?.type || null;
+  if (user) console.log(`👋 Logging out user: ${user.name}`);
+  auth.signOut().catch(console.error); // Sign out from Firebase too
+  clearSession();
+  window.location.href = '/'; // Hard redirect to clear any in-memory state
 };
 
-/**
- * Clear all user data from localStorage
- */
-export const clearUserData = () => {
-  localStorage.removeItem(USER_KEY);
-  localStorage.removeItem(LAST_LOGIN_KEY);
-};
+// --- Firebase & Backend Auth Flow ---
 
 /**
- * Check if a user is logged in
- * @returns {boolean} True if a user is logged in
+ * Step 1: Initialize ReCaptcha (Required for Phone Auth)
  */
-export const isLoggedIn = () => {
-  return !!getCurrentUser();
-};
-
-/**
- * Login handler with phone number
- * @param {string} phoneNumber - The phone number to login with
- * @param {string} userType - The user type (worker or employer)
- * @returns {Promise<Object>} The user data
- */
-export const loginWithPhone = async (phoneNumber, userType) => {
-  try {
-    // Validate phone number format
-    if (!phoneNumber || phoneNumber.length !== 10) {
-      throw new Error('Please provide a valid 10-digit phone number');
-    }
-
-    // Ensure user type is valid
-    if (!['worker', 'employer'].includes(userType)) {
-      throw new Error('Invalid user type');
-    }
-
-    // Determine the login endpoint based on user type
-    const endpoint = userType === 'worker' ? 'workers' : 'employers';
-    
-    // Make the login request
-    const response = await fetch(`${getApiUrl()}/auth/${endpoint}/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ phoneNumber }),
+export const initRecaptcha = (elementId) => {
+  if (!window.recaptchaVerifier) {
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, elementId, {
+      'size': 'invisible',
+      'callback': (response) => {
+        // reCAPTCHA solved
+      }
     });
+  }
+  return window.recaptchaVerifier;
+};
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Login failed');
-    }
-
-    const data = await response.json();
-    
-    // Format user data consistently regardless of user type
-    const userData = {
-      ...data.data,
-      type: userType,
-      id: data.data.id || data.data._id,
-      isLoggedIn: true,
-      lastLogin: new Date().toISOString()
-    };
-
-    // Save the user data
-    saveUserData(userData);
-    
-    return userData;
+/**
+ * Step 2: Send OTP via Firebase
+ */
+export const sendOtpFirebase = async (phoneNumber, appVerifier) => {
+  try {
+    const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+    return confirmationResult; // Contains .confirm(otp) method
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Firebase OTP Error:', error);
     throw error;
   }
 };
 
 /**
- * Handle user logout
+ * Step 3: Verify OTP & Exchange Token with Backend
+ * @param {Object} confirmationResult - Result from sendOtpFirebase
+ * @param {string} otp - User entered code
+ * @param {string} userType - 'worker' | 'employer'
  */
-export const logout = () => {
+export const verifyOtpAndLogin = async (confirmationResult, otp, userType) => {
   try {
-    // Get current user for logging
-    const user = getCurrentUser();
-    
-    if (user) {
-      console.log(`Logging out user: ${user.name} (${user.type})`);
+    // 1. Verify with Firebase
+    const firebaseCredential = await confirmationResult.confirm(otp);
+    const firebaseUser = firebaseCredential.user;
+    const idToken = await firebaseUser.getIdToken();
+
+    console.log('🔥 Firebase Auth Success. Token obtained.');
+
+    // 2. Send to Backend
+    const response = await fetch(buildApiUrl('/auth/firebase-login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: idToken,
+        userType: userType
+      })
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.message || 'Backend authentication failed');
     }
-    
-    // Clear all user data
-    clearUserData();
-    
-    return true;
+
+    // 3. Handle Result
+    if (data.requiresRegistration) {
+      console.log('📝 User needs registration.');
+      return {
+        requiresRegistration: true,
+        phoneNumber: firebaseUser.phoneNumber, // e.g., +919000000000
+        userType: userType
+      };
+    } else {
+      console.log('🎉 Login successful.');
+      saveSession(data.data, data.token);
+      return {
+        success: true,
+        user: data.data
+      };
+    }
   } catch (error) {
-    console.error('Logout error:', error);
-    return false;
+    console.error('Login Flow Error:', error);
+    throw error;
   }
-};
-
-/**
- * Check if current user is a worker
- * @returns {boolean} True if the current user is a worker
- */
-export const isWorker = () => {
-  const userType = getUserType();
-  return userType === 'worker';
-};
-
-/**
- * Check if current user is an employer
- * @returns {boolean} True if the current user is an employer
- */
-export const isEmployer = () => {
-  const userType = getUserType();
-  return userType === 'employer';
-};
-
-/**
- * Get common request headers with authentication info
- * @returns {Object} Headers object with auth info
- */
-export const getAuthHeaders = () => {
-  const user = getCurrentUser();
-  return {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'User-Type': user?.type || 'guest',
-    'User-ID': user?.id || ''
-  };
-};
-
-/**
- * Make an authenticated API request
- * @param {string} url - The API endpoint
- * @param {Object} options - Fetch options
- * @returns {Promise} Fetch promise
- */
-export const authFetch = async (url, options = {}) => {
-  const headers = {
-    ...getAuthHeaders(),
-    ...(options.headers || {})
-  };
-  
-  return fetch(url, {
-    ...options,
-    headers
-  });
 };

@@ -70,9 +70,24 @@ const EmployerRegistration = () => {
         toast.error('Please enter your full name (min 3 characters)');
         return;
       }
-      if (!formData.phone || formData.phone.length !== 10) {
-        toast.error('Please enter a valid 10-digit phone number');
+      // Validate phone number (flexible for international numbers with country code)
+      if (!formData.phone) {
+        toast.error('Phone number is required');
         return;
+      }
+      // Check if it has country code format (+XX...)
+      if (formData.phone.startsWith('+')) {
+        // International format: require at least 8 digits after country code
+        if (formData.phone.length < 10) {
+          toast.error('Please enter a valid phone number');
+          return;
+        }
+      } else {
+        // Legacy format without country code: require exactly 10 digits
+        if (formData.phone.length !== 10) {
+          toast.error('Please enter a valid 10-digit phone number');
+          return;
+        }
       }
       setCurrentPhase(2);
     } else if (currentPhase === 2) {
@@ -280,16 +295,17 @@ const EmployerRegistration = () => {
 
           {/* Phone */}
           <div>
-            <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Phone Number *</label>
+            <label className="block text-[10px] font-black text-[#3B4883]/70 uppercase tracking-wider mb-2">Phone Number * (Verified)</label>
             <input
               type="tel"
-              maxLength={10}
-              placeholder="10-digit mobile number"
+              placeholder="Phone number"
               value={formData.phone}
-              onChange={(e) => setFormData(p => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-              className="w-full bg-white/80 border-2 border-[#3B4883]/10 focus:border-[#FF7124] rounded-2xl p-4 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm"
-              disabled={!!location.state?.phoneNumber}
+              onChange={(e) => setFormData(p => ({ ...p, phone: e.target.value }))}
+              className="w-full bg-gray-100 border-2 border-[#3B4883]/10 rounded-2xl p-4 text-sm font-bold text-[#272D4E] transition-all outline-none shadow-sm cursor-not-allowed"
+              disabled={true}
+              readOnly={true}
             />
+            <p className="text-[9px] text-[#3B4883]/40 mt-1 uppercase tracking-wide">✓ Verified via OTP</p>
           </div>
 
           {/* Company Name */}

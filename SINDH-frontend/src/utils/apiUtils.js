@@ -1,215 +1,77 @@
-/**
- * API Utilities - Centralized API configuration and helpers
- * 
- * This module provides a consistent way to make API calls across the application.
- * It automatically detects the environment (web/mobile, development/production)
- * and routes requests to the appropriate backend.
- * 
- * Mobile Detection:
- * - Checks window.Capacitor || window.cordova
- * - Routes to http://localhost:10000/api for mobile apps
- * - Routes to detected local backend for web development
- * - Routes to production backend for web production
- * 
- * Usage Examples:
- * 
- * 1. Get API URL:
- *    const apiUrl = getApiUrl(); // Returns base URL
- * 
- * 2. Build full endpoint URL:
- *    const url = buildApiUrl('/workers/register');
- * 
- * 3. Make API call:
- *    const data = await apiGet('/jobs');
- * 
- * 4. Check environment:
- *    if (isMobileApp()) { ... }
- * 
- * Service File Pattern:
- * import { buildApiUrl } from '../utils/apiUtils';
- * class MyService {
- *   constructor() {
- *     this.baseUrl = buildApiUrl('');
- *   }
- * }
- */
-import { getApiUrl as getApiUrlAsyncImport, getApiUrlSync } from '../config/api.js';
-import { getDeviceId, getAppInfo } from '../utils/device';
+import axios from 'axios';
 
-// Centralized API URL utilities
-export const getApiUrl = getApiUrlSync; // Synchronous version for immediate use
-export const getApiUrlAsync = getApiUrlAsyncImport; // Async version for detection
+// Production API URL - Hardcoded for stability
+const API_URL = 'https://sindh-backend.onrender.com/api';
 
-// Helper function to build full API URLs
-export const buildApiUrl = (endpoint) => {
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${getApiUrl()}${cleanEndpoint}`;
-};
-
-// Enhanced fetch wrapper with consistent error handling
-export const apiFetch = async (endpoint, options = {}) => {
-  const url = buildApiUrl(endpoint);
-  
-  const defaultOptions = {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-  };
-
-  // Add Device Headers
-  try {
-    const deviceId = await getDeviceId();
-    if (deviceId) {
-      defaultOptions.headers['X-Device-Id'] = deviceId;
-    }
-    const appInfo = await getAppInfo();
-    if (appInfo) {
-      defaultOptions.headers['X-App-Version'] = appInfo.version;
-      defaultOptions.headers['X-App-Build'] = appInfo.build;
-    }
-    if (window.Capacitor) {
-      defaultOptions.headers['X-Platform'] = window.Capacitor.getPlatform();
-    }
-  } catch (e) {
-    // Ignore device info errors
+// Create axios instance with robust configuration
+const api = axios.create({
+  baseURL: API_URL,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
   }
+});
 
-  const finalOptions = {
-    ...defaultOptions,
-    ...options,
-    headers: {
-      ...defaultOptions.headers,
-      ...options.headers,
-    },
-  };
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
 
-  try {
-    const response = await fetch(url, finalOptions);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+// Request interceptor for token injection
+api.interceptors.request.use(
+  (config) => {
+    // Check for token in localStorage (standard JWT) or sessionStorage
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('API Fetch Error:', {
-      url,
-      error: error.message,
-      endpoint
-    });
-    throw error;
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for retries and global error handling
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+
+    // Auto-retry for network errors or 5xx server errors
+    if (config && (error.code === 'ERR_NETWORK' || (error.response && error.response.status >= 500))) {
+      // Initialize retry count if not present
+      if (!config.retryCount) {
+        config.retryCount = 0;
+      }
+
+      if (config.retryCount < MAX_RETRIES) {
+        config.retryCount += 1;
+
+        // Exponential backoff
+        const backoff = new Promise(resolve => {
+          setTimeout(resolve, RETRY_DELAY * config.retryCount);
+        });
+
+        console.log(`📡 Retrying request... Attempt ${config.retryCount}/${MAX_RETRIES}`);
+        await backoff;
+        return api(config);
+      }
+    }
+
+    // Handle specific auth errors
+    if (error.response && error.response.status === 401) {
+      // Dispatch event for auth expiration handling if needed
+      window.dispatchEvent(new Event('auth:expired'));
+    }
+
+    return Promise.reject(error);
   }
+);
+
+// Helper functions for backward compatibility with existing code
+export const getApiUrl = () => API_URL;
+
+export const buildApiUrl = (path) => {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_URL}${cleanPath}`;
 };
 
-// Common API methods
-export const apiGet = (endpoint) => apiFetch(endpoint);
-export const apiPost = (endpoint, data) => apiFetch(endpoint, {
-  method: 'POST',
-  body: JSON.stringify(data)
-});
-export const apiPut = (endpoint, data) => apiFetch(endpoint, {
-  method: 'PUT',
-  body: JSON.stringify(data)
-});
-export const apiDelete = (endpoint) => apiFetch(endpoint, {
-  method: 'DELETE'
-});
-
-// Auth-specific helpers
-export const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
-};
-
-// Enhanced fetch with auth
-export const authenticatedFetch = async (endpoint, options = {}) => {
-  const headers = {
-    ...getAuthHeaders(),
-    ...options.headers
-  };
-  
-  return apiFetch(endpoint, {
-    ...options,
-    headers
-  });
-};
-
-// Connection status checker
-export const checkApiConnection = async () => {
-  try {
-    const response = await apiGet('health');
-    return {
-      connected: true,
-      data: response
-    };
-  } catch (error) {
-    return {
-      connected: false,
-      error: error.message
-    };
-  }
-};
-
-// Environment detection
-export const isProduction = () => process.env.NODE_ENV === 'production';
-export const isDevelopment = () => process.env.NODE_ENV === 'development';
-export const isMobileApp = () => !!(window.Capacitor || window.cordova);
-
-/**
- * Test API configuration and connectivity
- * Useful for debugging and verification
- */
-export const testApiConfiguration = async () => {
-  const results = {
-    // Environment detection
-    environment: process.env.NODE_ENV,
-    reactAppEnv: process.env.REACT_APP_ENVIRONMENT,
-    isProduction: isProduction(),
-    isDevelopment: isDevelopment(),
-    isMobileApp: isMobileApp(),
-    
-    // API URL
-    apiUrl: getApiUrl(),
-    isUsingProduction: getApiUrl().includes('onrender.com'),
-    
-    // Connectivity
-    connection: await checkApiConnection(),
-    
-    // Platform info
-    userAgent: navigator.userAgent,
-    platform: navigator.platform,
-    
-    // Capacitor info (if available)
-    hasCapacitor: !!window.Capacitor,
-    capacitorPlatform: window.Capacitor?.getPlatform?.(),
-    isNativePlatform: window.Capacitor?.isNativePlatform?.()
-  };
-  
-  console.log('🧪 API Configuration Test Results:', results);
-  return results;
-};
-
-/**
- * Verify that all service files use centralized API configuration
- * Returns list of services and their API URL sources
- */
-export const verifyServiceConfiguration = () => {
-  const services = {
-    jobService: 'Uses buildApiUrl - ✅ Correct',
-    workerService: 'Uses buildApiUrl - ✅ Correct (after refactoring)',
-    employerService: 'Uses buildApiUrl - ✅ Correct (after refactoring)',
-    mobileService: 'Uses Capacitor plugins - N/A'
-  };
-  
-  console.log('📋 Service Configuration Status:', services);
-  return services;
-};
-
-// Log current API configuration
-console.log('🔧 API Utils initialized:', {
-  apiUrl: getApiUrl(),
-  environment: process.env.NODE_ENV,
-  isMobileApp: isMobileApp(),
-  isProduction: isProduction()
-});
+export default api;

@@ -122,7 +122,7 @@ const AppContent = () => {
               />
 
               {/* Public Routes */}
-              <Route path="/home" element={<Homepage />} />
+              <Route path="/home" element={<Layout><Homepage /></Layout>} />
               <Route path="/register" element={<Layout><UnifiedRegistration /></Layout>} />
 
               {/* Worker Routes */}
@@ -141,16 +141,16 @@ const AppContent = () => {
               <Route path="/employer/profile" element={<Layout><EmployerProfilePage /></Layout>} />
               <Route path="/employer/post-job" element={<PostJob />} />
               <Route path="/employer/post-job/chat" element={<JobChatPosting />} />
-              <Route path="/employer/posted-jobs" element={<PostedJobs />} />
-              <Route path="/employer/job/:jobId" element={<PostedJobDetails />} />
+              <Route path="/employer/posted-jobs" element={<Layout><PostedJobs /></Layout>} />
+              <Route path="/employer/job/:jobId" element={<Layout><PostedJobDetails /></Layout>} />
 
               {/* Job Routes */}
-              <Route path="/jobs" element={<AvailableJobs />} />
-              <Route path="/jobs/:jobId" element={<AvailableJobs />} />
+              <Route path="/jobs" element={<Layout><AvailableJobs /></Layout>} />
+              <Route path="/jobs/:jobId" element={<Layout><AvailableJobs /></Layout>} />
               <Route path="/job-categories" element={<Layout><JobCategories /></Layout>} />
 
               {/* New route for MyApplications */}
-              <Route path="/worker/applications" element={<MyApplications />} />
+              <Route path="/worker/applications" element={<Layout><MyApplications /></Layout>} />
 
               {/* Login route (no Layout, no Navbar) */}
               <Route path="/login" element={<Login />} />
