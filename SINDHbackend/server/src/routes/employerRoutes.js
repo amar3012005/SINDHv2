@@ -61,11 +61,11 @@ router.post('/register', asyncHandler(async (req, res) => {
   }
 
   console.log('🔍 Checking for existing employer with phone in Firestore:', phone);
-  
+
   // PRIMARY CHECK: Check Firestore first
   const firestoreUserRef = db.collection('users').where('phone', '==', phone).limit(1);
   const firestoreSnapshot = await firestoreUserRef.get();
-  
+
   if (!firestoreSnapshot.empty) {
     console.log('❌ Employer already exists in Firestore with phone:', phone);
     logger.warn(`Employer already exists in Firestore: ${phone}`);
@@ -117,6 +117,15 @@ router.post('/register', asyncHandler(async (req, res) => {
   }
 
   console.log('🔧 Creating employer object data');
+  const formattedCompany = {
+    name: company?.name || company || '',
+    type: company?.type || '',
+    industry: company?.industry || [],
+    primaryIndustry: company?.primaryIndustry || '',
+    description: company?.description || '',
+    registrationNumber: company?.registrationNumber || ''
+  };
+
   const employerDataRaw = {
     name: name.trim(),
     email: email || '',
@@ -146,40 +155,39 @@ router.post('/register', asyncHandler(async (req, res) => {
     lastLogin: new Date()
   };
 
-  // STEP 1: SAVE TO FIRESTORE (Primary)
-  let savedEmployerId;
+  // STEP 1: PREPARE MONGODB OBJECT (To get a valid ObjectId)
+  let mongoEmployer = new Employer(employerDataRaw);
+  const mongoId = mongoEmployer._id.toString();
+
+  // STEP 2: SAVE TO FIRESTORE (Primary)
+  let firestoreDocId;
   try {
-    const firestoreRef = db.collection('users').doc();
-    savedEmployerId = firestoreRef.id;
-    
+    const firestoreRef = db.collection('users').doc(mongoId);
+    firestoreDocId = firestoreRef.id;
+
     const firestoreData = {
       ...employerDataRaw,
-      _id: savedEmployerId,
-      id: savedEmployerId,
-      mongoId: savedEmployerId,
+      _id: mongoId,
+      id: mongoId,
+      mongoId: mongoId,
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
       registrationDate: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
     };
-    
+
     await firestoreRef.set(firestoreData);
-    console.log('💾 Employer profile saved to Firestore (Primary):', savedEmployerId);
+    console.log('💾 Employer profile saved to Firestore (Primary):', firestoreDocId);
   } catch (fsError) {
     console.error('❌ CRITICAL: Failed to save employer to Firestore:', fsError.message);
     throw new AppError('Profile creation failed. Please try again.', 500);
   }
 
-  // STEP 2: SAVE TO MONGODB (Optional/Background)
+  // STEP 3: SAVE TO MONGODB (Secondary/Background)
   try {
-    // Attempt to update existing or create new
+    // Attempt to update existing (if temporary created during job post) or create new
     await Employer.findOneAndUpdate(
       { phone },
-      { 
-        $set: {
-          ...employerDataRaw,
-          _id: new mongoose.Types.ObjectId(savedEmployerId.substring(0, 24).padEnd(24, '0'))
-        } 
-      },
+      { $set: employerDataRaw },
       { upsert: true, timeout: 3000 }
     );
     console.log('💾 Employer also saved to MongoDB');
@@ -194,8 +202,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     message: 'Employer registered successfully',
     employer: {
       ...employerDataRaw,
-      id: savedEmployerId,
-      _id: savedEmployerId,
+      id: mongoId,
+      _id: mongoId,
       isLoggedIn: 1
     }
   };

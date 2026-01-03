@@ -1,5 +1,6 @@
 
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { admin, db } = require('../config/firebase');
 const Worker = require('../models/Worker');
@@ -38,7 +39,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
   // Verify the ID token with Firebase Admin SDK
   const decodedToken = await admin.auth().verifyIdToken(token);
   const fullPhoneNumber = decodedToken.phone_number; // Full number with country code (e.g., +49176...)
-  
+
   // Extract phone without country code for backward compatibility
   // Store both the full number (with country code) and just the local number
   let phoneWithoutCode = fullPhoneNumber;
@@ -47,13 +48,13 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
     // countryCodeMatch[0] contains the full match including '+' (e.g., '+49')
     phoneWithoutCode = fullPhoneNumber.substring(countryCodeMatch[0].length);
   }
-  
+
   logger.info(`📱 Verified phone number: ${fullPhoneNumber} (local part: ${phoneWithoutCode})`);
 
   // Check Firestore for existing user mapping
   // Try full phone number first (with country code), then without for backward compatibility
   let snapshot = await db.collection('users').where('phone', '==', fullPhoneNumber).limit(1).get();
-  
+
   if (snapshot.empty) {
     // Try without country code for backward compatibility with old Indian numbers
     snapshot = await db.collection('users').where('phone', '==', phoneWithoutCode).limit(1).get();
@@ -78,12 +79,29 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
 
   logger.info(`✅ User found in Firestore - mongoId: ${mongoId}, type: ${userTypeFromFirestore}`);
 
+  // Helper to safely find user by ID or Phone
+  const findUserDynamically = async (Model, id, phone) => {
+    // 1. Try by ID if valid
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      const user = await Model.findById(id);
+      if (user) return user;
+    }
+
+    // 2. Fallback: Try by phone (full or local)
+    logger.info(`🔍 ID ${id} invalid or not found. Falling back to phone search: ${phone}`);
+    const userByPhone = await Model.findOne({
+      $or: [{ phone: phone }, { phone: phone.replace(/^\+91/, '') }]
+    });
+    return userByPhone;
+  };
+
   // Fetch full profile from MongoDB based on user type
   let userProfile;
   if (userTypeFromFirestore === 'worker') {
-    const worker = await Worker.findById(mongoId);
+    const worker = await findUserDynamically(Worker, mongoId, fullPhoneNumber);
+
     if (!worker) {
-      logger.warn(`⚠️ Worker mongoId ${mongoId} not found in MongoDB, treating as new user`);
+      logger.warn(`⚠️ Worker not found in MongoDB for Id: ${mongoId} or Phone: ${fullPhoneNumber}, treating as new user`);
       return res.status(200).json({
         success: true,
         requiresRegistration: true,
@@ -92,7 +110,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
         userType
       });
     }
-    
+
     // Update login timestamp
     worker.lastLogin = new Date();
     worker.isLoggedIn = 1;
@@ -116,9 +134,10 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
       phase: worker.phase || 1
     };
   } else if (userTypeFromFirestore === 'employer') {
-    const employer = await Employer.findById(mongoId);
+    const employer = await findUserDynamically(Employer, mongoId, fullPhoneNumber);
+
     if (!employer) {
-      logger.warn(`⚠️ Employer mongoId ${mongoId} not found in MongoDB, treating as new user`);
+      logger.warn(`⚠️ Employer not found in MongoDB for Id: ${mongoId} or Phone: ${fullPhoneNumber}, treating as new user`);
       return res.status(200).json({
         success: true,
         requiresRegistration: true,
@@ -127,7 +146,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
         userType
       });
     }
-    
+
     // Update login timestamp
     employer.lastLogin = new Date();
     employer.isLoggedIn = 1;

@@ -52,11 +52,11 @@ router.post('/register', asyncHandler(async (req, res) => {
   } = req.body;
 
   console.log('🔍 Checking for existing worker with phone in Firestore:', phone);
-  
+
   // PRIMARY CHECK: Check Firestore first (since we are migrating to Firebase)
   const firestoreUserRef = db.collection('users').where('phone', '==', phone).limit(1);
   const firestoreSnapshot = await firestoreUserRef.get();
-  
+
   if (!firestoreSnapshot.empty) {
     console.log('❌ Worker already exists in Firestore with phone:', phone);
     logger.warn(`Worker already exists in Firestore: ${phone}`);
@@ -182,38 +182,38 @@ router.post('/register', asyncHandler(async (req, res) => {
     type: 'worker'
   };
 
-  // STEP 1: SAVE TO FIRESTORE (Primary)
-  let savedWorkerId;
+  // STEP 1: PREPARE MONGODB OBJECT (To get a valid ObjectId)
+  let mongoWorker = new Worker(workerDataRaw);
+  const mongoId = mongoWorker._id.toString();
+
+  // STEP 2: SAVE TO FIRESTORE (Primary)
+  let firestoreDocId;
   try {
-    const firestoreRef = db.collection('users').doc();
-    savedWorkerId = firestoreRef.id;
-    
+    // Use the MongoDB ID as the document ID in Firestore for 1:1 mapping
+    const firestoreRef = db.collection('users').doc(mongoId);
+    firestoreDocId = firestoreRef.id;
+
     const firestoreData = {
       ...workerDataRaw,
-      _id: savedWorkerId,
-      id: savedWorkerId,
-      mongoId: savedWorkerId, // Use Firestore ID as mongoId for consistency
+      _id: mongoId,
+      id: mongoId,
+      mongoId: mongoId,
       type: 'worker',
       role: 'worker',
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
       registrationDate: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
     };
-    
+
     await firestoreRef.set(firestoreData);
-    console.log('💾 Worker profile saved to Firestore (Primary):', savedWorkerId);
+    console.log('💾 Worker profile saved to Firestore (Primary):', firestoreDocId);
   } catch (fsError) {
     console.error('❌ CRITICAL: Failed to save to Firestore:', fsError.message);
     throw new AppError('Profile creation failed. Please try again.', 500);
   }
 
-  // STEP 2: SAVE TO MONGODB (Optional/Background)
-  let mongoWorker;
+  // STEP 3: SAVE TO MONGODB (Secondary/Background)
   try {
-    mongoWorker = new Worker({
-      ...workerDataRaw,
-      _id: new mongoose.Types.ObjectId(savedWorkerId.substring(0, 24).padEnd(24, '0')) // Map Firestore ID to MongoDB format if possible
-    });
     await mongoWorker.save({ timeout: 3000 });
     console.log('💾 Worker also saved to MongoDB');
   } catch (mongoError) {
@@ -227,8 +227,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     message: 'Worker registered successfully',
     worker: {
       ...workerDataRaw,
-      id: savedWorkerId,
-      _id: savedWorkerId,
+      id: mongoId,
+      _id: mongoId,
       type: 'worker',
       isLoggedIn: 1
     }
