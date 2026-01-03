@@ -53,17 +53,18 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   console.log('🔍 Checking for existing worker with phone in Firestore:', phone);
 
-  // PRIMARY CHECK: Check Firestore first (since we are migrating to Firebase)
-  const firestoreUserRef = db.collection('users').where('phone', '==', phone).limit(1);
-  const firestoreSnapshot = await firestoreUserRef.get();
+  // PRIMARY CHECK: Check if a profile ALREADY exists in the root 'workers' collection
+  // We check 'workers' instead of 'users' mapping because a user might exist in mapping 
+  // but be missing their root profile (migrated but incomplete registration).
+  const firestoreWorkerSnapshot = await db.collection('workers').where('phone', '==', phone).limit(1).get();
 
-  if (!firestoreSnapshot.empty) {
-    console.log('❌ Worker already exists in Firestore with phone:', phone);
+  if (!firestoreWorkerSnapshot.empty) {
+    console.log('❌ Worker profile already exists in Firestore root collection:', phone);
     logger.warn(`Worker already exists in Firestore: ${phone}`);
-    throw new ValidationError('Worker already exists with this phone number');
+    throw new ValidationError('Worker already exists with this phone number. Please login instead.');
   }
 
-  console.log('✅ No existing worker found, proceeding with registration');
+  console.log('✅ No existing worker profile found, proceeding with registration');
 
   // Enhanced Phase-1 validation
   if (phase === 1) {
@@ -274,10 +275,8 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
 // Update worker
 router.put('/:id', asyncHandler(async (req, res) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/f37aaaad-37c4-46aa-b65b-61479aa84b1f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'workerRoutes.js:278',message:'Worker profile update attempt',data:{id:req.params.id,updates:Object.keys(req.body)},timestamp:Date.now(),sessionId:'robustness-check',hypothesisId:'H3'})}).catch(()=>{});
-  // #endregion
   const { id } = req.params;
+  logger.info(`ROBUSTNESS_CHECK: H3 - Worker profile update attempt for ${id}`, { updates: Object.keys(req.body) });
   logger.info(`Updating worker in Firestore: ${id}`);
   
   await db.collection('workers').doc(id).update({
@@ -485,11 +484,10 @@ router.get('/:id/balance', asyncHandler(async (req, res) => {
 // Manually process payment for completed job
 // Note: This still updates MongoDB as a shadow write for now, but uses Firestore data
 router.post('/:workerId/process-payment/:applicationId', asyncHandler(async (req, res) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/f37aaaad-37c4-46aa-b65b-61479aa84b1f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'workerRoutes.js:473',message:'Entering process-payment',data:{workerId:req.params.workerId,applicationId:req.params.applicationId,amount:req.body.amount},timestamp:Date.now(),sessionId:'robustness-check',hypothesisId:'H1'})}).catch(()=>{});
-  // #endregion
   const { amount } = req.body;
   const { workerId, applicationId } = req.params;
+
+  logger.info(`ROBUSTNESS_CHECK: H1 - Entering process-payment for worker ${workerId}`, { applicationId, amount });
 
   const workerDoc = await db.collection('workers').doc(workerId).get();
   if (!workerDoc.exists) {

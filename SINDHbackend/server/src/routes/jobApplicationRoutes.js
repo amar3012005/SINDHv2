@@ -407,11 +407,10 @@ router.delete('/:applicationId', async (req, res) => {
 
 // Enhanced application status update with comprehensive validation and flow management
 router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/f37aaaad-37c4-46aa-b65b-61479aa84b1f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobApplicationRoutes.js:386',message:'Entering status update',data:{applicationId:req.params.applicationId,status:req.body.status},timestamp:Date.now(),sessionId:'robustness-check',hypothesisId:'H2'})}).catch(()=>{});
-  // #endregion
   const { applicationId } = req.params;
   const { status, previousStatus, transitionReason, timestamp, updatedBy, ...additionalData } = req.body;
+
+  logger.info(`ROBUSTNESS_CHECK: H2 - Entering status update for application ${applicationId}`, { status });
 
   // --- ENHANCED LOGGING ---
   const logColor = '\x1b[33m'; // Yellow

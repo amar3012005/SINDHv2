@@ -62,14 +62,15 @@ router.post('/register', asyncHandler(async (req, res) => {
 
   console.log('🔍 Checking for existing employer with phone in Firestore:', phone);
 
-  // PRIMARY CHECK: Check Firestore first
-  const firestoreUserRef = db.collection('users').where('phone', '==', phone).limit(1);
-  const firestoreSnapshot = await firestoreUserRef.get();
+  // PRIMARY CHECK: Check if a profile ALREADY exists in the root 'employers' collection
+  // We check 'employers' instead of 'users' mapping because a user might exist in mapping 
+  // but be missing their root profile (migrated but incomplete registration).
+  const firestoreEmployerSnapshot = await db.collection('employers').where('phone', '==', phone).limit(1).get();
 
-  if (!firestoreSnapshot.empty) {
-    console.log('❌ Employer already exists in Firestore with phone:', phone);
+  if (!firestoreEmployerSnapshot.empty) {
+    console.log('❌ Employer profile already exists in Firestore root collection:', phone);
     logger.warn(`Employer already exists in Firestore: ${phone}`);
-    throw new ValidationError('Employer already exists with this phone number');
+    throw new ValidationError('Employer already exists with this phone number. Please login instead.');
   }
 
   console.log('✅ Proceeding with registration/update in Firestore');
