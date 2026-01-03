@@ -2,7 +2,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const mongoose = require('mongoose');
-const { db } = require('../src/config/firebase');
+const { db, admin } = require('../src/config/firebase');
 const Worker = require('../src/models/Worker');
 const Employer = require('../src/models/Employer');
 const Job = require('../src/models/Job');

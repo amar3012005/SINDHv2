@@ -1,10 +1,6 @@
 const { admin, db } = require('../config/firebase');
 const express = require('express');
-const mongoose = require('mongoose');
 const router = express.Router();
-const Worker = require('../models/Worker');
-const JobMatchingService = require('../services/JobMatchingService');
-const JobApplication = require('../models/JobApplication');
 const logger = require('../config/logger');
 const {
   AppError,
@@ -178,7 +174,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   // STEP 2: SAVE TO FIRESTORE (Primary)
   // Use Firebase UID as document ID in 'workers' collection (Phase 1 Strategy)
   // Fallback to mongoId if firebaseUid is not provided (should not happen with new logic)
-  const targetId = firebaseUid || (new mongoose.Types.ObjectId()).toString();
+  const targetId = firebaseUid || db.collection('workers').doc().id;
 
   try {
     const firestoreRef = db.collection('workers').doc(targetId);
@@ -209,16 +205,6 @@ router.post('/register', asyncHandler(async (req, res) => {
     console.error('❌ CRITICAL: Failed to save to Firestore:', fsError.message);
     throw new AppError('Profile creation failed. Please try again.', 500);
   }
-
-  // STEP 3: MONGODB SHADOW WRITE (DEPRECATED - Removed)
-  /*
-  try {
-    await mongoWorker.save({ timeout: 3000 });
-    console.log('💾 Worker also saved to MongoDB');
-  } catch (mongoError) {
-    console.warn('⚠️ MongoDB save failed (timed out), but profile exists in Firestore:', mongoError.message);
-  }
-  */
 
   logger.info(`Worker registered successfully in Firestore: ${name}`);
 
@@ -305,44 +291,6 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 
   logger.info(`Worker deleted from Firestore: ${id}`);
   res.json({ message: 'Worker deleted successfully' });
-}));
-
-// Get matching jobs for a worker
-router.get('/:id/jobs', asyncHandler(async (req, res) => {
-  const worker = await Worker.findById(req.params.id);
-  if (!worker) {
-    throw new NotFoundError('Worker not found');
-  }
-
-  logger.info(`Finding matching jobs for worker: ${worker.name}`);
-  const matchingJobs = await JobMatchingService.findMatchingJobs(worker);
-  res.json(matchingJobs);
-}));
-
-// Update worker availability
-router.patch('/:id/availability', asyncHandler(async (req, res) => {
-  const worker = await Worker.findById(req.params.id);
-  if (!worker) {
-    throw new NotFoundError('Worker not found');
-  }
-
-  worker.isAvailable = req.body.isAvailable;
-  await worker.save();
-  logger.info(`Worker availability updated for ${worker.name}`);
-  res.json(worker);
-}));
-
-// Update work radius
-router.patch('/:id/work-radius', asyncHandler(async (req, res) => {
-  const worker = await Worker.findById(req.params.id);
-  if (!worker) {
-    throw new NotFoundError('Worker not found');
-  }
-
-  worker.workRadius = req.body.workRadius;
-  await worker.save();
-  logger.info(`Worker work radius updated for ${worker.name}`);
-  res.json(worker);
 }));
 
 // Get worker profile with job history
@@ -534,19 +482,6 @@ router.post('/:workerId/process-payment/:applicationId', asyncHandler(async (req
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  // SHADOW WRITE: DEPRECATED - Removed in Phase 4
-  /*
-  try {
-    await Worker.findByIdAndUpdate(workerId, {
-      $inc: { balance: amount },
-      $push: { earnings: newEarning }
-    });
-    ...
-  } catch (err) {
-    logger.warn(`⚠️ MongoDB shadow write failed in process-payment: ${err.message}`);
-  }
-  */
-
   logger.info(`Payment processed for worker: ${worker.name}`);
   res.json({
     success: true,
@@ -587,16 +522,6 @@ router.post('/:id/sync-balance', asyncHandler(async (req, res) => {
     balance: totalEarned,
     earnings: earnings
   });
-
-  // SHADOW WRITE
-  try {
-    await Worker.findByIdAndUpdate(workerId, {
-      balance: totalEarned,
-      earnings: earnings
-    });
-  } catch (err) {
-    logger.warn(`⚠️ MongoDB shadow write failed in sync-balance: ${err.message}`);
-  }
 
   res.json({
     success: true,
@@ -715,19 +640,6 @@ router.post('/:id/withdraw', asyncHandler(async (req, res) => {
   });
 
   await db.collection('workers').doc(workerId).collection('transactions').add(transaction);
-
-  // SHADOW WRITE: DEPRECATED - Removed in Phase 4
-  /*
-  try {
-    await Worker.findByIdAndUpdate(workerId, {
-      $set: { wallet: updatedWallet },
-      $inc: { balance: -amount },
-      $push: { withdrawals: withdrawal }
-    });
-  } catch (err) {
-    logger.warn(`⚠️ MongoDB shadow write failed in withdraw: ${err.message}`);
-  }
-  */
 
   res.json({
     success: true,

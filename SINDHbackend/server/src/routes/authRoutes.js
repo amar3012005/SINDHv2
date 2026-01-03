@@ -29,7 +29,9 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
     throw new ValidationError('Firebase ID token and user type are required.');
   }
 
-  logger.info(`🔐 Firebase login attempt for userType: ${userType}`);
+  const normalizedUserType = userType === 'employer' ? 'employer' : 'worker';
+
+  logger.info(`🔐 Firebase login attempt for userType: ${normalizedUserType}`);
 
   // Verify the ID token with Firebase Admin SDK
   const decodedToken = await admin.auth().verifyIdToken(token);
@@ -47,61 +49,60 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
 
   logger.info(`📱 Verified phone number: ${fullPhoneNumber} (UID: ${firebaseUid})`);
 
-  // PRIMARY CHECK: Look for user by Firebase UID in root collections (Phase 1 strategy)
-  let userDoc = await db.collection('workers').doc(firebaseUid).get();
-  let foundUserType = 'worker';
-
-  if (!userDoc.exists) {
-    userDoc = await db.collection('employers').doc(firebaseUid).get();
-    foundUserType = 'employer';
-  }
+  // PRIMARY CHECK: Look for user by Firebase UID in the requested root collection
+  const rootCollection = normalizedUserType === 'worker' ? 'workers' : 'employers';
+  let userDoc = await db.collection(rootCollection).doc(firebaseUid).get();
 
   let mongoId;
-  let userTypeFromFirestore = userType;
+  let userTypeFromFirestore = normalizedUserType;
 
   if (userDoc.exists) {
-    logger.info(`✅ User found by UID in root collection: ${firebaseUid} (${foundUserType})`);
+    logger.info(`✅ User found by UID in root collection (${rootCollection}): ${firebaseUid}`);
     const userData = userDoc.data();
     mongoId = userData.mongoId || firebaseUid; // Use mongoId if present, otherwise assume UID is the ID
-    userTypeFromFirestore = foundUserType;
   } else {
-    // FALLBACK: Check legacy 'users' collection by phone
-    // Try full phone number first (with country code), then without for backward compatibility
-    let snapshot = await db.collection('users').where('phone', '==', fullPhoneNumber).limit(1).get();
+    // FALLBACK: Check legacy 'users' collection by phone AND type to avoid cross-role collisions
+    let snapshot = await db.collection('users')
+      .where('phone', '==', fullPhoneNumber)
+      .where('type', '==', normalizedUserType)
+      .limit(1)
+      .get();
 
     if (snapshot.empty) {
       // Try without country code for backward compatibility with old Indian numbers
-      snapshot = await db.collection('users').where('phone', '==', phoneWithoutCode).limit(1).get();
+      snapshot = await db.collection('users')
+        .where('phone', '==', phoneWithoutCode)
+        .where('type', '==', normalizedUserType)
+        .limit(1)
+        .get();
     }
 
     if (snapshot.empty) {
-      logger.info(`🆕 New user detected - UID ${firebaseUid} not found in Firestore`);
+      logger.info(`🆕 New ${normalizedUserType} detected - UID ${firebaseUid} not found in Firestore`);
       return res.status(200).json({
         success: true,
         requiresRegistration: true,
         message: 'Please complete your registration.',
         phoneNumber: fullPhoneNumber, // Send full phone number with country code
         firebaseUid, // NEW: Send UID to frontend
-        userType
+        userType: normalizedUserType
       });
     }
 
-    // User exists in Firestore - get their MongoDB ID and type
+    // User exists in legacy mapping of the requested type
     const firestoreDoc = snapshot.docs[0];
     const firestoreData = firestoreDoc.data();
     mongoId = firestoreData.mongoId;
-    userTypeFromFirestore = firestoreData.type || userType;
+    userTypeFromFirestore = firestoreData.type || normalizedUserType;
 
     logger.info(`✅ User found in legacy Firestore mapping - mongoId: ${mongoId}, type: ${userTypeFromFirestore}`);
   }
 
   // Fetch full profile from Firestore (Primary Source of Truth)
   let userProfileData;
-  const rootCollection = userTypeFromFirestore === 'worker' ? 'workers' : 'employers';
-  
   // Try finding by Firebase UID first (new registrations)
   let profileDoc = await db.collection(rootCollection).doc(firebaseUid).get();
-  
+
   if (!profileDoc.exists && mongoId && mongoId !== firebaseUid) {
     // Fallback: Try finding by legacy Mongo ID (migrated users)
     profileDoc = await db.collection(rootCollection).doc(mongoId).get();
@@ -113,9 +114,9 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
       success: true,
       requiresRegistration: true,
       message: 'Please complete your registration.',
-      phoneNumber: fullPhoneNumber,
-      firebaseUid,
-      userType
+        phoneNumber: fullPhoneNumber,
+        firebaseUid,
+        userType: normalizedUserType
     });
   }
 
@@ -141,12 +142,25 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
   // Generate JWT token with the Firestore ID (Primary Identifier)
   const sessionToken = generateToken(targetId, userTypeFromFirestore);
 
+  // Generate Firebase Custom Token for client-side Firestore SDK authentication
+  // This bridges the gap between Native Auth (Capacitor) and Web SDK (Firestore)
+  let firebaseCustomToken;
+  try {
+    firebaseCustomToken = await admin.auth().createCustomToken(targetId, {
+      type: userTypeFromFirestore
+    });
+  } catch (error) {
+    logger.error(`Error generating custom token for ${targetId}: ${error.message}`);
+    // Don't fail the whole login, but client-side Firestore might have issues
+  }
+
   logger.info(`✅ Firestore login successful for ${userProfile.name} (${userTypeFromFirestore})`);
 
   res.json({
     success: true,
     message: 'Login successful',
     token: sessionToken,
+    firebaseCustomToken, // Send this to the client
     requiresRegistration: false,
     data: userProfile
   });
@@ -326,7 +340,7 @@ router.post('/worker/request-otp', asyncHandler(async (req, res) => {
   }
 
   logger.info(`Worker OTP request for phone: ${phone}`);
-  
+
   // Check if worker exists in Firestore
   const snapshot = await db.collection('workers').where('phone', '==', phone).limit(1).get();
 
@@ -343,7 +357,7 @@ router.post('/worker/request-otp', asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'OTP sent successfully',
-    otp: otp 
+    otp: otp
   });
 }));
 
@@ -472,7 +486,7 @@ router.post('/employer/request-otp', asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'OTP sent successfully',
-    otp: otp 
+    otp: otp
   });
 }));
 
