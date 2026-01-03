@@ -45,10 +45,14 @@ const EmployerRegistration = () => {
   const [locationMethod, setLocationMethod] = useState(null); // 'gps' or 'manual'
   const [locationSubStep, setLocationSubStep] = useState('choice'); // 'choice', 'pincode', 'village'
 
+  // Extract firebaseUid from navigation state
+  const firebaseUid = location.state?.firebaseUid;
+
   // Form data
   const [formData, setFormData] = useState({
     name: '',
     phone: location.state?.phoneNumber || '',
+    firebaseUid: firebaseUid || '', // Store the UID
     companyName: '',
     location: {
       village: '',
@@ -206,6 +210,7 @@ const EmployerRegistration = () => {
       const payload = {
         name: formData.name.trim(),
         phone: formData.phone,
+        firebaseUid: formData.firebaseUid, // Explicitly include firebaseUid
         companyName: formData.companyName?.trim() || formData.name.trim(),
         location: formData.location,
         termsAccepted: formData.termsAccepted,

@@ -182,22 +182,27 @@ router.post('/register', asyncHandler(async (req, res) => {
     type: 'worker'
   };
 
-  // STEP 1: PREPARE MONGODB OBJECT (To get a valid ObjectId)
+  // Extract firebaseUid if provided by frontend
+  const { firebaseUid } = req.body;
+
+  // STEP 1: PREPARE MONGODB OBJECT (To get a valid ObjectId as fallback)
   let mongoWorker = new Worker(workerDataRaw);
   const mongoId = mongoWorker._id.toString();
 
   // STEP 2: SAVE TO FIRESTORE (Primary)
-  let firestoreDocId;
+  // Use Firebase UID as document ID in 'workers' collection (Phase 1 Strategy)
+  // Fallback to mongoId if firebaseUid is not provided (should not happen with new logic)
+  const targetId = firebaseUid || mongoId;
+
   try {
-    // Use the MongoDB ID as the document ID in Firestore for 1:1 mapping
-    const firestoreRef = db.collection('users').doc(mongoId);
-    firestoreDocId = firestoreRef.id;
+    const firestoreRef = db.collection('workers').doc(targetId);
 
     const firestoreData = {
       ...workerDataRaw,
-      _id: mongoId,
-      id: mongoId,
-      mongoId: mongoId,
+      _id: targetId,
+      id: targetId,
+      mongoId: mongoId, // Keep track of mongoId for fallback
+      firebaseUid: firebaseUid || null,
       type: 'worker',
       role: 'worker',
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -206,7 +211,15 @@ router.post('/register', asyncHandler(async (req, res) => {
     };
 
     await firestoreRef.set(firestoreData);
-    console.log('💾 Worker profile saved to Firestore (Primary):', firestoreDocId);
+    console.log('💾 Worker profile saved to Firestore root collection (workers):', targetId);
+
+    // Also update legacy tracking in 'users' collection for backward compatibility
+    await db.collection('users').doc(targetId).set({
+      phone: workerDataRaw.phone,
+      mongoId: mongoId,
+      type: 'worker',
+      firebaseUid: firebaseUid || null
+    });
   } catch (fsError) {
     console.error('❌ CRITICAL: Failed to save to Firestore:', fsError.message);
     throw new AppError('Profile creation failed. Please try again.', 500);
@@ -227,8 +240,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     message: 'Worker registered successfully',
     worker: {
       ...workerDataRaw,
-      id: mongoId,
-      _id: mongoId,
+      id: targetId,
+      _id: targetId,
       type: 'worker',
       isLoggedIn: 1
     }

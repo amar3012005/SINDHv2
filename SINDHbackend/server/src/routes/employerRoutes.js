@@ -155,28 +155,41 @@ router.post('/register', asyncHandler(async (req, res) => {
     lastLogin: new Date()
   };
 
-  // STEP 1: PREPARE MONGODB OBJECT (To get a valid ObjectId)
+  // Extract firebaseUid if provided by frontend
+  const { firebaseUid } = req.body;
+
+  // STEP 1: PREPARE MONGODB OBJECT (To get a valid ObjectId as fallback)
   let mongoEmployer = new Employer(employerDataRaw);
   const mongoId = mongoEmployer._id.toString();
 
   // STEP 2: SAVE TO FIRESTORE (Primary)
-  let firestoreDocId;
+  // Use Firebase UID as document ID in 'employers' collection (Phase 1 Strategy)
+  const targetId = firebaseUid || mongoId;
+
   try {
-    const firestoreRef = db.collection('users').doc(mongoId);
-    firestoreDocId = firestoreRef.id;
+    const firestoreRef = db.collection('employers').doc(targetId);
 
     const firestoreData = {
       ...employerDataRaw,
-      _id: mongoId,
-      id: mongoId,
+      _id: targetId,
+      id: targetId,
       mongoId: mongoId,
+      firebaseUid: firebaseUid || null,
       migratedAt: admin.firestore.FieldValue.serverTimestamp(),
       registrationDate: admin.firestore.FieldValue.serverTimestamp(),
       lastLogin: admin.firestore.FieldValue.serverTimestamp()
     };
 
     await firestoreRef.set(firestoreData);
-    console.log('💾 Employer profile saved to Firestore (Primary):', firestoreDocId);
+    console.log('💾 Employer profile saved to Firestore root collection (employers):', targetId);
+
+    // Also update legacy tracking in 'users' collection for backward compatibility
+    await db.collection('users').doc(targetId).set({
+      phone: employerDataRaw.phone,
+      mongoId: mongoId,
+      type: 'employer',
+      firebaseUid: firebaseUid || null
+    });
   } catch (fsError) {
     console.error('❌ CRITICAL: Failed to save employer to Firestore:', fsError.message);
     throw new AppError('Profile creation failed. Please try again.', 500);
@@ -202,8 +215,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     message: 'Employer registered successfully',
     employer: {
       ...employerDataRaw,
-      id: mongoId,
-      _id: mongoId,
+      id: targetId,
+      _id: targetId,
       isLoggedIn: 1
     }
   };

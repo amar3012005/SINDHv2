@@ -39,6 +39,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
   // Verify the ID token with Firebase Admin SDK
   const decodedToken = await admin.auth().verifyIdToken(token);
   const fullPhoneNumber = decodedToken.phone_number; // Full number with country code (e.g., +49176...)
+  const firebaseUid = decodedToken.uid; // NEW: Extract Firebase UID
 
   // Extract phone without country code for backward compatibility
   // Store both the full number (with country code) and just the local number
@@ -49,35 +50,55 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
     phoneWithoutCode = fullPhoneNumber.substring(countryCodeMatch[0].length);
   }
 
-  logger.info(`📱 Verified phone number: ${fullPhoneNumber} (local part: ${phoneWithoutCode})`);
+  logger.info(`📱 Verified phone number: ${fullPhoneNumber} (UID: ${firebaseUid})`);
 
-  // Check Firestore for existing user mapping
-  // Try full phone number first (with country code), then without for backward compatibility
-  let snapshot = await db.collection('users').where('phone', '==', fullPhoneNumber).limit(1).get();
+  // PRIMARY CHECK: Look for user by Firebase UID in root collections (Phase 1 strategy)
+  let userDoc = await db.collection('workers').doc(firebaseUid).get();
+  let foundUserType = 'worker';
 
-  if (snapshot.empty) {
-    // Try without country code for backward compatibility with old Indian numbers
-    snapshot = await db.collection('users').where('phone', '==', phoneWithoutCode).limit(1).get();
+  if (!userDoc.exists) {
+    userDoc = await db.collection('employers').doc(firebaseUid).get();
+    foundUserType = 'employer';
   }
 
-  if (snapshot.empty) {
-    logger.info(`🆕 New user detected - phone ${fullPhoneNumber} not found in Firestore`);
-    return res.status(200).json({
-      success: true,
-      requiresRegistration: true,
-      message: 'Please complete your registration.',
-      phoneNumber: fullPhoneNumber, // Send full phone number with country code
-      userType
-    });
+  let mongoId;
+  let userTypeFromFirestore = userType;
+
+  if (userDoc.exists) {
+    logger.info(`✅ User found by UID in root collection: ${firebaseUid} (${foundUserType})`);
+    const userData = userDoc.data();
+    mongoId = userData.mongoId || firebaseUid; // Use mongoId if present, otherwise assume UID is the ID
+    userTypeFromFirestore = foundUserType;
+  } else {
+    // FALLBACK: Check legacy 'users' collection by phone
+    // Try full phone number first (with country code), then without for backward compatibility
+    let snapshot = await db.collection('users').where('phone', '==', fullPhoneNumber).limit(1).get();
+
+    if (snapshot.empty) {
+      // Try without country code for backward compatibility with old Indian numbers
+      snapshot = await db.collection('users').where('phone', '==', phoneWithoutCode).limit(1).get();
+    }
+
+    if (snapshot.empty) {
+      logger.info(`🆕 New user detected - UID ${firebaseUid} not found in Firestore`);
+      return res.status(200).json({
+        success: true,
+        requiresRegistration: true,
+        message: 'Please complete your registration.',
+        phoneNumber: fullPhoneNumber, // Send full phone number with country code
+        firebaseUid, // NEW: Send UID to frontend
+        userType
+      });
+    }
+
+    // User exists in Firestore - get their MongoDB ID and type
+    const firestoreDoc = snapshot.docs[0];
+    const firestoreData = firestoreDoc.data();
+    mongoId = firestoreData.mongoId;
+    userTypeFromFirestore = firestoreData.type || userType;
+
+    logger.info(`✅ User found in legacy Firestore mapping - mongoId: ${mongoId}, type: ${userTypeFromFirestore}`);
   }
-
-  // User exists in Firestore - get their MongoDB ID and type
-  const firestoreDoc = snapshot.docs[0];
-  const firestoreData = firestoreDoc.data();
-  const mongoId = firestoreData.mongoId;
-  const userTypeFromFirestore = firestoreData.type || userType;
-
-  logger.info(`✅ User found in Firestore - mongoId: ${mongoId}, type: ${userTypeFromFirestore}`);
 
   // Helper to safely find user by ID or Phone
   const findUserDynamically = async (Model, id, phone) => {
@@ -101,12 +122,13 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
     const worker = await findUserDynamically(Worker, mongoId, fullPhoneNumber);
 
     if (!worker) {
-      logger.warn(`⚠️ Worker not found in MongoDB for Id: ${mongoId} or Phone: ${fullPhoneNumber}, treating as new user`);
+      logger.warn(`⚠️ Worker not found in MongoDB for Id: ${mongoId}, treating as new user`);
       return res.status(200).json({
         success: true,
         requiresRegistration: true,
         message: 'Please complete your registration.',
         phoneNumber: fullPhoneNumber,
+        firebaseUid,
         userType
       });
     }
@@ -143,6 +165,7 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
         requiresRegistration: true,
         message: 'Please complete your registration.',
         phoneNumber: fullPhoneNumber,
+        firebaseUid, // NEW: Pass UID for UID-based registration
         userType
       });
     }
@@ -167,11 +190,25 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
     throw new ValidationError('Invalid user type');
   }
 
-  // Update Firestore last login
-  await db.collection('users').doc(firestoreDoc.id).update({
-    lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-    isLoggedIn: 1
-  });
+  // Update Firestore last login with safety check
+  try {
+    const updateData = {
+      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      isLoggedIn: 1
+    };
+
+    // 1. Update root collection (workers/employers) if UID match
+    const rootCollection = userTypeFromFirestore === 'worker' ? 'workers' : 'employers';
+    const targetDocId = firebaseUid;
+    await db.collection(rootCollection).doc(targetDocId).update(updateData).catch(() => { });
+
+    // 2. Update legacy collection if phone match found
+    if (typeof firestoreDoc !== 'undefined' && firestoreDoc.id) {
+      await db.collection('users').doc(firestoreDoc.id).update(updateData).catch(() => { });
+    }
+  } catch (err) {
+    logger.warn(`⚠️ Non-critical: Failed to update Firestore timestamps: ${err.message}`);
+  }
 
   // Generate JWT token with MongoDB ID
   const sessionToken = generateToken(mongoId, userTypeFromFirestore);

@@ -122,6 +122,7 @@ export const verifyOtpAndLogin = async (confirmationResult, otp, userType) => {
       return {
         requiresRegistration: true,
         phoneNumber: firebaseUser.phoneNumber, // e.g., +919000000000
+        firebaseUid: data.firebaseUid, // NEW: Include UID
         userType: userType
       };
     } else {

@@ -242,7 +242,10 @@ const Login = () => {
         console.log(`🆕 New user detected - redirecting to registration with phone: ${verifiedPhone}`);
         toast.info('Welcome! Please complete your registration.', { autoClose: 4000 });
         navigate(`/${userType}/form-register`, {
-          state: { phoneNumber: verifiedPhone },
+          state: {
+            phoneNumber: verifiedPhone,
+            firebaseUid: data.firebaseUid // Pass the UID for UID-based registration
+          },
           replace: true
         });
         return;

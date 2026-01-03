@@ -46,11 +46,15 @@ const WorkerRegistrationPhase1 = () => {
   const [locationMethod, setLocationMethod] = useState(null); // 'gps' or 'manual'
   const [locationSubStep, setLocationSubStep] = useState('choice'); // 'choice', 'pincode', 'village'
 
+  // Extract firebaseUid from navigation state
+  const firebaseUid = location.state?.firebaseUid;
+
   // Phase-1 form data
   const [formData, setFormData] = useState({
     name: '',
     age: '',
     phone: location.state?.phoneNumber || '',
+    firebaseUid: firebaseUid || '', // Store the UID
     preferredCategory: '',
     expectedSalary: '',
     location: {
@@ -224,6 +228,7 @@ const WorkerRegistrationPhase1 = () => {
       const apiUrl = getApiUrlSync();
       const payload = {
         ...formData,
+        firebaseUid: formData.firebaseUid, // Explicitly include firebaseUid
         preferredCategory: formData.preferredCategory.replace(/\(.*?\)/g, '').trim(),
         age: parseInt(formData.age),
         gender: 'Male',
@@ -481,8 +486,8 @@ const WorkerRegistrationPhase1 = () => {
                   key={opt.value}
                   onClick={() => setFormData(p => ({ ...p, preferredCategory: opt.value }))}
                   className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${formData.preferredCategory === opt.value
-                      ? 'border-[#FF7124] bg-[#FF7124]/5 bg-white'
-                      : 'border-[#3B4883]/5 bg-white/50 hover:bg-white hover:border-[#FF7124]/30'
+                    ? 'border-[#FF7124] bg-[#FF7124]/5 bg-white'
+                    : 'border-[#3B4883]/5 bg-white/50 hover:bg-white hover:border-[#FF7124]/30'
                     }`}
                 >
                   <span className="text-xl">{opt.emoji}</span>
@@ -507,8 +512,8 @@ const WorkerRegistrationPhase1 = () => {
                   key={opt.value}
                   onClick={() => setFormData(p => ({ ...p, expectedSalary: opt.value }))}
                   className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-center ${formData.expectedSalary === opt.value
-                      ? 'border-[#FF7124] bg-[#FF7124]/5'
-                      : 'border-[#3B4883]/5 bg-white/50 hover:bg-white hover:border-[#FF7124]/30'
+                    ? 'border-[#FF7124] bg-[#FF7124]/5'
+                    : 'border-[#3B4883]/5 bg-white/50 hover:bg-white hover:border-[#FF7124]/30'
                     }`}
                 >
                   <span className="text-[10px] font-black text-[#272D4E] uppercase">{opt.label}</span>
@@ -567,7 +572,7 @@ const WorkerRegistrationPhase1 = () => {
             <div
               key={phase}
               className={`h-1 rounded-full transition-all duration-300 ${phase === currentPhase ? 'w-8 bg-[#FF7124]' :
-                  phase < currentPhase ? 'w-4 bg-[#3B4883]' : 'w-2 bg-[#3B4883]/10'
+                phase < currentPhase ? 'w-4 bg-[#3B4883]' : 'w-2 bg-[#3B4883]/10'
                 }`}
             />
           ))}
