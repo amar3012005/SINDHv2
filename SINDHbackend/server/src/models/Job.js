@@ -1,3 +1,7 @@
+/**
+ * @deprecated This model is deprecated. Use Firestore 'jobs' collection instead.
+ * MongoDB is currently used for shadow writes only and will be fully removed in Phase 4.
+ */
 const mongoose = require('mongoose');
 
 const jobSchema = new mongoose.Schema({

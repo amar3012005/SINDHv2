@@ -1,33 +1,39 @@
-const Notification = require('../models/Notification');
+const { db, admin } = require('../config/firebase');
+const mongoose = require('mongoose');
 
 class NotificationService {
   constructor() {
     this.isDevelopment = true;
   }
 
-  // Create in-app notification
+  // Create in-app notification in Firestore
   async createInAppNotification(data) {
     try {
-      const notification = new Notification({
-        recipient: data.recipientId,
+      const notificationData = {
+        recipient: data.recipientId?.toString(),
         recipientModel: data.recipientModel,
-        sender: data.senderId,
+        sender: data.senderId?.toString() || 'System',
         senderModel: data.senderModel || 'System',
         type: data.type,
         title: data.title,
         message: data.message,
         data: {
-          jobId: data.jobId,
-          applicationId: data.applicationId,
-          employerId: data.employerId,
-          workerId: data.workerId
-        }
-      });
-      await notification.save();
-      console.log(`✅ In-app notification created: ${data.type} for ${data.recipientModel}`);
-      return notification;
+          jobId: data.jobId?.toString(),
+          applicationId: data.applicationId?.toString(),
+          employerId: data.employerId?.toString(),
+          workerId: data.workerId?.toString()
+        },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      const targetId = (new mongoose.Types.ObjectId()).toString();
+      await db.collection('notifications').doc(targetId).set(notificationData);
+      
+      console.log(`✅ In-app notification created in Firestore: ${data.type} for ${data.recipientModel}`);
+      return { id: targetId, ...notificationData };
     } catch (error) {
-      console.error('❌ Error creating in-app notification:', error.message);
+      console.error('❌ Error creating in-app notification in Firestore:', error.message);
       return null;
     }
   }

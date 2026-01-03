@@ -1,6 +1,4 @@
-const Worker = require('../models/Worker');
-const Job = require('../models/Job');
-const JobApplication = require('../models/JobApplication');
+const { db } = require('../config/firebase');
 const NotificationService = require('./notificationService');
 
 class JobMatchingService {
@@ -20,9 +18,8 @@ class JobMatchingService {
     }
 
     // Experience match
-    if (worker.experience_years) {
-      const experienceScore = worker.experience_years > 0 ? 1 : 0;
-      score += experienceScore * weights.experience;
+    if (worker.experience_years || worker.experience) {
+      score += weights.experience;
     }
 
     // Location match (using city and state)
@@ -37,11 +34,11 @@ class JobMatchingService {
     let score = 0;
 
     // Check if state matches
-    if (worker.location.state === job.location.state) {
+    if (worker.location?.state === job.location?.state) {
       score += 0.6;
 
       // If city also matches, add more points
-      if (worker.location.district === job.location.city) {
+      if (worker.location?.district === job.location?.city || worker.location?.city === job.location?.city) {
         score += 0.4;
       }
     }
@@ -52,11 +49,17 @@ class JobMatchingService {
   // Find matching workers for a job
   async findMatchingWorkers(job, minMatchScore = 0.6) {
     try {
-      // Find workers in the same state
-      const nearbyWorkers = await Worker.find({
-        'location.state': job.location.state,
-        available: true
-      });
+      // Find workers in the same state from Firestore
+      const snapshot = await db.collection('workers')
+        .where('location.state', '==', job.location?.state)
+        .where('isAvailable', '==', true)
+        .get();
+
+      const nearbyWorkers = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        _id: doc.id
+      }));
 
       // Calculate match scores for nearby workers
       const matchedWorkers = nearbyWorkers
@@ -69,7 +72,7 @@ class JobMatchingService {
 
       return matchedWorkers;
     } catch (error) {
-      console.error('Error finding matching workers:', error);
+      console.error('Error finding matching workers in Firestore:', error);
       throw error;
     }
   }
@@ -77,11 +80,17 @@ class JobMatchingService {
   // Find matching jobs for a worker
   async findMatchingJobs(worker, minMatchScore = 0.6) {
     try {
-      // Find jobs in the same state
-      const nearbyJobs = await Job.find({
-        'location.state': worker.location.state,
-        status: 'active'
-      });
+      // Find jobs in the same state from Firestore
+      const snapshot = await db.collection('jobs')
+        .where('location.state', '==', worker.location?.state)
+        .where('status', 'in', ['active', 'POSTED', 'APPLIED'])
+        .get();
+
+      const nearbyJobs = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+        _id: doc.id
+      }));
 
       // Calculate match scores for nearby jobs
       const matchedJobs = nearbyJobs
@@ -94,7 +103,7 @@ class JobMatchingService {
 
       return matchedJobs;
     } catch (error) {
-      console.error('Error finding matching jobs:', error);
+      console.error('Error finding matching jobs in Firestore:', error);
       throw error;
     }
   }

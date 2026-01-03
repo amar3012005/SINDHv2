@@ -36,278 +36,87 @@ const deg2rad = (deg) => {
 
 // Apply for a job
 router.post('/apply', asyncHandler(async (req, res) => {
-  logger.info('🎯 Job application request received');
-  logger.info('📝 Request body:', req.body);
-  logger.info('📝 Request headers:', req.headers);
-
+  logger.info('🎯 Job application request received for Firestore');
   const { jobId, workerId, workerDetails } = req.body;
 
   if (!jobId || !workerId) {
-    logger.warn('Missing required fields for job application', { jobId: !!jobId, workerId: !!workerId });
     throw new ValidationError('Job ID and Worker ID are required');
   }
 
-  const job = await Job.findById(jobId).populate('employer');
-  if (!job) {
-    logger.warn(`Job not found for application: ${jobId}`);
+  // 1. Check job status in Firestore
+  const jobDoc = await db.collection('jobs').doc(jobId).get();
+  if (!jobDoc.exists) {
     throw new NotFoundError('Job not found');
   }
+  const job = jobDoc.data();
 
-  // PREVENT DUPLICATE APPLICATIONS
-  const existingApplication = await JobApplication.findOne({
-    job: jobId,
-    worker: workerId
-  });
+  // 2. Prevent duplicate applications
+  const existingAppSnapshot = await db.collection('applications')
+    .where('job', '==', jobId)
+    .where('worker', '==', workerId)
+    .limit(1)
+    .get();
 
-  if (existingApplication) {
-    logger.warn(`Worker ${workerId} already applied for job ${jobId}`);
+  if (!existingAppSnapshot.empty) {
     throw new ValidationError('You have already applied for this job');
   }
 
-  logger.info(`Job ${jobId} current status: ${job.status}`);
-
-  // Check if job is available for applications
-  // Allow if status is POSTED, APPLIED or active (legacy)
-  if (!['POSTED', 'APPLIED', 'active', 'posted'].includes(job.status)) {
-    logger.warn(`Job not available for worker application: status=${job.status}, workerStatus=${job.workerStatus}`);
-    throw new ValidationError('Job is no longer accepting applications');
+  // 3. Fetch worker data for denormalization
+  const workerDoc = await db.collection('workers').doc(workerId).get();
+  if (!workerDoc.exists) {
+    throw new NotFoundError('Worker not found');
   }
+  const worker = workerDoc.data();
 
-  // Update status when worker applies
-  logger.info(`Updating job ${jobId} status to APPLIED`);
-
-  // Update status and increment applicant count
-  job.status = 'APPLIED';
-  job.applicantCount = (job.applicantCount || 0) + 1;
-
-  // Track legacy dual status for compatibility
-  job.workerStatus = 'applied';
-  job.employerStatus = 'active';
-
-  await job.save();
-
-  logger.info(`Job ${jobId} dual status updated successfully`);
-  logger.info(`Job after update:`, {
-    id: job._id,
-    workerStatus: job.workerStatus,
-    employerStatus: job.employerStatus,
-    legacyStatus: job.status,
-    title: job.title
-  });
-
-  // Verify the job was actually updated in the database
-  const updatedJob = await Job.findById(jobId);
-  logger.info(`Job verification from database:`, {
-    id: updatedJob._id,
-    workerStatus: updatedJob.workerStatus,
-    employerStatus: updatedJob.employerStatus,
-    legacyStatus: updatedJob.status,
-    title: updatedJob.title
-  });
-
-  // Check if job has reached maximum applications (optional limit)
-  const existingApplicationsCount = await JobApplication.countDocuments({ job: jobId });
-  if (existingApplicationsCount >= 50) { // Optional: limit applications per job
-    logger.warn(`Job ${jobId} has reached maximum applications`);
-    throw new ValidationError('This job has received maximum applications');
-  }
-
-  const worker = await Worker.findById(workerId);
-
-  if (!worker) {
-    logger.warn(`Worker not found in database for ID: ${workerId}. Proceeding with workerDetails from request.`);
-
-    const mongoose = require('mongoose');
-    if (!mongoose.Types.ObjectId.isValid(workerId)) {
-      logger.warn(`Invalid ObjectId format for workerId: ${workerId}`);
-      throw new ValidationError('Invalid worker ID format');
-    }
-
-    const sanitizedWorkerDetails = {
-      name: workerDetails?.name || 'Unknown Worker',
-      phone: workerDetails?.phone || '',
-      email: workerDetails?.email || '',
-      skills: workerDetails?.skills || [],
-      experience: workerDetails?.experience || '',
-      location: workerDetails?.location || {},
-      rating: typeof workerDetails?.rating === 'object'
-        ? (workerDetails.rating.average || 0)
-        : (workerDetails?.rating || 0)
-    };
-
-    const employerId = job.employer?._id || job.employer || '000000000000000000000000';
-
-    // Calculate distance from worker to job location
-    let distanceFromWork = 10; // Default 10km
-    const workerCoords = workerDetails?.location?.coordinates?.coordinates;
-    const jobCoords = job.location?.coordinates?.coordinates;
-
-    if (workerCoords && jobCoords && workerCoords.length === 2 && jobCoords.length === 2) {
-      const calculatedDistance = calculateDistance(
-        workerCoords[1], // latitude
-        workerCoords[0], // longitude
-        jobCoords[1],    // latitude
-        jobCoords[0]     // longitude
-      );
-      if (calculatedDistance !== null) {
-        distanceFromWork = calculatedDistance;
-        logger.info(`📍 Distance calculated: ${distanceFromWork.toFixed(2)}km (worker not in DB)`);
-      }
-    } else {
-      logger.info(`📍 Using default distance: ${distanceFromWork}km (coordinates not available)`);
-    }
-
-    const applicationData = {
-      job: jobId,
-      worker: workerId,
-      employer: employerId,
-      status: 'applied',
-      workerDetails: sanitizedWorkerDetails,
-      distanceFromWork: distanceFromWork,
-      appliedAt: new Date(),
-      statusHistory: [{
-        status: 'applied',
-        changedAt: new Date(),
-        note: 'Application submitted successfully'
-      }]
-    };
-
-    const application = new JobApplication(applicationData);
-    await application.save();
-    logger.info(`Application saved successfully (worker not in DB): ${application._id}`);
-
-    await application.populate('job');
-
-    return res.status(201).json({
-      success: true,
-      message: 'Application submitted successfully',
-      data: application,
-      note: 'Worker not found in database but application created with provided details'
-    });
-  }
-
-
-
-  const employerId = job.employer?._id || job.employer || '000000000000000000000000';
-
-  const sanitizedWorkerDetails = {
-    name: workerDetails?.name || worker.name || 'Unknown',
-    phone: workerDetails?.phone || worker.phone || '',
-    email: workerDetails?.email || worker.email || '',
-    skills: workerDetails?.skills || worker.skills || [],
-    experience: workerDetails?.experience || worker.experience || '',
-    location: workerDetails?.location || worker.location || {},
-    rating: typeof workerDetails?.rating === 'object'
-      ? (workerDetails.rating.average || 0)
-      : (workerDetails?.rating || worker.rating?.average || 0)
-  };
-
-  // Calculate distance from worker to job location
-  let distanceFromWork = 10; // Default 10km
-  const workerCoords = worker.location?.coordinates?.coordinates;
-  const jobCoords = job.location?.coordinates?.coordinates;
-
-  if (workerCoords && jobCoords && workerCoords.length === 2 && jobCoords.length === 2) {
-    const calculatedDistance = calculateDistance(
-      workerCoords[1], // latitude
-      workerCoords[0], // longitude
-      jobCoords[1],    // latitude
-      jobCoords[0]     // longitude
-    );
-    if (calculatedDistance !== null) {
-      distanceFromWork = calculatedDistance;
-      logger.info(`📍 Distance calculated: ${distanceFromWork.toFixed(2)}km`);
-    }
-  } else {
-    logger.info(`📍 Using default distance: ${distanceFromWork}km (coordinates not available)`);
-  }
-
+  // 4. Create application in Firestore with denormalized snippets
+  const targetId = (new mongoose.Types.ObjectId()).toString();
   const applicationData = {
     job: jobId,
     worker: workerId,
-    employer: employerId,
+    employer: job.employer,
     status: 'applied',
-    workerDetails: sanitizedWorkerDetails,
-    distanceFromWork: distanceFromWork,
-    appliedAt: new Date(),
-    statusHistory: [{
-      status: 'applied',
-      changedAt: new Date(),
-      note: 'Application submitted successfully'
-    }]
+    workerDetails: workerDetails || {},
+    
+    // Denormalized snippets
+    workerSnippet: {
+      name: worker.name,
+      rating: worker.rating?.average || 0,
+      phone: worker.phone,
+      profilePicture: worker.profilePicture || '',
+      preferredCategory: worker.preferredCategory || ''
+    },
+    jobSnippet: {
+      title: job.title,
+      salary: job.salary || job.baseAmount || 0,
+      location: job.location,
+      companyName: job.companyName || ''
+    },
+
+    appliedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
   };
 
-  const application = new JobApplication(applicationData);
-  await application.save();
-  logger.info(`Application saved successfully: ${application._id}`);
+  await db.collection('applications').doc(targetId).set(applicationData);
 
-  // Update worker's jobApplications array
-  if (worker) {
-    try {
-      if (!worker.jobApplications) {
-        worker.jobApplications = [];
-      }
-      if (!worker.jobApplications.includes(application._id)) {
-        worker.jobApplications.push(application._id);
-        await worker.save();
-        logger.info(`✅ Added application ${application._id} to worker ${workerId} profile`);
-      }
-    } catch (err) {
-      logger.warn(`⚠️ Could not update worker jobApplications array: ${err.message}`);
-    }
-  }
-
-  // Update job's applicantCount
-  try {
-    await Job.findByIdAndUpdate(
-      jobId,
-      { $inc: { applicantCount: 1 } },
-      { new: true }
-    );
-    logger.info(`✅ Incremented applicantCount for job ${jobId}`);
-  } catch (err) {
-    logger.warn(`⚠️ Could not increment job applicantCount: ${err.message}`);
-  }
-  logger.info(`Application details:`, {
-    id: application._id,
-    jobId: application.job,
-    workerId: application.worker,
-    employerId: application.employer,
-    status: application.status,
-    createdAt: application.createdAt
+  // 5. Create first status history entry in sub-collection
+  await db.collection('applications').doc(targetId).collection('statusHistory').add({
+    status: 'applied',
+    changedAt: admin.firestore.FieldValue.serverTimestamp(),
+    note: 'Application submitted via Firestore'
   });
 
-  await application.populate(['job', 'worker']);
+  // 6. Update job applicant count in Firestore (Background)
+  db.collection('jobs').doc(jobId).update({
+    applicantCount: admin.firestore.FieldValue.increment(1),
+    status: 'APPLIED' // Update status if it was just posted
+  }).catch(err => logger.warn(`⚠️ Failed to update job applicant count in Firestore: ${err.message}`));
 
-  let employer = null;
-  if (job.employer) {
-    try {
-      employer = await Employer.findById(job.employer);
-    } catch (empError) {
-      logger.warn(`Could not fetch employer details for job ${job.employer}: ${empError.message}`);
-    }
-  }
-
-  if (employer) {
-    try {
-      await NotificationService.notifyNewApplication(
-        application,
-        application.job,
-        application.worker,
-        employer
-      );
-      logger.info('New application notification sent to employer');
-    } catch (notificationError) {
-      logger.error('Error sending notification:', notificationError);
-    }
-  }
+  logger.info(`Application saved successfully in Firestore: ${targetId}`);
 
   res.status(201).json({
     success: true,
     message: 'Application submitted successfully',
-    data: application,
-    jobStatusUpdated: job.status === 'in-progress',
-    jobStatus: job.status
+    data: { ...applicationData, id: targetId, _id: targetId }
   });
 }));
 
@@ -359,20 +168,23 @@ router.get('/employer/:employerId', asyncHandler(async (req, res) => {
   const { employerId } = req.params;
   const { status } = req.query;
 
-  console.log(`[API] [GET] /api/job-applications/employer/${employerId} [status=${status}]`);
-  logger.info(`Fetching applications for employer: ${employerId}`);
+  logger.info(`Fetching applications from Firestore for employer: ${employerId}`);
 
-  const query = { employer: employerId };
+  let query = db.collection('applications').where('employer', '==', employerId);
   if (status) {
-    query.status = status;
+    query = query.where('status', '==', status);
   }
 
-  const applications = await JobApplication.find(query)
-    .populate('worker', 'name phone skills rating')
-    .populate('job', 'title description salary location')
-    .sort({ createdAt: -1 });
-
-  console.log(`Found ${applications.length} applications for employer ${employerId}`);
+  const snapshot = await query.get();
+  const applications = snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    _id: doc.id
+  })).sort((a, b) => {
+    const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+    const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+    return dateB - dateA;
+  });
 
   res.status(200).json({
     success: true,
@@ -386,20 +198,23 @@ router.get('/job/:jobId', asyncHandler(async (req, res) => {
   const { jobId } = req.params;
   const { status } = req.query;
 
-  console.log(`[API] [GET] /api/job-applications/job/${jobId} [status=${status}]`);
-  logger.info(`Fetching applications for job: ${jobId}`);
+  logger.info(`Fetching applications from Firestore for job: ${jobId}`);
 
-  const query = { job: jobId };
+  let query = db.collection('applications').where('job', '==', jobId);
   if (status) {
-    query.status = status;
+    query = query.where('status', '==', status);
   }
 
-  const applications = await JobApplication.find(query)
-    .populate('worker', 'name phone skills rating')
-    .populate('job', 'title description salary location')
-    .sort({ createdAt: -1 });
-
-  console.log(`Found ${applications.length} applications for job ${jobId}`);
+  const snapshot = await query.get();
+  const applications = snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    _id: doc.id
+  })).sort((a, b) => {
+    const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+    const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+    return dateB - dateA;
+  });
 
   res.status(200).json({
     success: true,
@@ -411,79 +226,25 @@ router.get('/job/:jobId', asyncHandler(async (req, res) => {
 // Get a specific application by ID
 router.get('/:applicationId', asyncHandler(async (req, res) => {
   const { applicationId } = req.params;
+  logger.info(`Fetching application by ID from Firestore: ${applicationId}`);
 
-  // --- LOGGING ---
-  const logColor = '\x1b[34m'; // Blue
-  const resetColor = '\x1b[0m';
-  console.log(`${logColor}[API] [GET] /api/job-applications/${applicationId} [applicationId=${applicationId}]${resetColor}`);
-  // --- END LOGGING ---
+  const applicationDoc = await db.collection('applications').doc(applicationId).get();
 
-  logger.info(`Fetching application by ID: ${applicationId}`);
-
-  const application = await JobApplication.findById(applicationId)
-    .populate('job')
-    .populate('worker')
-    .populate('employer');
-
-  if (!application) {
+  if (!applicationDoc.exists) {
     logger.warn(`Application not found: ${applicationId}`);
     throw new NotFoundError('Application not found');
   }
 
-  // Transform the application to a frontend-friendly format
-  const transformedApplication = {
-    _id: application._id.toString(),
-    status: application.status,
-    appliedAt: application.appliedAt || application.createdAt || application.applicationDetails?.appliedAt,
-    job: application.job ? {
-      _id: application.job._id.toString(),
-      title: application.job.title || 'Job Title Not Available',
-      companyName: application.job.companyName || application.job.company || 'Company Not Available',
-      location: application.job.location || { city: 'Not Available', state: 'Not Available' },
-      salary: application.job.salary || 'Salary Not Specified',
-      category: application.job.category || 'General',
-      employmentType: application.job.employmentType || 'Full-time',
-      description: application.job.description || 'No description available'
-    } : {
-      _id: 'unknown',
-      title: 'Job Title Not Available',
-      companyName: 'Company Not Available',
-      location: { city: 'Not Available', state: 'Not Available' },
-      salary: 'Salary Not Specified',
-      category: 'General',
-      employmentType: 'Full-time',
-      description: 'No description available'
-    },
-    worker: application.worker ? {
-      _id: application.worker._id.toString(),
-      name: application.worker.name || application.workerDetails?.name || 'Unknown Worker',
-      phone: application.worker.phone || application.workerDetails?.phone || '',
-      skills: application.worker.skills || application.workerDetails?.skills || []
-    } : {
-      _id: 'unknown',
-      name: application.workerDetails?.name || 'Unknown Worker',
-      phone: application.workerDetails?.phone || '',
-      skills: application.workerDetails?.skills || []
-    },
-    employer: application.employer ? {
-      _id: application.employer._id.toString(),
-      name: application.employer.name || 'Unknown Employer',
-      companyName: application.employer.companyName || application.employer.company || 'Unknown Company'
-    } : {
-      _id: 'unknown',
-      name: 'Unknown Employer',
-      companyName: 'Unknown Company'
-    },
-    paymentStatus: application.paymentStatus || 'pending',
-    paymentAmount: application.paymentAmount || 0,
-    statusHistory: application.statusHistory || []
-  };
+  const application = applicationDoc.data();
 
-  logger.info(`Successfully fetched application: ${applicationId}`);
-
+  // Return formatted application
   res.json({
     success: true,
-    data: transformedApplication
+    data: {
+      ...application,
+      id: applicationDoc.id,
+      _id: applicationDoc.id
+    }
   });
 }));
 
@@ -491,120 +252,27 @@ router.get('/:applicationId', asyncHandler(async (req, res) => {
 router.get('/worker/:workerId/current', asyncHandler(async (req, res) => {
   const { workerId } = req.params;
 
-  // --- LOGGING ---
-  const logColor = '\x1b[35m'; // Magenta
-  const resetColor = '\x1b[0m';
-  console.log(`${logColor}[API] [GET] /api/job-applications/worker/${workerId}/current [workerId=${workerId}]${resetColor}`);
-  // --- END LOGGING ---
+  logger.info(`Fetching current applications from Firestore for worker: ${workerId}`);
 
-  logger.info(`Fetching current applications for worker: ${workerId}`);
-  logger.info(`DATABASE_NAME: ${mongoose.connection.name}`);
+  const snapshot = await db.collection('applications')
+    .where('worker', '==', workerId)
+    .where('status', 'in', ['applied', 'accepted', 'working', 'in-progress', 'APPLIED', 'ACCEPTED', 'WORKING', 'pending'])
+    .get();
 
-  const query = {
-    worker: workerId,
-    status: { $in: ['applied', 'accepted', 'working', 'in-progress', 'APPLIED', 'ACCEPTED', 'WORKING'] }
-  };
-
-  const applications = await JobApplication.find(query)
-    .populate('job')
-    .populate('worker')
-    .populate('employer')
-    .sort({ appliedAt: -1 });
-
-  logger.info(`Found ${applications.length} current applications for worker ${workerId} using query: ${JSON.stringify(query)}`);
-
-  if (applications.length === 0) {
-    const allForWorker = await JobApplication.find({ worker: workerId });
-    logger.info(`🔍 DEBUG: Total applications for this worker (any status): ${allForWorker.length}`);
-    if (allForWorker.length > 0) {
-      logger.info(`🔍 DEBUG: Sample application status: ${allForWorker[0].status}`);
-    }
-  }
-
-  // Transform the applications to a frontend-friendly format
-  const transformedApplications = applications.map(app => {
-    try {
-      logger.info(`Transforming application: ${app._id}`);
-      logger.info(`Original app data:`, {
-        _id: app._id,
-        status: app.status,
-        job: app.job ? 'exists' : 'null',
-        worker: app.worker ? 'exists' : 'null',
-        employer: app.employer ? 'exists' : 'null'
-      });
-
-      const transformed = {
-        _id: app._id.toString(),
-        status: app.status,
-        appliedAt: app.appliedAt || app.createdAt || app.applicationDetails?.appliedAt,
-        job: app.job ? {
-          _id: app.job._id.toString(),
-          title: app.job.title || 'Job Title Not Available',
-          companyName: app.job.companyName || app.job.company || 'Company Not Available',
-          location: app.job.location || { city: 'Not Available', state: 'Not Available' },
-          salary: app.job.salary || 'Salary Not Specified',
-          category: app.job.category || 'General',
-          employmentType: app.job.employmentType || 'Full-time',
-          description: app.job.description || 'No description available'
-        } : {
-          _id: 'unknown',
-          title: 'Job Title Not Available',
-          companyName: 'Company Not Available',
-          location: { city: 'Not Available', state: 'Not Available' },
-          salary: 'Salary Not Specified',
-          category: 'General',
-          employmentType: 'Full-time',
-          description: 'No description available'
-        },
-        worker: app.worker ? {
-          _id: app.worker._id.toString(),
-          name: app.worker.name || app.workerDetails?.name || 'Unknown Worker',
-          phone: app.worker.phone || app.workerDetails?.phone || '',
-          skills: app.worker.skills || app.workerDetails?.skills || []
-        } : {
-          _id: 'unknown',
-          name: app.workerDetails?.name || 'Unknown Worker',
-          phone: app.workerDetails?.phone || '',
-          skills: app.workerDetails?.skills || []
-        },
-        employer: app.employer ? {
-          _id: app.employer._id.toString(),
-          name: app.employer.name || 'Unknown Employer',
-          companyName: app.employer.companyName || app.employer.company || 'Unknown Company'
-        } : {
-          _id: 'unknown',
-          name: 'Unknown Employer',
-          companyName: 'Unknown Company'
-        },
-        paymentStatus: app.paymentStatus || 'pending',
-        paymentAmount: app.paymentAmount || 0,
-        statusHistory: app.statusHistory || []
-      };
-
-      logger.info(`Transformed application:`, {
-        _id: transformed._id,
-        status: transformed.status,
-        jobTitle: transformed.job.title,
-        jobCompany: transformed.job.companyName
-      });
-
-      return transformed;
-    } catch (transformError) {
-      logger.error('Error transforming application data:', {
-        error: transformError.message,
-        applicationId: app._id,
-        stack: transformError.stack
-      });
-      return null;
-    }
-  }).filter(Boolean); // Remove any null entries
-
-  logger.info(`Successfully processed ${transformedApplications.length} valid current applications`);
+  const applications = snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    _id: doc.id
+  })).sort((a, b) => {
+    const dateA = a.appliedAt?.toDate ? a.appliedAt.toDate() : new Date(a.appliedAt || 0);
+    const dateB = b.appliedAt?.toDate ? b.appliedAt.toDate() : new Date(b.appliedAt || 0);
+    return dateB - dateA;
+  });
 
   res.json({
     success: true,
-    data: transformedApplications,
-    count: transformedApplications.length
+    data: applications,
+    count: applications.length
   });
 }));
 
@@ -612,84 +280,27 @@ router.get('/worker/:workerId/current', asyncHandler(async (req, res) => {
 router.get('/worker/:workerId/completed', asyncHandler(async (req, res) => {
   const { workerId } = req.params;
 
-  logger.info(`Fetching completed applications for worker: ${workerId}`);
-  logger.info(`DATABASE_NAME: ${mongoose.connection.name}`);
+  logger.info(`Fetching completed applications from Firestore for worker: ${workerId}`);
 
-  const completedApplications = await JobApplication.find({
-    worker: workerId,
-    status: { $in: ['completed', 'paid', 'COMPLETED', 'PAID', 'FINISHED'] }
-  })
-    .populate('job')
-    .populate('employer', 'name company companyName')
-    .sort({ updatedAt: -1 });
+  const snapshot = await db.collection('applications')
+    .where('worker', '==', workerId)
+    .where('status', 'in', ['completed', 'paid', 'COMPLETED', 'PAID', 'FINISHED'])
+    .get();
 
-  logger.info(`Found ${completedApplications.length} completed applications for worker ${workerId}`);
-
-  if (completedApplications.length === 0) {
-    const allForWorker = await JobApplication.find({ worker: workerId });
-    logger.info(`🔍 DEBUG COMPLETED: Total applications for this worker (any status): ${allForWorker.length}`);
-  }
-
-  // Filter out applications with null/invalid jobs and safely transform the data
-  const validApplications = completedApplications.filter(app => {
-    if (!app.job) {
-      logger.warn(`Application ${app._id} has null job reference, skipping`);
-      return false;
-    }
-
-    // Check if job is a valid populated object
-    if (typeof app.job === 'object' && app.job._id) {
-      return true;
-    }
-
-    // Check if job is a valid ObjectId string
-    if (typeof app.job === 'string' && app.job.match(/^[0-9a-fA-F]{24}$/)) {
-      logger.warn(`Application ${app._id} has unpopulated job reference: ${app.job}`);
-      return false; // Skip unpopulated references for now
-    }
-
-    logger.warn(`Application ${app._id} has invalid job data type: ${typeof app.job}`);
-    return false;
+  const applications = snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    _id: doc.id
+  })).sort((a, b) => {
+    const dateA = a.updatedAt?.toDate ? a.updatedAt.toDate() : new Date(a.updatedAt || 0);
+    const dateB = b.updatedAt?.toDate ? b.updatedAt.toDate() : new Date(b.updatedAt || 0);
+    return dateB - dateA;
   });
-
-  const transformedData = validApplications.map(app => {
-    try {
-      return {
-        _id: app._id,
-        job: {
-          _id: app.job._id,
-          title: app.job.title || 'Job Title Not Available',
-          companyName: app.job.companyName || 'Company Not Available',
-          location: app.job.location || { city: 'Not specified', state: 'Not specified' },
-          salary: app.job.salary || 0,
-          category: app.job.category || 'General',
-          description: app.job.description || 'No description available'
-        },
-        application: {
-          status: app.status,
-          appliedAt: app.applicationDetails?.appliedAt || app.createdAt,
-          completedAt: app.jobCompletedDate || app.updatedAt,
-          paymentStatus: app.paymentStatus || 'pending',
-          paymentAmount: app.paymentAmount || app.job.salary || 0,
-          paymentDate: app.paymentDate
-        },
-        employer: app.employer || { name: 'Unknown Employer' }
-      };
-    } catch (transformError) {
-      logger.error('Error transforming application data:', {
-        error: transformError.message,
-        applicationId: app._id
-      });
-      return null;
-    }
-  }).filter(Boolean); // Remove any null entries
-
-  logger.info(`Successfully processed ${transformedData.length} valid completed applications`);
 
   res.json({
     success: true,
-    count: transformedData.length,
-    data: transformedData
+    data: applications,
+    count: applications.length
   });
 }));
 
@@ -796,6 +407,9 @@ router.delete('/:applicationId', async (req, res) => {
 
 // Enhanced application status update with comprehensive validation and flow management
 router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/f37aaaad-37c4-46aa-b65b-61479aa84b1f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'jobApplicationRoutes.js:386',message:'Entering status update',data:{applicationId:req.params.applicationId,status:req.body.status},timestamp:Date.now(),sessionId:'robustness-check',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
   const { applicationId } = req.params;
   const { status, previousStatus, transitionReason, timestamp, updatedBy, ...additionalData } = req.body;
 
@@ -861,27 +475,29 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     updateData.paymentAmount = currentApplication.job?.salary || additionalData.paymentAmount || 0;
   }
 
-  // Update status history
+  // Update status history in sub-collection
   const statusHistoryEntry = {
     status,
-    changedAt: new Date(),
+    changedAt: admin.firestore.FieldValue.serverTimestamp(),
     previousStatus: currentStatus,
     note: transitionReason || `Status changed from ${currentStatus} to ${status}`,
     updatedBy: updatedBy || 'system',
     timestamp: timestamp || new Date().toISOString()
   };
 
-  // Perform the update
-  const application = await JobApplication.findByIdAndUpdate(
-    applicationId,
-    {
-      ...updateData,
-      $push: { statusHistory: statusHistoryEntry }
-    },
-    { new: true }
-  ).populate(['job', 'worker']);
+  // Perform the update in Firestore
+  const applicationRef = db.collection('applications').doc(applicationId);
+  await applicationRef.update(updateData);
+  await applicationRef.collection('statusHistory').add(statusHistoryEntry);
 
-  if (!application) {
+  const updatedDoc = await applicationRef.get();
+  const application = {
+    ...updatedDoc.data(),
+    id: updatedDoc.id,
+    _id: updatedDoc.id
+  };
+
+  if (!updatedDoc.exists) {
     logger.warn(`❌ Failed to update application: ${applicationId}`);
     throw new NotFoundError('Failed to update application');
   }
@@ -1643,21 +1259,30 @@ router.post('/:applicationId/start-work', asyncHandler(async (req, res) => {
   // Update application status to working
   application.status = 'working';
   application.startedAt = new Date();
-  application.statusHistory.push({
+  
+  const statusHistoryEntry = {
     status: 'working',
-    changedAt: new Date(),
+    changedAt: admin.firestore.FieldValue.serverTimestamp(),
     note: 'Work started'
-  });
-  await application.save();
+  };
 
-  // Update job status
-  const job = await Job.findById(application.job._id || application.job);
-  if (job) {
-    job.status = 'WORKING';
-    job.workerStatus = 'working';
-    job.employerStatus = 'working';
-    await job.save();
-    logger.info(`✅ Job ${job._id} status updated to WORKING`);
+  await db.collection('applications').doc(applicationId).update({
+    status: 'working',
+    startedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  await db.collection('applications').doc(applicationId).collection('statusHistory').add(statusHistoryEntry);
+
+  // Update job status in Firestore
+  const jobId = application.job._id || application.job;
+  if (jobId) {
+    await db.collection('jobs').doc(jobId).update({
+      status: 'WORKING',
+      workerStatus: 'working',
+      employerStatus: 'working',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    logger.info(`✅ Job ${jobId} status updated to WORKING in Firestore`);
   }
 
   // Send notifications to both parties
@@ -1729,23 +1354,29 @@ router.post('/:applicationId/worker-finish', asyncHandler(async (req, res) => {
     throw new ValidationError(`Cannot finish work. Current status: ${application.status}. Must be 'working'.`);
   }
 
-  // Mark worker as confirmed finish and set status to PAYMENT_PENDING
-  application.status = 'PAYMENT_PENDING';
-  application.workerConfirmedFinish = true;
-  application.workerConfirmedFinishAt = new Date();
-  application.statusHistory.push({
+  // Mark worker as confirmed finish and set status to PAYMENT_PENDING in Firestore
+  const statusHistoryEntry = {
     status: 'PAYMENT_PENDING',
-    changedAt: new Date(),
+    changedAt: admin.firestore.FieldValue.serverTimestamp(),
     note: 'Worker confirmed work is complete'
-  });
-  await application.save();
+  };
 
-  // Also update the associated Job's status to PAYMENT_PENDING
-  const jobToUpdate = await Job.findById(application.job._id || application.job);
-  if (jobToUpdate) {
-    jobToUpdate.status = 'PAYMENT_PENDING';
-    await jobToUpdate.save();
-    logger.info(`✅ Job ${jobToUpdate._id} status updated to PAYMENT_PENDING`);
+  await db.collection('applications').doc(applicationId).update({
+    status: 'PAYMENT_PENDING',
+    workerConfirmedFinish: true,
+    workerConfirmedFinishAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  await db.collection('applications').doc(applicationId).collection('statusHistory').add(statusHistoryEntry);
+
+  // Also update the associated Job's status to PAYMENT_PENDING in Firestore
+  const jobId = application.job._id || application.job;
+  if (jobId) {
+    await db.collection('jobs').doc(jobId).update({
+      status: 'PAYMENT_PENDING',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    logger.info(`✅ Job ${jobId} status updated to PAYMENT_PENDING in Firestore`);
   }
 
   // Notify employer that worker finished
@@ -1805,37 +1436,41 @@ router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => 
     throw new ValidationError('Worker has not confirmed work completion yet.');
   }
 
-  // Update application
-  application.status = 'completed';
-  application.employerConfirmedFinish = true;
-  application.employerConfirmedFinishAt = new Date();
-  application.completedAt = new Date();
-  application.additionalCharges = additionalCharges;
-  application.totalPayment = (application.baseAmount || 0) + additionalCharges;
-
-  if (additionalCharges > 0) {
-    application.additionalChargesPaid = true;
-    application.additionalChargesPaidAt = new Date();
-  }
-
-  application.statusHistory.push({
+  // Update application in Firestore
+  const statusHistoryEntry = {
     status: 'completed',
-    changedAt: new Date(),
+    changedAt: admin.firestore.FieldValue.serverTimestamp(),
     note: `Job completed. Additional charges: ₹${additionalCharges}`
-  });
-  await application.save();
+  };
 
-  // Update job status
-  const job = await Job.findById(application.job._id || application.job);
-  if (job) {
-    job.status = 'COMPLETED';
-    job.workerStatus = 'completed';
-    job.employerStatus = 'completed';
-    job.additionalCharges = additionalCharges;
-    job.totalPayment = (job.baseAmount || 0) + additionalCharges;
-    job.completedAt = new Date();
-    await job.save();
-    logger.info(`✅ Job ${job._id} status updated to COMPLETED`);
+  await db.collection('applications').doc(applicationId).update({
+    status: 'completed',
+    employerConfirmedFinish: true,
+    employerConfirmedFinishAt: admin.firestore.FieldValue.serverTimestamp(),
+    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    additionalCharges: additionalCharges,
+    totalPayment: (application.baseAmount || 0) + additionalCharges,
+    ...(additionalCharges > 0 && {
+      additionalChargesPaid: true,
+      additionalChargesPaidAt: admin.firestore.FieldValue.serverTimestamp()
+    }),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+  await db.collection('applications').doc(applicationId).collection('statusHistory').add(statusHistoryEntry);
+
+  // Update job status in Firestore
+  const jobId = application.job._id || application.job;
+  if (jobId) {
+    await db.collection('jobs').doc(jobId).update({
+      status: 'COMPLETED',
+      workerStatus: 'completed',
+      employerStatus: 'completed',
+      additionalCharges: additionalCharges,
+      totalPayment: (application.baseAmount || 0) + additionalCharges,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    logger.info(`✅ Job ${jobId} status updated to COMPLETED in Firestore`);
   }
 
   // Credit additional charges to worker wallet

@@ -63,17 +63,6 @@ router.post('/register', asyncHandler(async (req, res) => {
     throw new ValidationError('Worker already exists with this phone number');
   }
 
-  // SECONDARY CHECK: Try MongoDB, but handle timeout/connection issues gracefully
-  try {
-    let worker = await Worker.findOne({ phone }).maxTimeMS(2000); // 2 second timeout
-    if (worker) {
-      console.log('❌ Worker already exists in MongoDB with phone:', phone);
-      throw new ValidationError('Worker already exists with this phone number');
-    }
-  } catch (mongoError) {
-    console.warn('⚠️ MongoDB check failed or timed out, proceeding with Firestore only:', mongoError.message);
-  }
-
   console.log('✅ No existing worker found, proceeding with registration');
 
   // Enhanced Phase-1 validation
@@ -185,14 +174,10 @@ router.post('/register', asyncHandler(async (req, res) => {
   // Extract firebaseUid if provided by frontend
   const { firebaseUid } = req.body;
 
-  // STEP 1: PREPARE MONGODB OBJECT (To get a valid ObjectId as fallback)
-  let mongoWorker = new Worker(workerDataRaw);
-  const mongoId = mongoWorker._id.toString();
-
   // STEP 2: SAVE TO FIRESTORE (Primary)
   // Use Firebase UID as document ID in 'workers' collection (Phase 1 Strategy)
   // Fallback to mongoId if firebaseUid is not provided (should not happen with new logic)
-  const targetId = firebaseUid || mongoId;
+  const targetId = firebaseUid || (new mongoose.Types.ObjectId()).toString();
 
   try {
     const firestoreRef = db.collection('workers').doc(targetId);
@@ -201,7 +186,6 @@ router.post('/register', asyncHandler(async (req, res) => {
       ...workerDataRaw,
       _id: targetId,
       id: targetId,
-      mongoId: mongoId, // Keep track of mongoId for fallback
       firebaseUid: firebaseUid || null,
       type: 'worker',
       role: 'worker',
@@ -216,7 +200,7 @@ router.post('/register', asyncHandler(async (req, res) => {
     // Also update legacy tracking in 'users' collection for backward compatibility
     await db.collection('users').doc(targetId).set({
       phone: workerDataRaw.phone,
-      mongoId: mongoId,
+      mongoId: targetId,
       type: 'worker',
       firebaseUid: firebaseUid || null
     });
@@ -225,13 +209,15 @@ router.post('/register', asyncHandler(async (req, res) => {
     throw new AppError('Profile creation failed. Please try again.', 500);
   }
 
-  // STEP 3: SAVE TO MONGODB (Secondary/Background)
+  // STEP 3: MONGODB SHADOW WRITE (DEPRECATED - Removed)
+  /*
   try {
     await mongoWorker.save({ timeout: 3000 });
     console.log('💾 Worker also saved to MongoDB');
   } catch (mongoError) {
     console.warn('⚠️ MongoDB save failed (timed out), but profile exists in Firestore:', mongoError.message);
   }
+  */
 
   logger.info(`Worker registered successfully in Firestore: ${name}`);
 
@@ -252,52 +238,73 @@ router.post('/register', asyncHandler(async (req, res) => {
 
 // Get all workers
 router.get('/', asyncHandler(async (req, res) => {
-  const workers = await Worker.find({});
+  logger.info('Fetching all workers from Firestore');
+  const snapshot = await db.collection('workers').get();
+  const workers = snapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    _id: doc.id
+  }));
   res.json(workers);
 }));
 
 // Get worker by ID
 router.get('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
-  logger.info(`Fetching worker by ID: ${id}`);
-  console.log(`🔍 [GET /api/workers/${id}] Looking for worker...`);
-  console.log(`   Database: ${mongoose.connection.name}, State: ${mongoose.connection.readyState}`);
-
-  const worker = await Worker.findById(id);
-  if (!worker) {
-    console.error(`❌ [GET /api/workers/${id}] Worker NOT FOUND in database`);
-    // List all IDs to see if there's a mismatch
-    const allWorkers = await Worker.find({}, '_id name').limit(5);
-    console.log(`   Recent workers in DB:`, allWorkers.map(w => w._id.toString()));
-
+  logger.info(`Fetching worker by ID from Firestore: ${id}`);
+  
+  // PRIMARY: Fetch from Firestore 'workers' collection
+  const workerDoc = await db.collection('workers').doc(id).get();
+  
+  if (!workerDoc.exists) {
+    console.error(`❌ [GET /api/workers/${id}] Worker NOT FOUND in Firestore`);
     throw new NotFoundError('Worker not found');
   }
 
-  console.log(`✅ [GET /api/workers/${id}] Worker found: ${worker.name}`);
-  res.json(worker);
+  const workerData = workerDoc.data();
+  console.log(`✅ [GET /api/workers/${id}] Worker found in Firestore: ${workerData.name}`);
+  
+  // Return formatted worker object (normalize ID)
+  res.json({
+    ...workerData,
+    id: workerDoc.id,
+    _id: workerDoc.id
+  });
 }));
 
 // Update worker
 router.put('/:id', asyncHandler(async (req, res) => {
-  const worker = await Worker.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true, runValidators: true }
-  );
-  if (!worker) {
-    throw new NotFoundError('Worker not found');
-  }
-  logger.info(`Worker profile updated: ${worker.name}`);
-  res.json(worker);
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/f37aaaad-37c4-46aa-b65b-61479aa84b1f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'workerRoutes.js:278',message:'Worker profile update attempt',data:{id:req.params.id,updates:Object.keys(req.body)},timestamp:Date.now(),sessionId:'robustness-check',hypothesisId:'H3'})}).catch(()=>{});
+  // #endregion
+  const { id } = req.params;
+  logger.info(`Updating worker in Firestore: ${id}`);
+  
+  await db.collection('workers').doc(id).update({
+    ...req.body,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  const updatedDoc = await db.collection('workers').doc(id).get();
+  const updatedWorker = updatedDoc.data();
+
+  logger.info(`Worker profile updated in Firestore: ${updatedWorker.name}`);
+  res.json({
+    ...updatedWorker,
+    id: updatedDoc.id,
+    _id: updatedDoc.id
+  });
 }));
 
 // Delete worker
 router.delete('/:id', asyncHandler(async (req, res) => {
-  const worker = await Worker.findByIdAndDelete(req.params.id);
-  if (!worker) {
-    throw new NotFoundError('Worker not found');
-  }
-  logger.info(`Worker deleted: ${worker.name}`);
+  const { id } = req.params;
+  logger.info(`Deleting worker from Firestore: ${id}`);
+  
+  await db.collection('workers').doc(id).delete();
+  await db.collection('users').doc(id).delete().catch(() => {});
+
+  logger.info(`Worker deleted from Firestore: ${id}`);
   res.json({ message: 'Worker deleted successfully' });
 }));
 
@@ -341,26 +348,54 @@ router.patch('/:id/work-radius', asyncHandler(async (req, res) => {
 
 // Get worker profile with job history
 router.get('/:id/profile', asyncHandler(async (req, res) => {
-  const worker = await Worker.findById(req.params.id);
-  if (!worker) {
+  const workerId = req.params.id;
+  logger.info(`Fetching worker profile from Firestore: ${workerId}`);
+  
+  const workerDoc = await db.collection('workers').doc(workerId).get();
+  if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
   }
+  const worker = workerDoc.data();
 
-  const jobApplications = await JobApplication.find({ worker: worker._id })
-    .populate('job')
-    .populate('employer', 'company.name')
-    .sort({ updatedAt: -1 });
+  // Fetch reviews from sub-collection
+  const reviewsSnapshot = await db.collection('workers').doc(workerId)
+    .collection('reviews')
+    .orderBy('createdAt', 'desc')
+    .limit(20)
+    .get();
+  
+  const reviews = reviewsSnapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id
+  }));
+
+  const applicationsSnapshot = await db.collection('applications')
+    .where('worker', '==', workerId)
+    .get();
+
+  const jobApplications = applicationsSnapshot.docs.map(doc => ({
+    ...doc.data(),
+    id: doc.id,
+    _id: doc.id
+  })).sort((a, b) => {
+    const dateA = a.updatedAt?.toDate ? a.updatedAt.toDate() : new Date(a.updatedAt || 0);
+    const dateB = b.updatedAt?.toDate ? b.updatedAt.toDate() : new Date(b.updatedAt || 0);
+    return dateB - dateA;
+  });
 
   const currentJobs = jobApplications.filter(app =>
-    ['pending', 'accepted'].includes(app.status)
+    ['pending', 'accepted', 'applied', 'working', 'in-progress'].includes(app.status)
   );
   const pastJobs = jobApplications.filter(app =>
-    app.status === 'completed'
+    ['completed', 'paid', 'finished'].includes(app.status)
   );
 
   res.json({
     worker: {
-      ...worker.toObject(),
+      ...worker,
+      id: workerId,
+      _id: workerId,
+      reviews: reviews,
       jobHistory: {
         current: currentJobs,
         past: pastJobs
@@ -377,15 +412,24 @@ router.post('/login', asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number is required');
   }
 
-  const worker = await Worker.findOne({ phone });
+  logger.info(`Worker login attempt for phone: ${phone}`);
+  
+  // PRIMARY: Check Firestore
+  const snapshot = await db.collection('workers').where('phone', '==', phone).limit(1).get();
 
-  if (!worker) {
+  if (snapshot.empty) {
     throw new NotFoundError('Worker not found. Please register first.');
   }
 
-  worker.lastLogin = new Date();
-  worker.isLoggedIn = 1;
-  await worker.save();
+  const workerDoc = snapshot.docs[0];
+  const worker = workerDoc.data();
+  const workerId = workerDoc.id;
+
+  // Update Firestore (Background)
+  db.collection('workers').doc(workerId).update({
+    lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+    isLoggedIn: 1
+  }).catch(err => logger.warn(`⚠️ Failed to update login status in Firestore: ${err.message}`));
 
   logger.info(`Worker login successful: ${worker.name}`);
   res.json({
@@ -393,8 +437,9 @@ router.post('/login', asyncHandler(async (req, res) => {
     message: 'Login successful',
     data: {
       worker: {
-        ...worker.toObject(),
-        id: worker._id,
+        ...worker,
+        id: workerId,
+        _id: workerId,
         type: 'worker'
       }
     }
@@ -403,21 +448,24 @@ router.post('/login', asyncHandler(async (req, res) => {
 
 // Get worker balance and earnings
 router.get('/:id/balance', asyncHandler(async (req, res) => {
-  const worker = await Worker.findById(req.params.id);
-  if (!worker) {
+  const { id } = req.params;
+  const workerDoc = await db.collection('workers').doc(id).get();
+  
+  if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
   }
+
+  const worker = workerDoc.data();
 
   // Use new wallet structure if available, fallback to old or 0
   const totalBalance = worker.wallet?.totalBalance || worker.balance || 0;
   const withdrawableBalance = worker.wallet?.withdrawableBalance || 0;
-  // Previously this was 'balance', implying distinct from earnings, but 'totalBalance' is the main view now.
 
   // Map earnings from transaction history if available
   let earnings = worker.earnings || [];
   if (worker.wallet?.transactionHistory) {
     earnings = worker.wallet.transactionHistory
-      .filter(t => t.type === 'credit' || t.type === 'earning' || t.type === 'credit_pending') // Show pending credits too
+      .filter(t => t.type === 'credit' || t.type === 'earning' || t.type === 'credit_pending')
       .map(t => ({
         jobId: t.jobId,
         amount: t.amount,
@@ -435,38 +483,77 @@ router.get('/:id/balance', asyncHandler(async (req, res) => {
 }));
 
 // Manually process payment for completed job
+// Note: This still updates MongoDB as a shadow write for now, but uses Firestore data
 router.post('/:workerId/process-payment/:applicationId', asyncHandler(async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/f37aaaad-37c4-46aa-b65b-61479aa84b1f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'workerRoutes.js:473',message:'Entering process-payment',data:{workerId:req.params.workerId,applicationId:req.params.applicationId,amount:req.body.amount},timestamp:Date.now(),sessionId:'robustness-check',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
   const { amount } = req.body;
+  const { workerId, applicationId } = req.params;
 
-  const worker = await Worker.findById(req.params.workerId);
-  if (!worker) {
+  const workerDoc = await db.collection('workers').doc(workerId).get();
+  if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
   }
 
-  const application = await JobApplication.findById(req.params.applicationId);
-  if (!application) {
+  const applicationDoc = await db.collection('applications').doc(applicationId).get();
+  if (!applicationDoc.exists) {
     throw new NotFoundError('Job application not found');
   }
 
-  worker.balance += amount;
-  worker.earnings.push({
-    jobId: application.job._id,
-    amount: amount,
-    description: `Payment for: ${application.job.title}`,
-    date: new Date()
-  });
-  await worker.save();
+  const worker = workerDoc.data();
+  const application = applicationDoc.data();
 
-  application.paymentStatus = 'paid';
-  application.paymentAmount = amount;
-  application.paymentDate = new Date();
-  await application.save();
+  const newBalance = (worker.balance || 0) + amount;
+  const newEarning = {
+    jobId: application.job,
+    amount: amount,
+    description: `Payment for: ${application.jobTitle || 'Job'}`,
+    date: new Date()
+  };
+
+  // Update Firestore
+  const transaction = {
+    type: 'credit',
+    amount: amount,
+    description: `Payment for: ${application.jobTitle || 'Job'}`,
+    jobId: application.job,
+    applicationId: applicationId,
+    createdAt: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  await db.collection('workers').doc(workerId).update({
+    balance: newBalance,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  await db.collection('workers').doc(workerId).collection('transactions').add(transaction);
+
+  await db.collection('applications').doc(applicationId).update({
+    paymentStatus: 'paid',
+    paymentAmount: amount,
+    paymentDate: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  // SHADOW WRITE: DEPRECATED - Removed in Phase 4
+  /*
+  try {
+    await Worker.findByIdAndUpdate(workerId, {
+      $inc: { balance: amount },
+      $push: { earnings: newEarning }
+    });
+    ...
+  } catch (err) {
+    logger.warn(`⚠️ MongoDB shadow write failed in process-payment: ${err.message}`);
+  }
+  */
 
   logger.info(`Payment processed for worker: ${worker.name}`);
   res.json({
     success: true,
     message: 'Payment processed successfully',
-    newBalance: worker.balance
+    newBalance: newBalance
   });
 }));
 
@@ -474,55 +561,67 @@ router.post('/:workerId/process-payment/:applicationId', asyncHandler(async (req
 router.post('/:id/sync-balance', asyncHandler(async (req, res) => {
   const workerId = req.params.id;
 
-  const worker = await Worker.findById(workerId);
-  if (!worker) {
+  const workerDoc = await db.collection('workers').doc(workerId).get();
+  if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
   }
 
-  const JobApplication = require('../models/JobApplication');
-  const completedApplications = await JobApplication.find({
-    worker: workerId,
-    status: 'completed',
-    paymentStatus: 'paid'
-  }).populate('job');
+  const applicationsSnapshot = await db.collection('applications')
+    .where('worker', '==', workerId)
+    .where('status', '==', 'completed')
+    .where('paymentStatus', '==', 'paid')
+    .get();
+
+  const completedApplications = applicationsSnapshot.docs.map(doc => doc.data());
 
   const totalEarned = completedApplications.reduce((sum, app) => {
-    const amount = app.paymentAmount || app.job?.salary || 0;
-    return sum + amount;
+    return sum + (app.paymentAmount || 0);
   }, 0);
 
-  worker.balance = totalEarned;
-
-  worker.earnings = completedApplications.map(app => ({
-    jobId: app.job._id,
-    amount: app.paymentAmount || app.job?.salary || 0,
-    description: `Payment for: ${app.job?.title || 'Job'}`,
+  const earnings = completedApplications.map(app => ({
+    jobId: app.job,
+    amount: app.paymentAmount || 0,
+    description: `Payment for job`,
     date: app.paymentDate || app.updatedAt || new Date()
   }));
 
-  await worker.save();
+  await db.collection('workers').doc(workerId).update({
+    balance: totalEarned,
+    earnings: earnings
+  });
 
-  logger.info(`Balance synced successfully for worker: ${worker.name}`);
+  // SHADOW WRITE
+  try {
+    await Worker.findByIdAndUpdate(workerId, {
+      balance: totalEarned,
+      earnings: earnings
+    });
+  } catch (err) {
+    logger.warn(`⚠️ MongoDB shadow write failed in sync-balance: ${err.message}`);
+  }
+
   res.json({
     success: true,
     message: 'Balance synchronized successfully',
     worker: {
-      name: worker.name,
-      balance: worker.balance,
-      earningsCount: worker.earnings.length,
+      balance: totalEarned,
+      earningsCount: earnings.length,
       totalEarned: totalEarned
     }
   });
 }));
 
-// Get worker wallet data (New Implementation using embedded wallet)
+// Get worker wallet data (New Implementation using sub-collections)
 router.get('/:id/wallet', asyncHandler(async (req, res) => {
   const workerId = req.params.id;
+  logger.info(`Fetching worker wallet from Firestore: ${workerId}`);
 
-  const worker = await Worker.findById(workerId);
-  if (!worker) {
+  const workerDoc = await db.collection('workers').doc(workerId).get();
+  if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
   }
+
+  let worker = workerDoc.data();
 
   // Initialize wallet if missing
   if (!worker.wallet) {
@@ -530,32 +629,41 @@ router.get('/:id/wallet', asyncHandler(async (req, res) => {
       pendingBalance: 0,
       totalEarnings: 0,
       withdrawnAmount: 0,
-      transactionHistory: []
+      totalBalance: 0,
+      withdrawableBalance: 0
     };
-    await worker.save();
+    await db.collection('workers').doc(workerId).update({ wallet: worker.wallet });
   }
 
-  // Use the source of truth from the worker document
-  const totalBalance = worker.wallet.totalBalance || 0;
+  const totalBalance = worker.wallet.totalBalance || worker.balance || 0;
   const withdrawableBalance = worker.wallet.withdrawableBalance || 0;
   const totalEarned = worker.wallet.totalEarnings || 0;
   const totalSpent = worker.wallet.withdrawnAmount || 0;
 
-  // Format transactions for frontend
-  const transactions = (worker.wallet.transactionHistory || []).map(t => ({
-    id: t._id ? t._id.toString() : `tx_${Date.now()}`,
-    type: t.type === 'credit' ? 'earning' : t.type, // Map 'credit' to 'earning' for frontend compatibility
-    amount: t.amount,
-    description: t.description,
-    date: t.createdAt,
-    status: t.type === 'credit_pending' ? 'pending' : 'completed',
-    jobId: t.jobId,
-    applicationId: t.applicationId
-  })).sort((a, b) => new Date(b.date) - new Date(a.date));
+  // Fetch transactions from sub-collection
+  const transactionsSnapshot = await db.collection('workers').doc(workerId)
+    .collection('transactions')
+    .orderBy('createdAt', 'desc')
+    .limit(50)
+    .get();
+
+  const transactions = transactionsSnapshot.docs.map(doc => {
+    const t = doc.data();
+    return {
+      id: doc.id,
+      type: t.type === 'credit' ? 'earning' : t.type,
+      amount: t.amount,
+      description: t.description,
+      date: t.createdAt?.toDate ? t.createdAt.toDate() : (t.createdAt || new Date()),
+      status: t.type === 'credit_pending' ? 'pending' : 'completed',
+      jobId: t.jobId,
+      applicationId: t.applicationId
+    };
+  });
 
   res.json({
-    balance: totalBalance, // Main display
-    withdrawableBalance: withdrawableBalance, // Specific display
+    balance: totalBalance,
+    withdrawableBalance: withdrawableBalance,
     totalEarned: totalEarned,
     totalSpent: totalSpent,
     transactions: transactions
@@ -567,21 +675,17 @@ router.post('/:id/withdraw', asyncHandler(async (req, res) => {
   const workerId = req.params.id;
   const { amount, method } = req.body;
 
-  const worker = await Worker.findById(workerId);
-  if (!worker) {
+  const workerDoc = await db.collection('workers').doc(workerId).get();
+  if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
   }
+  const worker = workerDoc.data();
 
-  // NEW WITHDRAWAL LOGIC: Check against withdrawableBalance
-  const safeWithdrawable = worker.wallet?.withdrawableBalance || 0; // Fallback to 0 if wallet missing
+  const safeWithdrawable = worker.wallet?.withdrawableBalance || 0;
 
   if (amount > safeWithdrawable) {
     throw new ValidationError(`Insufficient withdrawable balance. Available: ₹${safeWithdrawable}`);
   }
-
-  if (!worker.wallet) worker.wallet = {};
-  if (!Array.isArray(worker.wallet.transactionHistory)) worker.wallet.transactionHistory = [];
-  if (!Array.isArray(worker.withdrawals)) worker.withdrawals = []; // Maintain legacy array too
 
   const withdrawal = {
     amount: amount,
@@ -590,32 +694,48 @@ router.post('/:id/withdraw', asyncHandler(async (req, res) => {
     status: 'pending'
   };
 
-  worker.withdrawals.push(withdrawal); // Legacy
-
-  // Debit from Two-Tier Wallet
-  worker.wallet.withdrawableBalance = (worker.wallet.withdrawableBalance || 0) - amount;
-  worker.wallet.totalBalance = (worker.wallet.totalBalance || 0) - amount;
-  worker.wallet.withdrawnAmount = (worker.wallet.withdrawnAmount || 0) + amount;
-
-  // Legacy
-  worker.balance = (worker.balance || 0) - amount;
-
-  worker.wallet.transactionHistory.push({
+  const transaction = {
     type: 'withdrawal',
     amount: amount,
     description: `Withdrawal via ${method || 'bank_transfer'}`,
-    createdAt: new Date()
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    status: 'pending'
+  };
+
+  const newWallet = {
+    ...worker.wallet,
+    withdrawableBalance: (worker.wallet.withdrawableBalance || 0) - amount,
+    totalBalance: (worker.wallet.totalBalance || 0) - amount,
+    withdrawnAmount: (worker.wallet.withdrawnAmount || 0) + amount,
+    lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+  };
+
+  await db.collection('workers').doc(workerId).update({
+    wallet: newWallet,
+    balance: (worker.balance || 0) - amount,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
 
-  worker.markModified('wallet');
-  await worker.save();
+  await db.collection('workers').doc(workerId).collection('transactions').add(transaction);
 
-  logger.info(`Withdrawal processed: ${worker.name} - ₹${amount} (Remaining: ₹${worker.wallet.totalBalance}, Withdrawable: ₹${worker.wallet.withdrawableBalance})`);
+  // SHADOW WRITE: DEPRECATED - Removed in Phase 4
+  /*
+  try {
+    await Worker.findByIdAndUpdate(workerId, {
+      $set: { wallet: updatedWallet },
+      $inc: { balance: -amount },
+      $push: { withdrawals: withdrawal }
+    });
+  } catch (err) {
+    logger.warn(`⚠️ MongoDB shadow write failed in withdraw: ${err.message}`);
+  }
+  */
+
   res.json({
     success: true,
     message: 'Withdrawal request submitted successfully',
-    newBalance: worker.wallet.totalBalance,
-    withdrawableBalance: worker.wallet.withdrawableBalance
+    newBalance: newWallet.totalBalance,
+    withdrawableBalance: newWallet.withdrawableBalance
   });
 }));
 

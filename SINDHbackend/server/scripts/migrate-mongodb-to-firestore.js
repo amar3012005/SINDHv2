@@ -41,10 +41,60 @@ function sanitizeForFirestore(obj) {
   return obj;
 }
 
+async function migrateCollection(name, Model, firestoreCollection, transformFn) {
+  console.log(`📦 Migrating ${name}...`);
+  const documents = await Model.find({});
+  console.log(`   Found ${documents.length} ${name} in MongoDB`);
+
+  let batch = db.batch();
+  let count = 0;
+  let totalMigrated = 0;
+
+  for (const doc of documents) {
+    const data = doc.toObject();
+    const id = data._id.toString();
+    delete data._id;
+
+    const sanitizedData = sanitizeForFirestore(data);
+    const firestoreData = transformFn ? transformFn(id, sanitizedData) : sanitizedData;
+
+    const docRef = db.collection(firestoreCollection).doc(id);
+    batch.set(docRef, firestoreData, { merge: true });
+
+    // Also manage legacy user mapping if it's a user type
+    if (name === 'Workers' || name === 'Employers') {
+      const userRef = db.collection('users').doc(id);
+      batch.set(userRef, {
+        phone: sanitizedData.phone,
+        mongoId: id,
+        type: name === 'Workers' ? 'worker' : 'employer',
+        role: name === 'Workers' ? 'worker' : 'employer',
+        migratedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      count++; // user mapping counts as an operation
+    }
+
+    count++;
+    totalMigrated++;
+
+    if (count >= 400) { // Commit before hitting 500 limit
+      await batch.commit();
+      console.log(`   Committed batch of writes... (${totalMigrated}/${documents.length})`);
+      batch = db.batch();
+      count = 0;
+    }
+  }
+
+  if (count > 0) {
+    await batch.commit();
+  }
+  console.log(`✅ Migrated ${totalMigrated} ${name}`);
+}
+
 async function migrate() {
   try {
-    console.log('🚀 Starting migration from MongoDB to Firestore...');
-    
+    console.log('🚀 Starting Robust Migration from MongoDB to Firestore...');
+
     if (!process.env.MONGODB_URI) {
       throw new Error('MONGODB_URI not found in environment');
     }
@@ -56,79 +106,45 @@ async function migrate() {
       throw new Error('Firestore not initialized. Check your serviceAccountKey.json');
     }
 
-    // 1. Migrate Workers to 'users' collection with role 'worker'
-    console.log('📦 Migrating Workers...');
-    const workers = await Worker.find({});
-    for (const worker of workers) {
-      const data = worker.toObject();
-      const id = data._id.toString();
-      delete data._id;
-      
-      const sanitizedData = sanitizeForFirestore(data);
-      
-      await db.collection('users').doc(id).set({
-        ...sanitizedData,
-        type: 'worker',
-        role: 'worker',
-        migratedAt: new Date()
-      }, { merge: true });
-    }
-    console.log(`✅ Migrated ${workers.length} workers`);
+    const { admin } = require('../src/config/firebase');
 
-    // 2. Migrate Employers to 'users' collection with role 'employer'
-    console.log('📦 Migrating Employers...');
-    const employers = await Employer.find({});
-    for (const employer of employers) {
-      const data = employer.toObject();
-      const id = data._id.toString();
-      delete data._id;
-      
-      const sanitizedData = sanitizeForFirestore(data);
-      
-      await db.collection('users').doc(id).set({
-        ...sanitizedData,
-        type: 'employer',
-        role: 'employer',
-        migratedAt: new Date()
-      }, { merge: true });
-    }
-    console.log(`✅ Migrated ${employers.length} employers`);
+    // 1. Migrate Workers
+    await migrateCollection('Workers', Worker, 'workers', (id, data) => ({
+      ...data,
+      _id: id,
+      id: id,
+      type: 'worker',
+      role: 'worker',
+      migratedAt: new Date()
+    }));
+
+    // 2. Migrate Employers
+    await migrateCollection('Employers', Employer, 'employers', (id, data) => ({
+      ...data,
+      _id: id,
+      id: id,
+      type: 'employer',
+      role: 'employer',
+      migratedAt: new Date()
+    }));
 
     // 3. Migrate Jobs
-    console.log('📦 Migrating Jobs...');
-    const jobs = await Job.find({});
-    for (const job of jobs) {
-      const data = job.toObject();
-      const id = data._id.toString();
-      delete data._id;
-      
-      const sanitizedData = sanitizeForFirestore(data);
-      
-      await db.collection('jobs').doc(id).set({
-        ...sanitizedData,
-        createdAt: sanitizedData.createdAt || new Date(),
-        migratedAt: new Date()
-      }, { merge: true });
-    }
-    console.log(`✅ Migrated ${jobs.length} jobs`);
+    await migrateCollection('Jobs', Job, 'jobs', (id, data) => ({
+      ...data,
+      id: id,
+      _id: id,
+      createdAt: data.createdAt || new Date(),
+      migratedAt: new Date()
+    }));
 
-    // 4. Migrate Job Applications
-    console.log('📦 Migrating Applications...');
-    const applications = await JobApplication.find({});
-    for (const app of applications) {
-      const data = app.toObject();
-      const id = data._id.toString();
-      delete data._id;
-      
-      const sanitizedData = sanitizeForFirestore(data);
-
-      await db.collection('applications').doc(id).set({
-        ...sanitizedData,
-        appliedAt: sanitizedData.createdAt || sanitizedData.appliedAt || new Date(),
-        migratedAt: new Date()
-      }, { merge: true });
-    }
-    console.log(`✅ Migrated ${applications.length} applications`);
+    // 4. Migrate Applications
+    await migrateCollection('Applications', JobApplication, 'applications', (id, data) => ({
+      ...data,
+      id: id,
+      _id: id,
+      appliedAt: data.createdAt || data.appliedAt || new Date(),
+      migratedAt: new Date()
+    }));
 
     console.log('🎉 Migration completed successfully!');
     process.exit(0);

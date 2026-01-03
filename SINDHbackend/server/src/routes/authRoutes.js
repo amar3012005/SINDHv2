@@ -3,16 +3,11 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 const { admin, db } = require('../config/firebase');
-const Worker = require('../models/Worker');
-const Employer = require('../models/Employer');
-const JobApplication = require('../models/JobApplication');
 const logger = require('../config/logger');
 const jwt = require('jsonwebtoken');
 const {
-  AppError,
   ValidationError,
   NotFoundError,
-  AuthenticationError,
   asyncHandler
 } = require('../middleware/errorHandler');
 
@@ -100,120 +95,53 @@ router.post('/firebase-login', asyncHandler(async (req, res) => {
     logger.info(`✅ User found in legacy Firestore mapping - mongoId: ${mongoId}, type: ${userTypeFromFirestore}`);
   }
 
-  // Helper to safely find user by ID or Phone
-  const findUserDynamically = async (Model, id, phone) => {
-    // 1. Try by ID if valid
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      const user = await Model.findById(id);
-      if (user) return user;
-    }
+  // Fetch full profile from Firestore (Primary Source of Truth)
+  let userProfileData;
+  const rootCollection = userTypeFromFirestore === 'worker' ? 'workers' : 'employers';
+  
+  // Try finding by Firebase UID first (new registrations)
+  let profileDoc = await db.collection(rootCollection).doc(firebaseUid).get();
+  
+  if (!profileDoc.exists && mongoId && mongoId !== firebaseUid) {
+    // Fallback: Try finding by legacy Mongo ID (migrated users)
+    profileDoc = await db.collection(rootCollection).doc(mongoId).get();
+  }
 
-    // 2. Fallback: Try by phone (full or local)
-    logger.info(`🔍 ID ${id} invalid or not found. Falling back to phone search: ${phone}`);
-    const userByPhone = await Model.findOne({
-      $or: [{ phone: phone }, { phone: phone.replace(/^\+91/, '') }]
+  if (!profileDoc.exists) {
+    logger.warn(`⚠️ Profile not found in Firestore root collection ${rootCollection} for UID: ${firebaseUid} or MongoId: ${mongoId}`);
+    return res.status(200).json({
+      success: true,
+      requiresRegistration: true,
+      message: 'Please complete your registration.',
+      phoneNumber: fullPhoneNumber,
+      firebaseUid,
+      userType
     });
-    return userByPhone;
+  }
+
+  userProfileData = profileDoc.data();
+  const targetId = profileDoc.id; // Use the document ID for all references
+
+  // Update last login in Firestore (Background)
+  db.collection(rootCollection).doc(targetId).update({
+    lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+    isLoggedIn: 1
+  }).catch(err => logger.warn(`⚠️ Non-critical: Failed to update Firestore timestamps: ${err.message}`));
+
+  // Format profile for response
+  const userProfile = {
+    ...userProfileData,
+    id: targetId,
+    _id: targetId,
+    phoneNumber: userProfileData.phone || fullPhoneNumber,
+    type: userTypeFromFirestore,
+    phase: userProfileData.phase || 1
   };
 
-  // Fetch full profile from MongoDB based on user type
-  let userProfile;
-  if (userTypeFromFirestore === 'worker') {
-    const worker = await findUserDynamically(Worker, mongoId, fullPhoneNumber);
+  // Generate JWT token with the Firestore ID (Primary Identifier)
+  const sessionToken = generateToken(targetId, userTypeFromFirestore);
 
-    if (!worker) {
-      logger.warn(`⚠️ Worker not found in MongoDB for Id: ${mongoId}, treating as new user`);
-      return res.status(200).json({
-        success: true,
-        requiresRegistration: true,
-        message: 'Please complete your registration.',
-        phoneNumber: fullPhoneNumber,
-        firebaseUid,
-        userType
-      });
-    }
-
-    // Update login timestamp
-    worker.lastLogin = new Date();
-    worker.isLoggedIn = 1;
-    await worker.save();
-
-    userProfile = {
-      id: worker._id.toString(),
-      _id: worker._id.toString(),
-      name: worker.name,
-      phone: worker.phone,
-      phoneNumber: worker.phone,
-      location: worker.location,
-      preferredCategory: worker.preferredCategory,
-      expectedSalary: worker.expectedSalary,
-      skills: worker.skills,
-      experience: worker.experience,
-      languages: worker.languages,
-      age: worker.age,
-      gender: worker.gender,
-      type: 'worker',
-      phase: worker.phase || 1
-    };
-  } else if (userTypeFromFirestore === 'employer') {
-    const employer = await findUserDynamically(Employer, mongoId, fullPhoneNumber);
-
-    if (!employer) {
-      logger.warn(`⚠️ Employer not found in MongoDB for Id: ${mongoId} or Phone: ${fullPhoneNumber}, treating as new user`);
-      return res.status(200).json({
-        success: true,
-        requiresRegistration: true,
-        message: 'Please complete your registration.',
-        phoneNumber: fullPhoneNumber,
-        firebaseUid, // NEW: Pass UID for UID-based registration
-        userType
-      });
-    }
-
-    // Update login timestamp
-    employer.lastLogin = new Date();
-    employer.isLoggedIn = 1;
-    await employer.save();
-
-    userProfile = {
-      id: employer._id.toString(),
-      _id: employer._id.toString(),
-      name: employer.name,
-      phone: employer.phone,
-      phoneNumber: employer.phone,
-      companyName: employer.companyName,
-      location: employer.location,
-      type: 'employer',
-      phase: employer.phase || 1
-    };
-  } else {
-    throw new ValidationError('Invalid user type');
-  }
-
-  // Update Firestore last login with safety check
-  try {
-    const updateData = {
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-      isLoggedIn: 1
-    };
-
-    // 1. Update root collection (workers/employers) if UID match
-    const rootCollection = userTypeFromFirestore === 'worker' ? 'workers' : 'employers';
-    const targetDocId = firebaseUid;
-    await db.collection(rootCollection).doc(targetDocId).update(updateData).catch(() => { });
-
-    // 2. Update legacy collection if phone match found
-    if (typeof firestoreDoc !== 'undefined' && firestoreDoc.id) {
-      await db.collection('users').doc(firestoreDoc.id).update(updateData).catch(() => { });
-    }
-  } catch (err) {
-    logger.warn(`⚠️ Non-critical: Failed to update Firestore timestamps: ${err.message}`);
-  }
-
-  // Generate JWT token with MongoDB ID
-  const sessionToken = generateToken(mongoId, userTypeFromFirestore);
-
-  logger.info(`✅ Firebase login successful for ${userProfile.name} (${userTypeFromFirestore})`);
+  logger.info(`✅ Firestore login successful for ${userProfile.name} (${userTypeFromFirestore})`);
 
   res.json({
     success: true,
@@ -393,41 +321,29 @@ router.post('/generate-token', asyncHandler(async (req, res) => {
 router.post('/worker/request-otp', asyncHandler(async (req, res) => {
   const { phone } = req.body;
 
-  // Flexible phone validation for international numbers
   if (!phone) {
     throw new ValidationError('Please provide a phone number');
   }
-  if (phone.startsWith('+')) {
-    if (phone.length < 10) {
-      throw new ValidationError('Please provide a valid phone number');
-    }
-  } else {
-    if (phone.length !== 10) {
-      throw new ValidationError('Please provide a valid 10-digit phone number');
-    }
-  }
 
-  // Check if worker exists
-  const existingWorker = await Worker.findOne({ phone });
+  logger.info(`Worker OTP request for phone: ${phone}`);
+  
+  // Check if worker exists in Firestore
+  const snapshot = await db.collection('workers').where('phone', '==', phone).limit(1).get();
 
-  if (!existingWorker) {
+  if (snapshot.empty) {
     logger.info(`New worker phone number: ${phone}, will create during registration`);
   } else {
-    logger.info(`Existing worker found: ${existingWorker.name} (Phase: ${existingWorker.phase})`);
+    const worker = snapshot.docs[0].data();
+    logger.info(`Existing worker found in Firestore: ${worker.name} (Phase: ${worker.phase})`);
   }
 
-  // For OTP request, we don't create temporary workers anymore
-  // The form-based registration will handle worker creation
-
-  // Generate a dummy OTP response for development
-  // In production, this should send actual SMS
   const otp = '0000'; // Fixed OTP for development
 
   logger.info(`OTP request processed for worker phone: ${phone}`);
   res.json({
     success: true,
     message: 'OTP sent successfully',
-    otp: otp // In production, this should be sent via SMS
+    otp: otp 
   });
 }));
 
@@ -439,20 +355,21 @@ router.post('/worker/verify-otp', asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number and OTP are required');
   }
 
-  // For development, accept '0000' as valid OTP
   if (otp !== '0000') {
     throw new ValidationError('Invalid OTP');
   }
 
-  const worker = await Worker.findOne({ phone });
+  const snapshot = await db.collection('workers').where('phone', '==', phone).limit(1).get();
+  const isNewUser = snapshot.empty;
 
-  // Check if this is a new user (worker doesn't exist)
-  const isNewUser = !worker;
-
-  // Check if existing worker needs to complete registration
   let requiresRegistration = false;
-  if (worker) {
-    // Worker exists but might be incomplete Phase-1
+  let worker = null;
+  let workerId = null;
+
+  if (!isNewUser) {
+    const workerDoc = snapshot.docs[0];
+    worker = workerDoc.data();
+    workerId = workerDoc.id;
     requiresRegistration = !worker.name ||
       worker.name === 'Temporary' ||
       !worker.preferredCategory ||
@@ -460,11 +377,9 @@ router.post('/worker/verify-otp', asyncHandler(async (req, res) => {
       !worker.location?.pincode;
   }
 
-  logger.info(`Worker OTP verification: phone=${phone}, isNewUser=${isNewUser}, requiresRegistration=${requiresRegistration}`);
+  logger.info(`Worker OTP verification (Firestore): phone=${phone}, isNewUser=${isNewUser}, requiresRegistration=${requiresRegistration}`);
 
   if (isNewUser) {
-    // New user - redirect to registration
-    logger.info(`New worker detected, redirecting to registration: ${phone}`);
     return res.json({
       success: true,
       message: 'Please complete your registration',
@@ -475,8 +390,6 @@ router.post('/worker/verify-otp', asyncHandler(async (req, res) => {
   }
 
   if (requiresRegistration) {
-    // Existing worker but incomplete registration
-    logger.info(`Worker exists but incomplete registration, redirecting: ${worker.name}`);
     return res.json({
       success: true,
       message: 'Please complete your registration',
@@ -486,15 +399,15 @@ router.post('/worker/verify-otp', asyncHandler(async (req, res) => {
     });
   }
 
-  // Existing worker with complete registration - allow login
-  worker.lastLogin = new Date();
-  worker.isLoggedIn = 1;
-  await worker.save();
+  // Update login status in Firestore
+  await db.collection('workers').doc(workerId).update({
+    lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+    isLoggedIn: 1
+  }).catch(err => logger.warn(`⚠️ Failed to update worker login in Firestore: ${err.message}`));
 
-  // Generate token
-  const token = generateToken(worker._id, 'worker');
+  const token = generateToken(workerId, 'worker');
 
-  logger.info(`Worker login successful: ${worker.name}`);
+  logger.info(`Worker login successful from Firestore: ${worker.name}`);
   res.json({
     success: true,
     message: 'Login successful',
@@ -503,8 +416,9 @@ router.post('/worker/verify-otp', asyncHandler(async (req, res) => {
     requiresRegistration: false,
     data: {
       worker: {
-        ...worker.toObject(),
-        id: worker._id,
+        ...worker,
+        id: workerId,
+        _id: workerId,
         type: 'worker',
         phase: worker.phase || 1
       }
@@ -516,31 +430,21 @@ router.post('/worker/verify-otp', asyncHandler(async (req, res) => {
 router.post('/employer/request-otp', asyncHandler(async (req, res) => {
   const { phone } = req.body;
 
-  // Flexible phone validation for international numbers
   if (!phone) {
     throw new ValidationError('Please provide a phone number');
   }
-  if (phone.startsWith('+')) {
-    if (phone.length < 10) {
-      throw new ValidationError('Please provide a valid phone number');
-    }
-  } else {
-    if (phone.length !== 10) {
-      throw new ValidationError('Please provide a valid 10-digit phone number');
-    }
-  }
 
-  console.log(`📞 Employer OTP request for phone: \"${phone}\" (type: ${typeof phone}, length: ${phone.length})`);
+  logger.info(`Employer OTP request for phone from Firestore: ${phone}`);
 
-  // Find or create employer (minimal data for Phase-1)
-  let employer = await Employer.findOne({ phone });
+  // Check if employer exists in Firestore
+  const snapshot = await db.collection('employers').where('phone', '==', phone).limit(1).get();
 
-  if (!employer) {
-    console.log(`🆕 Creating temporary employer for phone: \"${phone}\"`);
-    // Create a minimal temporary employer for OTP (Phase-1)
-    employer = new Employer({
+  if (snapshot.empty) {
+    logger.info(`Creating temporary employer in Firestore for phone: ${phone}`);
+    const targetId = (new mongoose.Types.ObjectId()).toString();
+    const temporaryEmployer = {
       phone,
-      name: 'Temporary', // Will be updated during registration
+      name: 'Temporary',
       email: '',
       location: {
         village: '',
@@ -549,28 +453,29 @@ router.post('/employer/request-otp', asyncHandler(async (req, res) => {
         pincode: ''
       },
       phase: 1,
-      termsAccepted: false
+      termsAccepted: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('employers').doc(targetId).set(temporaryEmployer);
+    await db.collection('users').doc(targetId).set({
+      phone,
+      mongoId: targetId,
+      type: 'employer'
     });
-    await employer.save();
-    console.log(`💾 Temporary employer saved with ID: ${employer._id}`);
   } else {
-    console.log(`✅ Found existing employer: ${employer.name} (ID: ${employer._id})`);
+    logger.info(`Found existing employer in Firestore: ${snapshot.docs[0].data().name}`);
   }
 
-  // Generate OTP
-  const otp = await employer.generateOTP();
+  const otp = '0000'; // Fixed OTP for development
 
-  // Log OTP for development (remove in production)
-  console.log(`📱 OTP for ${phone}: ${otp}`);
-  logger.info(`OTP sent to employer phone: ${phone}`);
+  logger.info(`OTP request processed for employer phone: ${phone}`);
   res.json({
     success: true,
     message: 'OTP sent successfully',
-    otp: otp // In production, this should be sent via SMS
+    otp: otp 
   });
 }));
 
-// Employer OTP verification
 // Employer OTP verification
 router.post('/employer/verify-otp', asyncHandler(async (req, res) => {
   const { phone, otp } = req.body;
@@ -579,62 +484,47 @@ router.post('/employer/verify-otp', asyncHandler(async (req, res) => {
     throw new ValidationError('Phone number and OTP are required');
   }
 
-  console.log(`🔍 Searching for employer with phone: \"${phone}\" (type: ${typeof phone}, length: ${phone.length})`);
-  const employer = await Employer.findOne({ phone });
+  if (otp !== '0000') {
+    throw new ValidationError('Invalid OTP');
+  }
 
-  if (!employer) {
-    console.log(`❌ Employer not found with phone: \"${phone}\"`);
-    // Let's see what employers exist
-    const allEmployers = await Employer.find({}, 'phone name').limit(5);
-    console.log('📋 Existing employers:', allEmployers.map(e => ({ phone: e.phone, name: e.name })));
+  const snapshot = await db.collection('employers').where('phone', '==', phone).limit(1).get();
+
+  if (snapshot.empty) {
     throw new NotFoundError('Employer not found');
   }
 
-  console.log(`✅ Found employer: ${employer.name} (phone: ${employer.phone})`);
-
-  // Verify OTP
-  await employer.verifyOTP(otp);
+  const employerDoc = snapshot.docs[0];
+  const employer = employerDoc.data();
+  const employerId = employerDoc.id;
 
   // Update login status
-  employer.lastLogin = new Date();
-  employer.isLoggedIn = 1;
-  await employer.save();
+  await db.collection('employers').doc(employerId).update({
+    lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+    isLoggedIn: 1
+  }).catch(err => logger.warn(`⚠️ Failed to update employer login in Firestore: ${err.message}`));
 
-  // Check if employer has completed registration (Phase-1 fields)
-  // An employer is considered \"new\" only if they have the temporary name
   const isNewUser = employer.name === 'Temporary';
-
-  // An employer requires registration if:
-  // 1. They have a temporary name (never completed registration), OR
-  // 2. They don't have required Phase-1 fields (name, location, termsAccepted)
   const requiresRegistration =
     employer.name === 'Temporary' ||
     !employer.location?.state ||
     !employer.location?.village;
 
-  console.log(`📊 Registration status check:`, {
-    name: employer.name,
-    hasLocation: !!(employer.location?.state && employer.location?.village),
-    termsAccepted: employer.termsAccepted,
-    isNewUser,
-    requiresRegistration
-  });
+  const token = generateToken(employerId, 'employer');
 
-  // Generate token
-  const token = generateToken(employer._id, 'employer');
-
-  logger.info(`Employer OTP verified successfully: ${employer.name} | New User: ${isNewUser} | Requires Registration: ${requiresRegistration} | Phase: ${employer.phase}`);
+  logger.info(`Employer OTP verified successfully in Firestore: ${employer.name}`);
   res.json({
     success: true,
     message: 'OTP verified successfully',
     token,
     isNewUser,
     requiresRegistration,
-    phase: employer.phase,
+    phase: employer.phase || 1,
     data: {
       employer: {
-        ...employer.toObject(),
-        id: employer._id,
+        ...employer,
+        id: employerId,
+        _id: employerId,
         type: 'employer'
       }
     }
