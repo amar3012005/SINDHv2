@@ -89,7 +89,7 @@ router.post('/apply', asyncHandler(async (req, res) => {
     const employerDoc = await db.collection('employers').doc(job.employer).get();
     if (employerDoc.exists) {
       const employerData = employerDoc.data();
-      
+
       // Save notification to in-app center
       const notifRef = db.collection('employers').doc(job.employer).collection('notifications').doc();
       const notifData = {
@@ -287,43 +287,43 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
   // TWO-STAGE PAYMENT: Stage 1 - Acceptance (Base Price)
   if (status === 'accepted' && currentStatus === 'applied') {
     logger.info(`💰 Processing Stage 1 Payment (Acceptance) for application ${applicationId}`);
-    
+
     await db.runTransaction(async (transaction) => {
       const appDoc = await transaction.get(applicationRef);
       const appData = appDoc.data();
       const jobRef = db.collection('jobs').doc(appData.job);
       const jobDoc = await transaction.get(jobRef);
-      
+
       if (!jobDoc.exists) throw new NotFoundError('Job not found');
       const jobData = jobDoc.data();
       const basePrice = jobData.salary || jobData.baseAmount || 0;
-      
+
       const employerRef = db.collection('employers').doc(appData.employer);
       const workerRef = db.collection('workers').doc(appData.worker);
-      
+
       const employerDoc = await transaction.get(employerRef);
       const workerDoc = await transaction.get(workerRef);
-      
+
       if (!employerDoc.exists) throw new NotFoundError('Employer not found');
       if (!workerDoc.exists) throw new NotFoundError('Worker not found');
-      
+
       const employerData = employerDoc.data();
       const workerData = workerDoc.data();
-      
+
       // Update Employer Wallet
       const empWallet = employerData.wallet || { totalBalance: 0, spentAmount: 0 };
       transaction.update(employerRef, {
         'wallet.totalBalance': (empWallet.totalBalance || 0) - basePrice,
         'updatedAt': admin.firestore.FieldValue.serverTimestamp()
       });
-      
+
       // Update Worker Wallet (Net Worth)
       const workWallet = workerData.wallet || { totalBalance: 0, totalEarnings: 0 };
       transaction.update(workerRef, {
         'wallet.totalBalance': (workWallet.totalBalance || 0) + basePrice,
         'updatedAt': admin.firestore.FieldValue.serverTimestamp()
       });
-      
+
       // Update Application
       transaction.update(applicationRef, {
         status,
@@ -332,14 +332,14 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      
+
       // Update Job
       transaction.update(jobRef, {
         status: 'accepted',
         acceptedApplicationId: applicationId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      
+
       // Add transaction history records
       const empTransRef = employerRef.collection('transactions').doc();
       transaction.set(empTransRef, {
@@ -350,7 +350,7 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         applicationId,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      
+
       const workTransRef = workerRef.collection('transactions').doc();
       transaction.set(workTransRef, {
         type: 'credit_pending',
@@ -361,8 +361,40 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
     });
-    
+
     logger.info(`✅ Stage 1 Payment and Acceptance completed for ${applicationId}`);
+
+    // --- Application Accepted Notification Trigger ---
+    try {
+      const workerDoc = await db.collection('workers').doc(appData.worker).get();
+      if (workerDoc.exists) {
+        const workerData = workerDoc.data();
+
+        // Save to In-App center
+        const notifRef = db.collection('workers').doc(appData.worker).collection('notifications').doc();
+        const notifData = {
+          title: "You've been hired! 🎉",
+          body: `Employer accepted your application for: ${jobData.title}`,
+          data: { jobId: appData.job, applicationId, type: 'status_update', status: 'accepted' },
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+        await notifRef.set(notifData);
+
+        // Send Push
+        if (workerData.fcmToken) {
+          await sendPushNotification(
+            workerData.fcmToken,
+            notifData.title,
+            notifData.body,
+            { ...notifData.data, id: notifRef.id }
+          );
+        }
+      }
+    } catch (err) {
+      logger.error(`FCM: Error triggering accepted notification for ${applicationId}:`, err.message);
+    }
+    // --- End Trigger ---
   } else {
     // Standard status update for other transitions
     const updateData = {
@@ -372,6 +404,58 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     };
 
     await applicationRef.update(updateData);
+
+    // --- Employer Notifications for Work Progress ---
+    try {
+      if (status === 'working' || status === 'completed') {
+        const employerDoc = await db.collection('employers').doc(currentApplication.employer).get();
+        if (employerDoc.exists && employerDoc.data().fcmToken) {
+          const title = status === 'working' ? 'Work Started! 🚀' : 'Job Done! 🏁';
+          const body = status === 'working' 
+            ? `${currentApplication.workerSnippet?.name || 'Worker'} has started working on: ${currentApplication.jobSnippet?.title}`
+            : `${currentApplication.workerSnippet?.name || 'Worker'} marked the job as done: ${currentApplication.jobSnippet?.title}. Please review and release payment.`;
+
+          // Save to In-App center for Employer
+          const notifRef = db.collection('employers').doc(currentApplication.employer).collection('notifications').doc();
+          await notifRef.set({
+            title,
+            body,
+            data: { jobId: currentApplication.job, applicationId, type: 'status_update', status },
+            read: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+
+          // Send Push
+          await sendPushNotification(
+            employerDoc.data().fcmToken,
+            title,
+            body,
+            { applicationId, type: 'status_update', status, id: notifRef.id }
+          );
+        }
+      }
+    } catch (err) {
+      logger.error(`FCM: Error triggering employer notification for ${applicationId} (${status}):`, err.message);
+    }
+    // --- End Trigger ---
+
+    // --- Application Rejected/Other Notification Trigger ---
+    if (status === 'rejected') {
+      try {
+        const workerDoc = await db.collection('workers').doc(currentApplication.worker).get();
+        if (workerDoc.exists && workerDoc.data().fcmToken) {
+          await sendPushNotification(
+            workerDoc.data().fcmToken,
+            'Application Update',
+            `Your application for ${currentApplication.jobSnippet?.title || 'a job'} was rejected.`,
+            { applicationId, type: 'status_update', status: 'rejected' }
+          );
+        }
+      } catch (err) {
+        logger.error(`FCM: Error triggering rejected notification for ${applicationId}:`, err.message);
+      }
+    }
+    // --- End Trigger ---
   }
 
   // Add status history record (outside transaction or could be inside)
@@ -422,16 +506,16 @@ router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => 
     const jobDoc = await transaction.get(jobRef);
     if (!jobDoc.exists) throw new NotFoundError('Job not found');
     const jobData = jobDoc.data();
-    
+
     const employerRef = db.collection('employers').doc(appData.employer);
     const workerRef = db.collection('workers').doc(appData.worker);
-    
+
     const employerDoc = await transaction.get(employerRef);
     const workerDoc = await transaction.get(workerRef);
-    
+
     if (!employerDoc.exists) throw new NotFoundError('Employer not found');
     if (!workerDoc.exists) throw new NotFoundError('Worker not found');
-    
+
     const employerData = employerDoc.data();
     const workerData = workerDoc.data();
     const basePrice = appData.baseAmount || jobData.salary || jobData.baseAmount || 0;
@@ -483,7 +567,7 @@ router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => 
         applicationId,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      
+
       const workTransRef = workerRef.collection('transactions').doc();
       transaction.set(workTransRef, {
         type: 'credit',
@@ -512,7 +596,7 @@ router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => 
     const workerDoc = await db.collection('workers').doc(appData.worker).get();
     if (workerDoc.exists) {
       const workerData = workerDoc.data();
-      
+
       // Save notification to in-app center
       const notifRef = db.collection('workers').doc(appData.worker).collection('notifications').doc();
       const notifData = {
@@ -593,4 +677,4 @@ router.delete('/:applicationId', asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
- 
+

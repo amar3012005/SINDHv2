@@ -215,6 +215,32 @@ router.post('/', asyncHandler(async (req, res) => {
 
   logger.info(`Job posted successfully in Firestore: ${jobData.title}`, { jobId: targetId });
 
+  // --- New Job Notification Trigger ---
+  try {
+    const workersSnapshot = await db.collection('workers')
+      .where('preferredCategory', '==', jobData.category)
+      .get();
+
+    if (!workersSnapshot.empty) {
+      const tokens = workersSnapshot.docs
+        .map(doc => doc.data().fcmToken)
+        .filter(token => !!token);
+
+      if (tokens.length > 0) {
+        const { sendMulticastNotification } = require('../services/fcmService');
+        await sendMulticastNotification(
+          tokens,
+          'New Job Alert! 📍',
+          `${jobData.title} in ${jobData.location.city}`,
+          { jobId: targetId, type: 'new_job' }
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('FCM: Error triggering new job notifications:', err.message);
+  }
+  // --- End Trigger ---
+
   res.status(201).json(createSuccessResponse({ ...jobData, id: targetId, _id: targetId }, 'Job posted successfully', 201));
 }));
 
@@ -650,7 +676,7 @@ router.delete('/:id', async (req, res) => {
     if (jobData.employer) {
       db.collection('employers').doc(jobData.employer).update({
         postedJobs: admin.firestore.FieldValue.arrayRemove(jobId)
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     logger.info(`Job deleted successfully (Firestore): ${jobId}`);
