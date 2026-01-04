@@ -246,7 +246,17 @@ const WorkerRegistrationPhase1 = () => {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Registration failed');
+      console.log('📝 Registration response:', data);
+
+      if (!response.ok) {
+        // Handle specific error structure from our backend
+        const errorMessage = data.message || data.error || 'Registration failed';
+        throw new Error(errorMessage);
+      }
+
+      if (!data.worker) {
+        throw new Error('Registration succeeded but no worker profile was returned.');
+      }
 
       // Save worker id in local storage explicitly as requested
       const workerId = data.worker._id || data.worker.id;
@@ -267,7 +277,8 @@ const WorkerRegistrationPhase1 = () => {
       toast.success('Registration completed!');
       setTimeout(() => navigate('/jobs'), 1500);
     } catch (error) {
-      toast.error(error.message || 'Error occurred');
+      console.error('❌ Registration Error:', error);
+      toast.error(error.message || 'An unexpected error occurred during registration.');
       setIsSubmitting(false);
     }
   };

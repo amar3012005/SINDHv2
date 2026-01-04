@@ -4,9 +4,20 @@
  * Initialize user state on app load
  * @returns {Object|null} The initialized user object or null
  */
-export const initializeUserState = () => {
+import { auth } from '../config/firebase';
+import { signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+
+/**
+ * Initialize user state on app load
+ * Also ensures Firebase Web SDK is authenticated using a stored custom token
+ * @returns {Promise<Object|null>} The initialized user object or null
+ */
+export const initializeUserState = async () => {
   try {
     const userStr = localStorage.getItem('user');
+    const customToken = localStorage.getItem('firebaseCustomToken');
+
+    // Early return if no user
     if (!userStr) {
       return null;
     }
@@ -20,6 +31,18 @@ export const initializeUserState = () => {
     if (!user.id && user._id) {
       user.id = user._id;
       localStorage.setItem('user', JSON.stringify(user));
+    }
+
+    // If already signed in, skip re-auth
+    const current = auth.currentUser;
+    if (!current && customToken) {
+      try {
+        console.log('🔐 Re-authenticating Web SDK with stored custom token...');
+        await signInWithCustomToken(auth, customToken);
+        console.log('✅ Web SDK re-authenticated');
+      } catch (err) {
+        console.warn('⚠️ Failed to re-authenticate Web SDK with stored token:', err.message);
+      }
     }
 
     return user;

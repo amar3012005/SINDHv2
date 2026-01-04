@@ -35,22 +35,29 @@ api.interceptors.response.use(
   async (error) => {
     const config = error.config;
 
-    // Auto-retry for network errors or 5xx server errors
-    if (config && (error.code === 'ERR_NETWORK' || (error.response && error.response.status >= 500))) {
+    // Auto-retry configuration
+    // Only retry GET requests by default (idempotent)
+    const isIdempotent = config.method === 'get';
+    
+    // Retry for network errors or 5xx server errors
+    const shouldRetry = config && 
+      (error.code === 'ERR_NETWORK' || (error.response && error.response.status >= 500)) &&
+      isIdempotent;
+
+    if (shouldRetry) {
       // Initialize retry count if not present
-      if (!config.retryCount) {
-        config.retryCount = 0;
-      }
+      config.retryCount = config.retryCount || 0;
 
       if (config.retryCount < MAX_RETRIES) {
         config.retryCount += 1;
 
-        // Exponential backoff
+        // Exponential backoff: 1s, 2s, 4s...
+        const delay = Math.pow(2, config.retryCount - 1) * RETRY_DELAY;
         const backoff = new Promise(resolve => {
-          setTimeout(resolve, RETRY_DELAY * config.retryCount);
+          setTimeout(resolve, delay);
         });
 
-        console.log(`📡 Retrying request... Attempt ${config.retryCount}/${MAX_RETRIES}`);
+        console.log(`📡 [Network] Retrying ${config.url}... Attempt ${config.retryCount}/${MAX_RETRIES} (Delay: ${delay}ms)`);
         await backoff;
         return api(config);
       }
@@ -58,8 +65,15 @@ api.interceptors.response.use(
 
     // Handle specific auth errors
     if (error.response && error.response.status === 401) {
-      // Dispatch event for auth expiration handling if needed
+      console.warn('🔑 [Auth] Session expired or unauthorized');
       window.dispatchEvent(new Event('auth:expired'));
+    }
+
+    // Global error logging for production monitoring
+    if (!error.response) {
+      console.error('🌐 [Network] No response received. Check internet connection.');
+    } else if (error.response.status >= 500) {
+      console.error(`⚙️ [Server] Error ${error.response.status}: ${error.response.data?.message || 'Unknown server error'}`);
     }
 
     return Promise.reject(error);

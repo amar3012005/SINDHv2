@@ -12,10 +12,15 @@ export const UserProvider = ({ children }) => {
 
   // Load user from localStorage on initial render
   useEffect(() => {
-    const savedUser = localStorage.getItem('INDUSUser');
+    const savedUser = localStorage.getItem('user');
     if (savedUser) {
       try {
-        setCurrentUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        // Ensure 'id' exists if '_id' is present
+        if (parsedUser && parsedUser._id && !parsedUser.id) {
+          parsedUser.id = parsedUser._id;
+        }
+        setCurrentUser(parsedUser);
       } catch (error) {
         console.error("Error parsing saved user:", error);
       }
@@ -45,7 +50,7 @@ export const UserProvider = ({ children }) => {
     };
 
     // Save user to localStorage
-    localStorage.setItem('INDUSUser', JSON.stringify(user));
+    localStorage.setItem('user', JSON.stringify(user));
     setCurrentUser(user);
     return user;
   };
@@ -60,7 +65,7 @@ export const UserProvider = ({ children }) => {
       lastUpdated: new Date().toISOString()
     };
 
-    localStorage.setItem('INDUSUser', JSON.stringify(updatedUser));
+    localStorage.setItem('user', JSON.stringify(updatedUser));
     setCurrentUser(updatedUser);
     return updatedUser;
   };
@@ -80,7 +85,7 @@ export const UserProvider = ({ children }) => {
       shaktiScore: Math.min(100, (currentUser.shaktiScore || 35) + 5) // Increase ShaktiScore
     };
 
-    localStorage.setItem('INDUSUser', JSON.stringify(updatedUser));
+    localStorage.setItem('user', JSON.stringify(updatedUser));
     setCurrentUser(updatedUser);
     return updatedUser;
   };
@@ -91,7 +96,7 @@ export const UserProvider = ({ children }) => {
 
     // First save basic user data
     setCurrentUser(userData);
-    localStorage.setItem('INDUSUser', JSON.stringify(userData));
+    localStorage.setItem('user', JSON.stringify(userData));
 
     // Then try to fetch complete profile data if we have an ID
     if (userData.id) {
@@ -116,7 +121,7 @@ export const UserProvider = ({ children }) => {
         // Update state and localStorage with complete data
         console.log('Saving complete user data:', completeUserData);
         setCurrentUser(completeUserData);
-        localStorage.setItem('INDUSUser', JSON.stringify(completeUserData));
+        localStorage.setItem('user', JSON.stringify(completeUserData));
 
         return completeUserData;
       } catch (error) {
@@ -170,7 +175,7 @@ export const UserProvider = ({ children }) => {
 
       console.log('Updated user with profile data:', updatedUser);
       setCurrentUser(updatedUser);
-      localStorage.setItem('INDUSUser', JSON.stringify(updatedUser));
+      localStorage.setItem('user', JSON.stringify(updatedUser));
       return updatedUser;
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -181,7 +186,7 @@ export const UserProvider = ({ children }) => {
   // Log out user
   const logoutUser = () => {
     setCurrentUser(null);
-    localStorage.removeItem('INDUSUser');
+    localStorage.removeItem('user');
   };
 
   return (

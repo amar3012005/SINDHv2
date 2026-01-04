@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
 import { buildApiUrl } from '../../utils/apiUtils';
+import { db } from '../../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import {
   MapPin,
   Users,
@@ -26,6 +28,74 @@ const AvailableJobs = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [applyingJobId, setApplyingJobId] = useState(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [appliedJobIds, setAppliedJobIds] = useState(new Set());
+
+  // Real-time jobs listener
+  useEffect(() => {
+    if (user === undefined) return;
+
+    console.log('📡 Setting up real-time jobs listener');
+    setLoading(true);
+
+    // 1. Listen to jobs collection (status-based to match backend writes)
+    const jobsQuery = query(
+      collection(db, 'jobs'),
+      where('status', 'in', ['POSTED', 'active', 'APPLIED'])
+    );
+
+    const unsubscribeJobs = onSnapshot(jobsQuery, (snapshot) => {
+      const jobsList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          _id: doc.id,
+          ...data,
+          // Robust location handling
+          displayLocation: data.location?.village || data.location?.district || data.location?.city || 'Location'
+        };
+      });
+      console.log(`✅ Received ${jobsList.length} jobs from Firestore`);
+      setJobs(jobsList);
+      setLoading(false);
+    }, (error) => {
+      console.error('❌ Jobs listener error:', error);
+      toast.error('Could not load jobs');
+      setLoading(false);
+    });
+
+    // 2. Listen to worker's applications to track 'hasApplied'
+    let unsubscribeApps = () => { };
+    if (user?.id && user?.type === 'worker') {
+      console.log('📡 Setting up real-time applications listener for worker:', user.id);
+      const appsQuery = query(
+        collection(db, 'applications'),
+        where('worker', '==', user.id)
+      );
+
+      unsubscribeApps = onSnapshot(appsQuery, (snapshot) => {
+        const appJobIds = new Set(snapshot.docs.map(doc => {
+          const jobId = doc.data().job;
+          return typeof jobId === 'string' ? jobId : (jobId?.id || String(jobId));
+        }));
+        console.log(`📝 Worker has applied to ${appJobIds.size} jobs`);
+        setAppliedJobIds(appJobIds);
+      });
+    }
+
+    return () => {
+      unsubscribeJobs();
+      unsubscribeApps();
+    };
+  }, [user?.id, user?.type]);
+
+  // Update hasApplied flag when jobs or appliedJobIds change
+  useEffect(() => {
+    const updatedJobs = jobs.map(job => ({
+      ...job,
+      hasApplied: appliedJobIds.has(job.id) || appliedJobIds.has(job._id)
+    }));
+    setFilteredJobs(updatedJobs);
+  }, [jobs, appliedJobIds]);
 
   // Filters matching the reference layout
   const filters = [
@@ -36,75 +106,7 @@ const AvailableJobs = () => {
     { id: 'nearest', label: 'NEAREST' }
   ];
 
-  // Fetch Jobs
-  const fetchJobs = useCallback(async () => {
-    try {
-      setLoading(true);
-      const queryParams = new URLSearchParams();
-      if (user?.id && user?.type === 'worker') {
-        queryParams.append('workerId', user.id);
-      }
-
-      const apiUrl = buildApiUrl(`/jobs/dual-status?${queryParams.toString()}`);
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Type': user?.type || 'guest',
-          'User-ID': user?.id || ''
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        let jobsArray = [];
-        if (Array.isArray(data)) jobsArray = data;
-        else if (data.data && Array.isArray(data.data)) jobsArray = data.data;
-        else if (data.jobs && Array.isArray(data.jobs)) jobsArray = data.jobs;
-
-        // Show ALL jobs - no status filtering
-        // Jobs are marked as 'hasApplied' from backend based on worker's applications
-        const validJobs = jobsArray; // Show all jobs
-
-        console.log(`📊 Fetched ${validJobs.length} jobs from backend`);
-
-        // Deduplicate by _id
-        const uniqueJobs = Array.from(new Map(validJobs.map(job => [job._id, job])).values());
-        console.log(`✅ After deduplication: ${uniqueJobs.length} unique jobs`);
-
-        // Debug: Log hasApplied status for each job
-        uniqueJobs.forEach(job => {
-          console.log(`📝 Job "${job.title}" - hasApplied: ${job.hasApplied}, workerStatus: ${job.workerStatus}`);
-        });
-
-        setJobs(uniqueJobs);
-        setFilteredJobs(uniqueJobs);
-      }
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-      toast.error('Could not load jobs');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    // Only fetch if we have user context loaded (or if user is guest)
-    if (user === undefined) {
-      console.log('⏳ Waiting for user context to load...');
-      return;
-    }
-
-    console.log(`👤 User context available: id=${user?.id}, type=${user?.type}`);
-    fetchJobs();
-
-    // Auto-refresh every 10 seconds to keep counts updated
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing jobs...');
-      fetchJobs();
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [fetchJobs, user]); // Re-fetch when user context changes
+  // Filters matching the reference layout
 
   // Apply for job
   const handleApply = async (job) => {
@@ -387,7 +389,7 @@ const AvailableJobs = () => {
                       <div className="flex items-center gap-2 text-sm text-[#3B4883] font-semibold">
                         <MapPin className="w-4 h-4" />
                         <span>
-                          {job.location?.city || 'Location'}
+                          {job.displayLocation}
                           <span className="text-[#202124]/40 ml-1">(~{job.calculatedDistance ? job.calculatedDistance.toFixed(1) : '?'}km)</span>
                         </span>
                       </div>
@@ -397,7 +399,14 @@ const AvailableJobs = () => {
                         <div className="flex items-center gap-2 text-sm text-[#FF7124] font-semibold">
                           <Clock className="w-4 h-4" />
                           <span>
-                            {job.startDate ? new Date(job.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                            {job.startDate ? (() => {
+                              try {
+                                const d = job.startDate?.toDate ? job.startDate.toDate() : new Date(job.startDate);
+                                return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                              } catch (e) {
+                                return 'Upcoming';
+                              }
+                            })() : ''}
                             {job.startTime ? ` @ ${job.startTime}` : ''}
                             {job.endTime ? ` - ${job.endTime}` : ''}
                           </span>

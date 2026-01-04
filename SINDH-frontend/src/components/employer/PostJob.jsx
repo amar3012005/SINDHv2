@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { buildApiUrl } from '../../utils/apiUtils';
+import { db } from '../../config/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 // --- Theme Constants ---
 const COLORS = {
@@ -82,97 +84,58 @@ const PostJob = () => {
     'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
   ];
 
-  // Load employer ID and location from backend API
+  // Load employer data in real-time
   useEffect(() => {
-    const loadEmployerData = async () => {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const empId = localStorage.getItem('employerId') || user.id || user._id;
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const empId = localStorage.getItem('employerId') || user.id || user._id;
 
-      if (!empId) {
-        toast.error('Please login as an employer');
-        navigate('/login?type=employer');
-        return;
-      }
+    if (!empId) {
+      toast.error('Please login as an employer');
+      navigate('/login?type=employer');
+      return;
+    }
 
-      setEmployerId(empId);
+    setEmployerId(empId);
 
-      // Fetch fresh employer profile from backend
-      try {
-        const response = await fetch(buildApiUrl(`/employers/${empId}`));
-        if (response.ok) {
-          const employerData = await response.json();
+    console.log('📡 Setting up real-time employer listener for PostJob:', empId);
+    const employerRef = doc(db, 'employers', empId);
+    
+    const unsubscribe = onSnapshot(employerRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const employerData = docSnap.data();
+        console.log('👤 Employer profile updated in PostJob:', employerData);
 
-          // Update localStorage with fresh data in a single dictionary
-          const completeEmployerProfile = {
-            id: employerData._id || employerData.id,
-            _id: employerData._id || employerData.id,
-            name: employerData.name,
-            phone: employerData.phone,
-            companyName: employerData.companyName,
-            location: employerData.location,
-            type: 'employer',
-            phase: employerData.phase || 1,
-            ...employerData
-          };
+        const completeEmployerProfile = {
+          id: docSnap.id,
+          _id: docSnap.id,
+          ...employerData,
+          type: 'employer'
+        };
 
-          localStorage.setItem('employerProfile', JSON.stringify(completeEmployerProfile));
-          localStorage.setItem('user', JSON.stringify(completeEmployerProfile));
-          console.log('✅ Updated employer profile in localStorage:', completeEmployerProfile);
+        localStorage.setItem('employerProfile', JSON.stringify(completeEmployerProfile));
+        localStorage.setItem('user', JSON.stringify(completeEmployerProfile));
 
-          // Pre-fill location from fresh employer data
-          if (employerData.location) {
-            setFormData(prev => ({
-              ...prev,
-              location: {
-                ...prev.location,
-                village: employerData.location.village || '',
-                district: employerData.location.district || '',
-                state: employerData.location.state || '',
-                pincode: employerData.location.pincode || ''
-              }
-            }));
-            console.log('✅ Pre-filled location from backend:', employerData.location);
-          }
-        } else {
-          console.warn('⚠️ Could not fetch employer profile from backend');
-          // Fallback to localStorage
-          const employerProfile = JSON.parse(localStorage.getItem('employerProfile') || localStorage.getItem('employer') || '{}');
-          const employerLocation = employerProfile.location || user.location || {};
-          if (employerLocation.village || employerLocation.district || employerLocation.state) {
-            setFormData(prev => ({
-              ...prev,
-              location: {
-                ...prev.location,
-                village: employerLocation.village || '',
-                district: employerLocation.district || '',
-                state: employerLocation.state || '',
-                pincode: employerLocation.pincode || ''
-              }
-            }));
-            console.log('✅ Pre-filled location from localStorage (fallback):', employerLocation);
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error fetching employer profile:', error);
-        // Fallback to localStorage
-        const employerProfile = JSON.parse(localStorage.getItem('employerProfile') || localStorage.getItem('employer') || '{}');
-        const employerLocation = employerProfile.location || user.location || {};
-        if (employerLocation.village || employerLocation.district || employerLocation.state) {
+        // Pre-fill location from fresh employer data
+        if (employerData.location) {
           setFormData(prev => ({
             ...prev,
             location: {
               ...prev.location,
-              village: employerLocation.village || '',
-              district: employerLocation.district || '',
-              state: employerLocation.state || '',
-              pincode: employerLocation.pincode || ''
+              village: employerData.location.village || '',
+              district: employerData.location.district || '',
+              state: employerData.location.state || '',
+              pincode: employerData.location.pincode || ''
             }
           }));
         }
+      } else {
+        console.warn('⚠️ Employer profile not found in Firestore');
       }
-    };
+    }, (error) => {
+      console.error('❌ Employer listener error:', error);
+    });
 
-    loadEmployerData();
+    return () => unsubscribe();
   }, [navigate]);
 
   const handleNext = () => {
@@ -269,6 +232,8 @@ const PostJob = () => {
           ? formData.requirements.join(', ')
           : (formData.requirements || 'Basic requirements apply'),
         status: 'POSTED',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         urgency: formData.urgency,
         startDate: formData.startDate,
         endDate: formData.endDate,

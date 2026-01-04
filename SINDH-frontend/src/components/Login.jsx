@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 import { useUser } from '../context/UserContext';
 import { api } from '../config/api';
 import { auth } from '../config/firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, signInWithCustomToken } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { Capacitor } from '@capacitor/core';
 
@@ -256,8 +256,23 @@ const Login = () => {
           ...data.data,
           type: userType,
           isLoggedIn: 1,
+          isLoggedIn: 1,
           lastLogin: new Date().toISOString()
         };
+
+        // Authenticte Firebase Web SDK (Crucial for Firestore Permissions on Native)
+        if (data.firebaseCustomToken) {
+          try {
+            console.log('🔐 Authenticating Web SDK with Custom Token...');
+            await signInWithCustomToken(auth, data.firebaseCustomToken);
+            console.log('✅ Web SDK Authenticated!');
+            // Persist the token so we can restore auth on app relaunch (Capacitor/Web)
+            localStorage.setItem('firebaseCustomToken', data.firebaseCustomToken);
+          } catch (authErr) {
+            console.error('❌ Failed to authenticate Web SDK:', authErr);
+            // Continue login even if this fails, though Firestore might break
+          }
+        }
 
         localStorage.setItem('userType', userType);
         localStorage.setItem('user', JSON.stringify(userData));

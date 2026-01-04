@@ -12,37 +12,73 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
-    // Users collection (workers & employers)
+
+    // Helper function: check if user owns a job
+    function jobOwnedByUser(jobId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/jobs/$(jobId)).data.employer == request.auth.uid;
+    }
+
+    // Users collection (mapping UID to mongoId/Type)
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow read, write: if isOwner(userId);
+    }
+
+    // Workers collection
+    match /workers/{workerId} {
+      allow read, write: if isOwner(workerId);
+      
+      match /transactions/{txId} {
+        allow read: if isOwner(workerId);
+      }
+      
+      match /reviews/{reviewId} {
+        allow read, create: if isSignedIn();
+      }
+    }
+
+    // Employers collection
+    match /employers/{employerId} {
+      allow read, write: if isOwner(employerId);
+      
+      match /reviews/{reviewId} {
+        allow read, create: if isSignedIn();
+      }
     }
     
     // Jobs collection
     match /jobs/{jobId} {
+      // Allow any signed-in user to read job listings (workers need listing)
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && (
-        request.resource.data.employerId == request.auth.uid ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'employer'
-      );
-      allow update, delete: if isSignedIn() && resource.data.employerId == request.auth.uid;
+      // Only the authenticated employer can create with their own UID
+      allow create: if isSignedIn() && request.resource.data.employer == request.auth.uid;
+      // Updates/deletes only by owning employer
+      allow update, delete: if isSignedIn() && resource.data.employer == request.auth.uid;
     }
     
     // Applications collection
     match /applications/{appId} {
+      // Worker or employer on the doc, or employer who owns the job
       allow read: if isSignedIn() && (
-        resource.data.workerId == request.auth.uid ||
-        resource.data.employerId == request.auth.uid
+        resource.data.worker == request.auth.uid ||
+        resource.data.employer == request.auth.uid ||
+        jobOwnedByUser(resource.data.job)
       );
-      allow create: if isSignedIn() && request.resource.data.workerId == request.auth.uid;
+      // Worker creates their own application
+      allow create: if isSignedIn() && request.resource.data.worker == request.auth.uid;
+      // Worker or employer involved, or job owner can update
       allow update: if isSignedIn() && (
-        resource.data.workerId == request.auth.uid ||
-        resource.data.employerId == request.auth.uid
+        resource.data.worker == request.auth.uid ||
+        resource.data.employer == request.auth.uid ||
+        jobOwnedByUser(resource.data.job)
       );
+
+      match /statusHistory/{historyId} {
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/applications/$(appId)).data.worker == request.auth.uid ||
+          get(/databases/$(database)/documents/applications/$(appId)).data.employer == request.auth.uid
+        );
+      }
     }
   }
 }
-
-
-

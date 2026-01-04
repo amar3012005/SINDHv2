@@ -3,6 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../../context/UserContext';
 import { buildApiUrl } from '../../utils/apiUtils';
+import { db } from '../../config/firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  onSnapshot, 
+  doc 
+} from 'firebase/firestore';
 import { toast } from 'react-toastify';
 import {
   MapPin,
@@ -36,71 +44,73 @@ const MyApplications = () => {
     { id: 'completed', label: 'COMPLETED' }
   ];
 
-  // Fetch Data
-  const fetchData = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      setLoading(true);
-
-      // Fetch Wallet/Worker info
-      const workerRes = await fetch(buildApiUrl(`/workers/${user.id}`));
-      if (workerRes.ok) {
-        const workerData = await workerRes.json();
-        const worker = workerData.data || workerData;
-        setWalletBalance(worker.balance || 0);
-      }
-
-      // Fetch Applications
-      const currentUrl = buildApiUrl(`/job-applications/worker/${user.id}/current`);
-      const completedUrl = buildApiUrl(`/job-applications/worker/${user.id}/completed`);
-
-      const [currentRes, completedRes] = await Promise.all([
-        fetch(currentUrl),
-        fetch(completedUrl)
-      ]);
-
-      if (currentRes.ok && completedRes.ok) {
-        const [currentData, completedData] = await Promise.all([
-          currentRes.json(),
-          completedRes.json()
-        ]);
-
-        const currentApps = (currentData.data || []).map(app => ({ ...app, type: 'current' }));
-        const completedApps = (completedData.data || []).map(app => ({ ...app, type: 'completed' }));
-
-        const allApps = [...currentApps, ...completedApps];
-        // Deduplicate
-        const uniqueApps = Array.from(new Map(allApps.map(app => [app._id, app])).values());
-
-        setApplications(uniqueApps);
-        setFilteredApps(uniqueApps);
-
-        // Sync appliedJobIds to localStorage
-        try {
-          const applicationIds = uniqueApps.map(app => app._id).filter(Boolean);
-          localStorage.setItem('appliedJobIds', JSON.stringify(applicationIds));
-          console.log(`✅ Synced ${applicationIds.length} application IDs to localStorage`);
-        } catch (e) {
-          console.warn('⚠️ Could not sync to localStorage:', e);
-        }
-
-        // Calc total earnings (paid ones)
-        const total = allApps
-          .filter(a => a.paymentStatus === 'paid' || a.status === 'PAID')
-          .reduce((sum, a) => sum + (a.paymentAmount || a.job?.baseAmount || a.job?.salary || 0), 0);
-        setTotalEarnings(total);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Could not load applications');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
+  // Real-time Listeners
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!user?.id) return;
+
+    setLoading(true);
+
+    // 1. Listen to worker document for balance changes
+    const workerDocRef = doc(db, 'workers', user.id);
+    const unsubscribeWorker = onSnapshot(workerDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const workerData = docSnap.data();
+        setWalletBalance(workerData.wallet?.totalBalance || workerData.balance || 0);
+      }
+    }, (err) => {
+      console.error("Error listening to worker doc:", err);
+    });
+
+    // 2. Listen to applications collection
+    const appsQuery = query(
+      collection(db, 'applications'),
+      where('worker', '==', user.id)
+    );
+
+    const unsubscribeApps = onSnapshot(appsQuery, (snapshot) => {
+      const allApps = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const jobInfo = data.jobSnippet || data.job || {};
+        return {
+          ...data,
+          _id: doc.id,
+          id: doc.id,
+          // Robust display fields
+          displayTitle: jobInfo.title || 'Job Title',
+          displayCompany: jobInfo.companyName || 'Unknown Company',
+          displaySalary: data.paymentAmount || jobInfo.salary || jobInfo.baseAmount || 0,
+          displayLocation: jobInfo.location?.village || jobInfo.location?.district || jobInfo.location?.city || 'On-site'
+        };
+      });
+
+      setApplications(allApps);
+
+      // Sync appliedJobIds to localStorage
+      try {
+        const applicationIds = allApps.map(app => app._id).filter(Boolean);
+        localStorage.setItem('appliedJobIds', JSON.stringify(applicationIds));
+      } catch (e) {
+        console.warn('⚠️ Could not sync to localStorage:', e);
+      }
+
+      // Calc total earnings (paid ones)
+      const total = allApps
+        .filter(a => a.paymentStatus === 'paid' || a.status?.toUpperCase() === 'PAID')
+        .reduce((sum, a) => sum + (a.paymentAmount || a.jobSnippet?.salary || a.job?.salary || a.job?.baseAmount || 0), 0);
+      setTotalEarnings(total);
+      
+      setLoading(false);
+    }, (error) => {
+      console.error('Error listening to applications:', error);
+      toast.error('Could not load applications in real-time');
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribeWorker();
+      unsubscribeApps();
+    };
+  }, [user]);
 
   // Handle Filtering
   useEffect(() => {
@@ -108,7 +118,7 @@ const MyApplications = () => {
       setFilteredApps(applications);
     } else if (selectedFilter === 'applied') {
       setFilteredApps(applications.filter(app =>
-        ['applied', 'accepted', 'working', 'in-progress', 'payment_pending'].includes(app.status?.toLowerCase())
+        ['applied', 'accepted', 'working', 'in-progress', 'payment_pending', 'pending'].includes(app.status?.toLowerCase())
       ));
     } else if (selectedFilter === 'completed') {
       setFilteredApps(applications.filter(app =>
@@ -151,7 +161,6 @@ const MyApplications = () => {
       });
       if (response.ok) {
         toast.success('🚀 Work started!');
-        fetchData(); // Refresh data
         if (selectedApp && selectedApp._id === applicationId) {
           setSelectedApp({ ...selectedApp, status: 'working' });
         }
@@ -254,18 +263,18 @@ const MyApplications = () => {
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1 pr-4">
                       <h3 className="text-base font-bold text-[#272D4E] uppercase tracking-wide group-hover:text-[#FF7124] transition-colors line-clamp-1">
-                        {app.job?.title || 'Job Title'}
+                        {app.displayTitle}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <Building className="w-3 h-3 text-[#3B4883]/40" />
                         <span className="text-xs font-medium text-[#3B4883]/60">
-                          {app.job?.companyName || 'Unknown Company'}
+                          {app.displayCompany}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
                       <span className="text-lg font-black text-[#FF7124] block">
-                        ₹{app.paymentAmount || app.job?.baseAmount || app.job?.salary || 0}
+                        ₹{app.displaySalary}
                       </span>
                       <div className="mt-1 flex justify-end">
                         {getStatusBadge(app.status)}
@@ -277,14 +286,19 @@ const MyApplications = () => {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3 h-3" />
-                        <span>{new Date(app.appliedAt || app.createdAt).toLocaleDateString()}</span>
+                        <span>{(() => {
+                          try {
+                            const d = app.appliedAt?.toDate ? app.appliedAt.toDate() : (app.createdAt?.toDate ? app.createdAt.toDate() : new Date(app.appliedAt || app.createdAt || Date.now()));
+                            return d.toLocaleDateString();
+                          } catch (e) {
+                            return 'Recently';
+                          }
+                        })()}</span>
                       </div>
-                      {app.job?.location?.city && (
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3 h-3 text-green-600" />
-                          <span className="text-green-600 font-bold">~{app.distanceFromWork ? app.distanceFromWork.toFixed(1) : 10}km</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 text-green-600" />
+                        <span className="text-green-600 font-bold">{app.displayLocation}</span>
+                      </div>
                     </div>
                     {['accepted'].includes(app.status?.toLowerCase()) &&
                       new Date(app.job?.startDate) <= new Date() ? (
@@ -330,7 +344,7 @@ const MyApplications = () => {
                   <div className="bg-white px-4 py-2 rounded-xl shadow-sm">
                     <p className="text-xs text-[#3B4883]/60 font-bold uppercase mb-0.5">Base Price</p>
                     <p className="text-2xl font-black text-[#FF7124]">
-                      ₹{selectedApp.paymentAmount || selectedApp.job?.baseAmount || selectedApp.job?.salary}
+                      ₹{selectedApp.displaySalary}
                     </p>
                   </div>
 
@@ -342,46 +356,37 @@ const MyApplications = () => {
                     >
                       <X className="w-5 h-5 text-[#3B4883]" />
                     </button>
-                    <div className={`px-3 py-1 rounded-full text-xs font-black uppercase ${selectedApp.job?.urgency && selectedApp.job.urgency !== 'Normal'
+                    <div className={`px-3 py-1 rounded-full text-xs font-black uppercase ${(selectedApp.jobSnippet?.urgency || selectedApp.job?.urgency) && (selectedApp.jobSnippet?.urgency !== 'Normal' && selectedApp.job?.urgency !== 'Normal')
                       ? 'bg-[#FF7124] text-white'
                       : 'bg-[#3B4883] text-white'
                       }`}>
-                      {selectedApp.job?.urgency && selectedApp.job.urgency !== 'Normal'
-                        ? selectedApp.job.urgency
-                        : 'General'}
+                      {selectedApp.jobSnippet?.urgency || selectedApp.job?.urgency || 'General'}
                     </div>
                   </div>
                 </div>
 
                 {/* Job Title */}
                 <h2 className="text-xl font-black text-[#3B4883] mb-2 uppercase tracking-tight leading-tight">
-                  {selectedApp.job?.title}
+                  {selectedApp.displayTitle}
                 </h2>
 
                 {/* Distance, Company & Location */}
                 <div className="flex items-start gap-3 text-sm flex-wrap pb-2">
                   <div className="flex items-center gap-1.5 text-green-600">
                     <MapPin className="w-4 h-4 shrink-0" />
-                    <span className="font-bold">~{selectedApp.distanceFromWork ? selectedApp.distanceFromWork.toFixed(1) : 10}km</span>
+                    <span className="font-bold">{selectedApp.displayLocation}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[#3B4883]/70">
                     <Building className="w-4 h-4 shrink-0" />
-                    <span className="font-bold">{selectedApp.job?.companyName || 'Company'}</span>
+                    <span className="font-bold">{selectedApp.displayCompany}</span>
                   </div>
-                  {selectedApp.job?.location && (
-                    <div className="flex items-center gap-1.5 text-[#3B4883]/50 text-xs">
-                      <span className="font-medium">
-                        {[selectedApp.job.location.village, selectedApp.job.location.district, selectedApp.job.location.state].filter(Boolean).join(', ')}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Category Badge */}
-                {selectedApp.job?.category && (
+                {(selectedApp.jobSnippet?.category || selectedApp.job?.category) && (
                   <div className="absolute -bottom-3 left-6 z-10">
                     <span className="inline-block px-4 py-1.5 bg-[#3B4883] text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg border-2 border-white">
-                      {selectedApp.job.category}
+                      {selectedApp.jobSnippet?.category || selectedApp.job?.category}
                     </span>
                   </div>
                 )}
@@ -389,11 +394,11 @@ const MyApplications = () => {
 
               <div className="p-6 pt-8 space-y-5">
                 {/* Job Description */}
-                {selectedApp.job?.description && (
+                {(selectedApp.jobSnippet?.description || selectedApp.job?.description) && (
                   <div>
                     <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-2">Description</p>
                     <p className="text-sm text-[#202124]/80 leading-relaxed line-clamp-3">
-                      {selectedApp.job.description}
+                      {selectedApp.jobSnippet?.description || selectedApp.job?.description}
                     </p>
                   </div>
                 )}
@@ -448,18 +453,23 @@ const MyApplications = () => {
                   <div className="bg-[#F8F5F2] p-3 rounded-xl">
                     <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Work Timing</p>
                     <p className="text-xs font-black text-[#3B4883]">
-                      {(selectedApp.job?.startDate || selectedApp.job?.startTime) ? (
-                        <>
-                          {selectedApp.job.startDate ? new Date(selectedApp.job.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
-                          {selectedApp.job.startTime ? ` @ ${selectedApp.job.startTime}` : ' - Full day'}
-                        </>
-                      ) : 'Check description'}
+                      {(() => {
+                        const job = selectedApp.jobSnippet || selectedApp.job || {};
+                        if (job.startDate || job.startTime) {
+                          try {
+                            const d = job.startDate?.toDate ? job.startDate.toDate() : new Date(job.startDate);
+                            const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                            return `${dateStr}${job.startTime ? ` @ ${job.startTime}` : ' - Full day'}`;
+                          } catch (e) { return 'Upcoming'; }
+                        }
+                        return 'Check description';
+                      })()}
                     </p>
                   </div>
                   <div className="bg-[#F8F5F2] p-3 rounded-xl">
                     <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Location</p>
                     <p className="text-xs font-black text-[#3B4883] truncate">
-                      {selectedApp.job?.location?.village || selectedApp.job?.location?.district || 'On-site'}
+                      {selectedApp.displayLocation}
                     </p>
                   </div>
                 </div>
@@ -469,10 +479,12 @@ const MyApplications = () => {
                   <div className="bg-[#F8F5F2] p-3 rounded-xl">
                     <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Applied On</p>
                     <p className="text-xs font-black text-[#3B4883]">
-                      {selectedApp.appliedAt ? new Date(selectedApp.appliedAt).toLocaleDateString('en-IN', {
-                        day: 'numeric',
-                        month: 'short'
-                      }) : 'Recently'}
+                      {(() => {
+                        try {
+                          const d = selectedApp.appliedAt?.toDate ? selectedApp.appliedAt.toDate() : (selectedApp.createdAt?.toDate ? selectedApp.createdAt.toDate() : new Date(selectedApp.appliedAt || selectedApp.createdAt || Date.now()));
+                          return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                        } catch (e) { return 'Recently'; }
+                      })()}
                     </p>
                   </div>
                   <div className="bg-[#F8F5F2] p-3 rounded-xl">
@@ -549,7 +561,6 @@ const MyApplications = () => {
                           if (response.ok) {
                             toast.success('✅ Work marked as complete!');
                             setSelectedApp({ ...selectedApp, workerConfirmedFinish: true, status: 'PAYMENT_PENDING' });
-                            fetchData(); // Refresh data
                           } else {
                             const error = await response.json();
                             toast.error(error.message || 'Failed to mark work finished');

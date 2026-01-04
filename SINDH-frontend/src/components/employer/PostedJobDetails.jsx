@@ -3,6 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { getApiUrl } from '../../utils/apiUtils.js';
+import { db } from '../../config/firebase';
+import { 
+  doc, 
+  collection, 
+  query, 
+  where, 
+  onSnapshot 
+} from 'firebase/firestore';
 
 const PostedJobDetails = () => {
   const { jobId } = useParams();
@@ -14,38 +22,62 @@ const PostedJobDetails = () => {
   const [processingAction, setProcessingAction] = useState(null);
   
   useEffect(() => {
-    const fetchJobDetails = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch job details
-        const jobResponse = await fetch(`${getApiUrl()}/jobs/${jobId}`);
-        
-        if (!jobResponse.ok) {
-          throw new Error('Failed to fetch job details');
-        }
-        
-        const jobData = await jobResponse.json();
-        setJob(jobData);
-        
-        // Fetch applications for this job
-        const applicationsResponse = await fetch(`${getApiUrl()}/jobs/${jobId}/applications`);
-        
-        if (!applicationsResponse.ok) {
-          throw new Error('Failed to fetch applications');
-        }
-        
-        const applicationsData = await applicationsResponse.json();
-        setApplications(applicationsData);
-      } catch (error) {
-        console.error('Error fetching job details:', error);
-        toast.error('Failed to load job details');
-      } finally {
-        setLoading(false);
+    if (!jobId) return;
+
+    setLoading(true);
+
+    // 1. Listen to job document
+    const jobDocRef = doc(db, 'jobs', jobId);
+    const unsubscribeJob = onSnapshot(jobDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setJob({ 
+          ...data, 
+          _id: docSnap.id, 
+          id: docSnap.id,
+          company: data.companyName || data.company 
+        });
+      } else {
+        toast.error('Job not found');
+        setJob(null);
       }
+    }, (err) => {
+      console.error("Error listening to job:", err);
+    });
+
+    // 2. Listen to applications for this job
+    const appsQuery = query(
+      collection(db, 'applications'),
+      where('job', '==', jobId)
+    );
+
+    const unsubscribeApps = onSnapshot(appsQuery, (snapshot) => {
+      const allApps = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          ...data,
+          _id: docSnap.id,
+          id: docSnap.id,
+          // Use workerSnippet if available, otherwise fallback
+          worker: data.workerSnippet || data.workerDetails || { name: 'Worker' }
+        };
+      }).sort((a, b) => {
+        const dateA = a.appliedAt?.toDate ? a.appliedAt.toDate() : new Date(a.appliedAt || 0);
+        const dateB = b.appliedAt?.toDate ? b.appliedAt.toDate() : new Date(b.appliedAt || 0);
+        return dateB - dateA;
+      });
+
+      setApplications(allApps);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error listening to applications:', error);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribeJob();
+      unsubscribeApps();
     };
-    
-    fetchJobDetails();
   }, [jobId]);
   
   const handleFinalSelection = async (applicationId) => {

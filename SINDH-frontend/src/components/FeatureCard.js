@@ -19,6 +19,7 @@ const FeatureCard = ({ icon, title, description, link, delay = 0 }) => {
         <Link
           to={link}
           className="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center transition-colors"
+          
         >
           <span>Learn more</span>
           <svg

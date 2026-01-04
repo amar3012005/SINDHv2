@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Briefcase, MapPin, DollarSign, Clock, Users, Building, Search, Filter, ArrowRight } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import { getApiUrlSync } from '../../config/api.js';
+import { db } from '../../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const jobCategories = [
   { id: 'all', name: 'All', icon: '🔍', nameHi: 'सभी' },
@@ -27,46 +29,35 @@ export default function FindWork() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPhase2Modal, setShowPhase2Modal] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
-  // Fetch jobs on mount
+  // Real-time Jobs Listener (Phase 4)
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    setLoading(true);
+    setError(null);
+    const jobsRef = collection(db, 'jobs');
+    const q = query(jobsRef);
 
-  const fetchJobs = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const apiUrl = getApiUrlSync();
+    console.log("📡 Setting up real-time jobs listener in FindWork...");
 
-      const response = await fetch(`${apiUrl}/jobs`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const allJobs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const activeJobs = allJobs.filter(job => ['active', 'POSTED', 'APPLIED'].includes(job.status));
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch jobs');
-      }
-
-      const data = await response.json();
-      console.log('Fetched jobs:', data);
-
-      // Filter active jobs - include both old 'active' and new standard uppercase statuses
-      const activeJobs = Array.isArray(data)
-        ? data.filter(job => ['active', 'POSTED', 'APPLIED'].includes(job.status))
-        : data.jobs?.filter(job => ['active', 'POSTED', 'APPLIED'].includes(job.status)) || [];
-
+      console.log("🔥 Real-time jobs update:", activeJobs.length);
       setJobs(activeJobs);
-    } catch (err) {
-      console.error('Error fetching jobs:', err);
-      setError(err.message);
-      toast.error('नौकरियां लोड करने में विफल');
-    } finally {
       setLoading(false);
-    }
-  };
+      setError(null);
+    }, (err) => {
+      console.error("❌ Jobs listener error:", err);
+      setError("Failed to load real-time jobs");
+      setLoading(false);
+      toast.error('कनक्शॅन एरर (Connection Error)');
+    });
+
+    return () => unsubscribe();
+  }, [retryTrigger]);
+
 
   const handleApplyNow = async (job) => {
     if (!user) {
@@ -229,7 +220,7 @@ export default function FindWork() {
           >
             <p className="text-red-600 font-medium">❌ {error}</p>
             <button
-              onClick={fetchJobs}
+              onClick={() => setRetryTrigger(prev => prev + 1)}
               className="mt-4 px-6 py-2 bg-[#FF7124] text-white rounded-lg hover:bg-[#e66420] transition-colors"
             >
               फिर से प्रयास करें

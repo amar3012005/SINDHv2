@@ -18,6 +18,9 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 import { buildApiUrl } from '../../utils/apiUtils';
 import { toast } from 'react-toastify';
+import { db, auth } from '../../config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const PostedJobs = () => {
   const { user } = useUser();
@@ -37,70 +40,137 @@ const PostedJobs = () => {
   const [selectedAppForPayment, setSelectedAppForPayment] = useState(null);
   const [isProcessingFinish, setIsProcessingFinish] = useState(false);
 
-  // Fetch posted jobs... (rest of the state and useEffect remains same)
-
+  // Real-time jobs listener
   useEffect(() => {
-    const fetchJobs = async () => {
-      if (!user?.id) return;
-
-      try {
-        setLoading(true);
-        const response = await fetch(buildApiUrl(`/jobs/employer/${user.id}`));
-        if (response.ok) {
-          const data = await response.json();
-          setJobs(data);
-        }
-      } catch (error) {
-        console.error('Error fetching jobs:', error);
-        toast.error('Failed to load jobs');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchJobs();
-  }, [user]);
-
-  // Fetch applications when job is selected
-  useEffect(() => {
-    const fetchApplications = async () => {
-      if (!selectedJob) {
-        setApplications([]);
+    let unsubscribeJobs = null;
+    const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
+      if (!authUser) {
+        console.warn('⚠️ Auth not ready; waiting to attach jobs listener');
         return;
       }
 
-      try {
-        setLoadingApplications(true);
-        const response = await fetch(buildApiUrl(`/jobs/${selectedJob._id}/applications`));
-        if (response.ok) {
-          const data = await response.json();
-
-          // Normalize response - ensure it's always an array
-          let applicationsArray = [];
-          if (Array.isArray(data)) {
-            applicationsArray = data;
-          } else if (data.applications && Array.isArray(data.applications)) {
-            applicationsArray = data.applications;
-          } else if (data.data && Array.isArray(data.data)) {
-            applicationsArray = data.data;
-          }
-
-          console.log('📋 Applications loaded:', applicationsArray.length);
-          setApplications(applicationsArray);
-        } else {
-          setApplications([]);
-        }
-      } catch (error) {
-        console.error('Error fetching applications:', error);
-        toast.error('Failed to load applications');
-        setApplications([]);
-      } finally {
-        setLoadingApplications(false);
+      const employerId =
+        user?.id ||
+        localStorage.getItem('employerId') ||
+        JSON.parse(localStorage.getItem('user') || '{}')?.id;
+      
+      if (!employerId) {
+        console.warn('⚠️ No employerId found for jobs listener');
+        return;
       }
-    };
 
-    fetchApplications();
-  }, [selectedJob]);
+      console.log('📡 Setting up real-time jobs listener for employer:', employerId);
+      setLoading(true);
+
+      const jobsQuery = query(collection(db, 'jobs'), where('employer', '==', employerId));
+
+      // Clean previous
+      if (unsubscribeJobs) {
+        unsubscribeJobs();
+      }
+
+      unsubscribeJobs = onSnapshot(jobsQuery, (snapshot) => {
+        console.log(`📥 Snapshot received with ${snapshot.docs.length} documents`);
+        
+        const jobsList = snapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            // Log each job for debugging
+            console.log(`Job Doc: ${doc.id}, Status: ${data.status}, Employer: ${data.employer}`);
+            
+            let createdAtDate;
+            if (data.createdAt?.toDate) {
+              createdAtDate = data.createdAt.toDate();
+            } else if (data.createdAt && typeof data.createdAt === 'object' && Object.keys(data.createdAt).length === 0) {
+              // Handle { } from serverTimestamp in local snapshot
+              createdAtDate = new Date();
+            } else if (data.createdAt) {
+              createdAtDate = new Date(data.createdAt);
+            } else {
+              createdAtDate = new Date(0);
+            }
+
+            const rawStatus = data.status || 'POSTED';
+            const status = rawStatus.toLowerCase();
+            
+            return { 
+              ...data,
+              id: doc.id, 
+              _id: doc.id, 
+              createdAt: createdAtDate, 
+              status 
+            };
+          })
+          .filter(j => {
+            // Be very inclusive for debugging
+            const validStatuses = ['posted', 'applied', 'active', 'in-progress', 'working', 'completed', 'payment_pending', 'paid'];
+            const keep = validStatuses.includes(j.status);
+            if (!keep) console.log(`🚫 Filtering out job ${j.id} with status ${j.status}`);
+            return keep;
+          });
+
+        // Robust sort
+        jobsList.sort((a, b) => {
+          const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : 0;
+          const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : 0;
+          return timeB - timeA;
+        });
+
+        console.log(`✅ Final jobsList after filtering and sorting: ${jobsList.length} jobs`);
+        setJobs(jobsList);
+        setLoading(false);
+
+        if (selectedJob) {
+          const updatedSelectedJob = jobsList.find(j => j._id === selectedJob._id);
+          if (updatedSelectedJob) {
+            setSelectedJob(updatedSelectedJob);
+          }
+        }
+      }, (error) => {
+        console.error('❌ Jobs listener error:', error);
+        toast.error('Failed to load jobs');
+        setLoading(false);
+      });
+    });
+
+    return () => {
+      if (unsubscribeJobs) unsubscribeJobs();
+      if (unsubscribeAuth) unsubscribeAuth();
+    };
+  }, [user?.id]); // Removed selectedJob from dependencies to prevent unnecessary re-subscribes
+
+  // Real-time applications listener when job is selected
+  useEffect(() => {
+    if (!selectedJob?._id) {
+      setApplications([]);
+      return;
+    }
+
+    console.log('📡 Setting up real-time applications listener for job:', selectedJob._id);
+    setLoadingApplications(true);
+
+    const appsQuery = query(
+      collection(db, 'applications'),
+      where('job', '==', selectedJob._id)
+    );
+
+    const unsubscribe = onSnapshot(appsQuery, (snapshot) => {
+      const appsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        _id: doc.id,
+        ...doc.data()
+      }));
+      console.log(`📋 Received ${appsList.length} applications for job ${selectedJob._id}`);
+      setApplications(appsList);
+      setLoadingApplications(false);
+    }, (error) => {
+      console.error('❌ Applications listener error:', error);
+      toast.error('Failed to load applications');
+      setLoadingApplications(false);
+    });
+
+    return () => unsubscribe();
+  }, [selectedJob?._id]);
 
   // Handle accept click - shows payment simulation first
   const handleAcceptClick = (application) => {
@@ -239,7 +309,7 @@ const PostedJobs = () => {
   };
 
   const totalJobs = jobs.length;
-  const activeJobs = jobs.filter(j => j.status === 'POSTED' || j.status === 'APPLIED').length;
+  const activeJobs = jobs.filter(j => ['posted', 'applied', 'active'].includes(j.status)).length;
 
   const getStatusBadge = (status) => {
     const s = status?.toUpperCase();
@@ -321,6 +391,13 @@ const PostedJobs = () => {
                 <Briefcase className="w-8 h-8 text-slate-400" />
               </div>
               <p className="text-[#3B4883] font-bold">No jobs posted yet</p>
+              
+              {/* Debug Info for User */}
+              <div className="mt-8 p-4 bg-[#3B4883]/5 rounded-xl text-[10px] text-[#3B4883]/40 font-mono break-all">
+                DEBUG: Employer ID: {user?.id || localStorage.getItem('employerId') || 'Not found'}<br/>
+                TYPE: {user?.type || 'Not found'}
+              </div>
+
               <button
                 onClick={() => navigate('/employer/post-job')}
                 className="mt-4 text-sm font-bold text-[#FF7124] hover:underline"
@@ -367,10 +444,15 @@ const PostedJobs = () => {
 
                   <div className="flex items-center justify-between text-[10px] font-bold text-[#202124]/40 uppercase tracking-widest mt-3">
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5 text-[#3B4883]/40">
-                        <Clock className="w-3 h-3" />
-                        <span>Posted on {new Date(job.createdAt).toLocaleDateString()}</span>
-                      </div>
+                        <div className="flex items-center gap-1.5 text-[#3B4883]/40">
+                          <Clock className="w-3 h-3" />
+                          <span>Posted on {(() => {
+                            try {
+                              const d = job.createdAt?.toDate ? job.createdAt.toDate() : new Date(job.createdAt || Date.now());
+                              return d.toLocaleDateString();
+                            } catch (e) { return 'Recently'; }
+                          })()}</span>
+                        </div>
                       {job.category && (
                         <div className="bg-[#3B4883]/5 px-2 py-0.5 rounded text-[#3B4883]/60 border border-[#3B4883]/10">
                           {job.category}
@@ -742,7 +824,15 @@ const PostedJobs = () => {
                     <div className="bg-[#F8F5F2] px-3 py-2 rounded-xl flex items-center gap-2 border border-[#3B4883]/5 min-w-max">
                       <Clock className="w-3 h-3 text-[#3B4883]/60" />
                       <span className="text-xs font-black text-[#3B4883]">
-                        {selectedJob.startDate ? new Date(selectedJob.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Flexible'}
+                        {(() => {
+                          if (selectedJob.startDate) {
+                            try {
+                              const d = selectedJob.startDate?.toDate ? selectedJob.startDate.toDate() : new Date(selectedJob.startDate);
+                              return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                            } catch (e) { return 'Flexible'; }
+                          }
+                          return 'Flexible';
+                        })()}
                       </span>
                     </div>
                   </div>

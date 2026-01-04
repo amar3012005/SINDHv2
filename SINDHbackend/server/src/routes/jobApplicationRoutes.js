@@ -251,13 +251,97 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
     throw new ValidationError(`Invalid status transition from ${currentStatus} to ${status}`);
   }
 
-  const updateData = {
-    status,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    [`${status}At`]: admin.firestore.FieldValue.serverTimestamp()
-  };
+  // TWO-STAGE PAYMENT: Stage 1 - Acceptance (Base Price)
+  if (status === 'accepted' && currentStatus === 'applied') {
+    logger.info(`💰 Processing Stage 1 Payment (Acceptance) for application ${applicationId}`);
+    
+    await db.runTransaction(async (transaction) => {
+      const appDoc = await transaction.get(applicationRef);
+      const appData = appDoc.data();
+      const jobRef = db.collection('jobs').doc(appData.job);
+      const jobDoc = await transaction.get(jobRef);
+      
+      if (!jobDoc.exists) throw new NotFoundError('Job not found');
+      const jobData = jobDoc.data();
+      const basePrice = jobData.salary || jobData.baseAmount || 0;
+      
+      const employerRef = db.collection('employers').doc(appData.employer);
+      const workerRef = db.collection('workers').doc(appData.worker);
+      
+      const employerDoc = await transaction.get(employerRef);
+      const workerDoc = await transaction.get(workerRef);
+      
+      if (!employerDoc.exists) throw new NotFoundError('Employer not found');
+      if (!workerDoc.exists) throw new NotFoundError('Worker not found');
+      
+      const employerData = employerDoc.data();
+      const workerData = workerDoc.data();
+      
+      // Update Employer Wallet
+      const empWallet = employerData.wallet || { totalBalance: 0, spentAmount: 0 };
+      transaction.update(employerRef, {
+        'wallet.totalBalance': (empWallet.totalBalance || 0) - basePrice,
+        'updatedAt': admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // Update Worker Wallet (Net Worth)
+      const workWallet = workerData.wallet || { totalBalance: 0, totalEarnings: 0 };
+      transaction.update(workerRef, {
+        'wallet.totalBalance': (workWallet.totalBalance || 0) + basePrice,
+        'updatedAt': admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // Update Application
+      transaction.update(applicationRef, {
+        status,
+        baseAmount: basePrice,
+        baseAmountPaid: true,
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // Update Job
+      transaction.update(jobRef, {
+        status: 'accepted',
+        acceptedApplicationId: applicationId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      // Add transaction history records
+      const empTransRef = employerRef.collection('transactions').doc();
+      transaction.set(empTransRef, {
+        type: 'debit',
+        amount: basePrice,
+        description: `Base price for job: ${jobData.title} (Accepted Worker)`,
+        jobId: appData.job,
+        applicationId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      const workTransRef = workerRef.collection('transactions').doc();
+      transaction.set(workTransRef, {
+        type: 'credit_pending',
+        amount: basePrice,
+        description: `Base price for job: ${jobData.title} (Committed)`,
+        jobId: appData.job,
+        applicationId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    
+    logger.info(`✅ Stage 1 Payment and Acceptance completed for ${applicationId}`);
+  } else {
+    // Standard status update for other transitions
+    const updateData = {
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      [`${status}At`]: admin.firestore.FieldValue.serverTimestamp()
+    };
 
-  await applicationRef.update(updateData);
+    await applicationRef.update(updateData);
+  }
+
+  // Add status history record (outside transaction or could be inside)
   await applicationRef.collection('statusHistory').add({
     status,
     changedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -279,6 +363,123 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
       timestamp: new Date().toISOString(),
       reason: transitionReason
     }
+  });
+}));
+
+// TWO-STAGE PAYMENT: Stage 2 - Finalization (Additional Charges)
+router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  const { additionalCharges = 0 } = req.body;
+  const charges = parseFloat(additionalCharges) || 0;
+
+  logger.info(`🏁 Processing Stage 2 Payment (Finalization) for application ${applicationId} with additional charges: ₹${charges}`);
+
+  const applicationRef = db.collection('applications').doc(applicationId);
+  const applicationSnap = await applicationRef.get();
+  if (!applicationSnap.exists) throw new NotFoundError('Application not found');
+  const appData = applicationSnap.data();
+
+  // Validate current status - should be 'working' or 'payment_pending'
+  if (!['working', 'payment_pending', 'in-progress'].includes(appData.status?.toLowerCase())) {
+    throw new ValidationError(`Cannot finalize job from status: ${appData.status}`);
+  }
+
+  await db.runTransaction(async (transaction) => {
+    const jobRef = db.collection('jobs').doc(appData.job);
+    const jobDoc = await transaction.get(jobRef);
+    if (!jobDoc.exists) throw new NotFoundError('Job not found');
+    const jobData = jobDoc.data();
+    
+    const employerRef = db.collection('employers').doc(appData.employer);
+    const workerRef = db.collection('workers').doc(appData.worker);
+    
+    const employerDoc = await transaction.get(employerRef);
+    const workerDoc = await transaction.get(workerRef);
+    
+    if (!employerDoc.exists) throw new NotFoundError('Employer not found');
+    if (!workerDoc.exists) throw new NotFoundError('Worker not found');
+    
+    const employerData = employerDoc.data();
+    const workerData = workerDoc.data();
+    const basePrice = appData.baseAmount || jobData.salary || jobData.baseAmount || 0;
+    const totalPrice = basePrice + charges;
+
+    // Update Employer Wallet
+    const empWallet = employerData.wallet || { totalBalance: 0, spentAmount: 0 };
+    transaction.update(employerRef, {
+      'wallet.totalBalance': (empWallet.totalBalance || 0) - charges,
+      'wallet.spentAmount': (empWallet.spentAmount || 0) + totalPrice,
+      'updatedAt': admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update Worker Wallet (Net Worth, Liquid Cash, Lifetime History)
+    const workWallet = workerData.wallet || { totalBalance: 0, totalEarnings: 0, withdrawableBalance: 0 };
+    transaction.update(workerRef, {
+      'wallet.totalBalance': (workWallet.totalBalance || 0) + charges,
+      'balance': (workerData.balance || 0) + totalPrice, // Legacy field
+      'wallet.withdrawableBalance': (workWallet.withdrawableBalance || 0) + totalPrice,
+      'wallet.totalEarnings': (workWallet.totalEarnings || 0) + totalPrice,
+      'updatedAt': admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update Application
+    transaction.update(applicationRef, {
+      status: 'completed',
+      additionalCharges: charges,
+      totalPayment: totalPrice,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update Job
+    transaction.update(jobRef, {
+      status: 'completed',
+      totalPayment: totalPrice,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Add transaction history records
+    if (charges > 0) {
+      const empTransRef = employerRef.collection('transactions').doc();
+      transaction.set(empTransRef, {
+        type: 'debit',
+        amount: charges,
+        description: `Additional charges for job: ${jobData.title}`,
+        jobId: appData.job,
+        applicationId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      const workTransRef = workerRef.collection('transactions').doc();
+      transaction.set(workTransRef, {
+        type: 'credit',
+        amount: charges,
+        description: `Additional charges for job: ${jobData.title}`,
+        jobId: appData.job,
+        applicationId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    // Final settlement record
+    const workFinalTransRef = workerRef.collection('transactions').doc();
+    transaction.set(workFinalTransRef, {
+      type: 'credit',
+      amount: totalPrice,
+      description: `Final payout released for job: ${jobData.title}`,
+      jobId: appData.job,
+      applicationId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  });
+
+  logger.info(`✅ Stage 2 Payment and Finalization completed for ${applicationId}`);
+
+  res.json({
+    success: true,
+    message: 'Job finalized and payment released successfully',
+    totalPaid: appData.baseAmount + charges
   });
 }));
 

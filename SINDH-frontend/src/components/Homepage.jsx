@@ -8,6 +8,8 @@ import { getCurrentUser, logout } from '../utils/authUtils';
 import { Briefcase, ArrowRight, X, Phone, Loader2, RefreshCw } from 'lucide-react';
 import { buildApiUrl, getApiUrl } from '../utils/apiUtils';
 import axios from 'axios';
+import { db } from '../config/firebase';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import NotificationBell from './NotificationBell';
 import '../styles/homepage-light.css';
 
@@ -37,14 +39,8 @@ function Homepage() {
     const toastId = toast.loading('Refreshing...');
 
     try {
-      // Refresh all critical data
-      await Promise.all([
-        fetchJobCount(),
-        fetchWorkerFinancials(),
-        detectAndShowBackendConnection(),
-        user?.id && user?.type === 'worker' ? fetchShaktiScore(user.id) : Promise.resolve(),
-        user?.id && user?.type === 'worker' ? axios.get(buildApiUrl(`/workers/${user.id}`)).then(r => setWorkerProfile(r.data)).catch(() => { }) : Promise.resolve()
-      ]);
+      // Refresh connection (other data like counts and profile are real-time)
+      await detectAndShowBackendConnection();
 
       toast.update(toastId, { render: 'Updated!', type: 'success', isLoading: false, autoClose: 1000 });
     } catch (error) {
@@ -107,7 +103,6 @@ function Homepage() {
   const [showInProgressNotification, setShowInProgressNotification] = useState(false);
   const [hasShownNotification, setHasShownNotification] = useState(false);
   const [workerProfile, setWorkerProfile] = useState(null);
-  const profileRefreshInterval = useRef(null);
 
   // Menu refs for focus management - Comment 5
   const homeMenuRef = useRef(null);
@@ -238,41 +233,78 @@ function Homepage() {
     return () => clearTimeout(timer);
   }, [detectAndShowBackendConnection]);
 
-  // Continuously update worker profile
+  // Real-time listeners for profile and job counts
   useEffect(() => {
-    const updateWorkerProfile = async () => {
-      if (!user?.id || user?.type !== 'worker') return;
+    if (!user?.id) return;
 
-      try {
-        console.log('Updating worker profile data...');
-        const response = await axios.get(buildApiUrl(`/workers/${user.id}`), {
-          headers: { 'Content-Type': 'application/json' }
-        });
+    const collectionName = user.type === 'employer' ? 'employers' : 'workers';
+    const profileRef = doc(db, collectionName, user.id);
 
-        if (response.data) {
-          console.log('Updated worker profile:', response.data);
-          setWorkerProfile(response.data);
-
-          // Location is part of worker profile; no homepage stats update needed
+    console.log(`📡 Setting up real-time listener for ${collectionName}/${user.id}`);
+    const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log('👤 Profile updated:', data);
+        setWorkerProfile(data);
+        if (user.type === 'worker') {
+          setWorkerBalance(data.wallet?.totalBalance || data.balance || 0);
+          setRecentEarnings(data.wallet?.transactionHistory?.slice(-5) || []);
         }
-      } catch (error) {
-        console.error('Error updating worker profile:', error);
       }
-    };
+    }, (error) => {
+      console.error('❌ Profile listener error:', error);
+    });
 
-    // Initial fetch
-    updateWorkerProfile();
+    // Job count listener (if worker)
+    let unsubscribeJobs = () => {};
+    if (user.type === 'worker') {
+      const jobsQuery = query(
+        collection(db, 'jobs'),
+        where('status', 'in', ['POSTED', 'active', 'APPLIED'])
+      );
 
-    // Set up interval for continuous updates (every 30 seconds)
-    profileRefreshInterval.current = setInterval(updateWorkerProfile, 30000);
+      console.log('📡 Setting up real-time job count listener');
+      unsubscribeJobs = onSnapshot(jobsQuery, (querySnapshot) => {
+        let activeJobs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Client-side filtering for location if worker has district/state preference
+        if (user.location?.district || user.location?.state) {
+          activeJobs = activeJobs.filter(job => {
+            const jobLoc = job.location || {};
+            const userLoc = user.location || {};
+            
+            // Match by district if available, otherwise fallback to state
+            if (userLoc.district && jobLoc.district) {
+              return jobLoc.district.toLowerCase() === userLoc.district.toLowerCase();
+            }
+            if (userLoc.state && jobLoc.state) {
+              return jobLoc.state.toLowerCase() === userLoc.state.toLowerCase();
+            }
+            return true; // Keep if no specific match data
+          });
+        }
 
-    // Clean up interval on unmount
+        const count = activeJobs.length;
+        console.log('🎯 Real-time job count:', count);
+        setJobCount(count);
+
+        // Show notification if needed
+        if (count > 0 && !hasShownNotification) {
+          setTimeout(() => {
+            setShowJobNotification(true);
+            setHasShownNotification(true);
+          }, 1500);
+        }
+      }, (error) => {
+        console.error('❌ Job count listener error:', error);
+      });
+    }
+
     return () => {
-      if (profileRefreshInterval.current) {
-        clearInterval(profileRefreshInterval.current);
-      }
+      unsubscribeProfile();
+      unsubscribeJobs();
     };
-  }, [user?.id, user?.type]);
+  }, [user?.id, user?.type, user?.location?.state, hasShownNotification]);
 
   // Work reminders functionality
   useEffect(() => {
@@ -468,114 +500,6 @@ function Homepage() {
     window.location.reload();
   };
 
-  // Fetch job count for notifications - wrapped in useCallback
-  const fetchJobCount = useCallback(async () => {
-    setJobCountLoading(true);
-    try {
-      console.log('Fetching job count for user:', user);
-
-      const queryParams = new URLSearchParams();
-
-      // Add user-specific parameter for application status (same as AvailableJobs)
-      if (user?.id && user?.type === 'worker') {
-        queryParams.append('workerId', user.id);
-      }
-
-      // Use dual status system - only count jobs where both worker and employer status are 'active'
-      // This ensures we only show truly available jobs
-
-      // Add location filter if user has location
-      if (user?.location?.state) {
-        queryParams.append('location', user.location.state);
-        console.log('Adding location filter:', user.location.state);
-      }
-
-      // Use the new dual-status endpoint for accurate job counting
-      const url = buildApiUrl(`/jobs/dual-status?${queryParams.toString()}`);
-      console.log('Fetching from URL:', url);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-
-      console.log('Response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📊 Dual status response:', data);
-
-        // Filter jobs where both worker and employer status are 'active'
-        const activeJobs = data.jobs?.filter(job =>
-          job.workerStatus === 'active' && job.employerStatus === 'active'
-        ) || [];
-
-        const count = activeJobs.length;
-        console.log('🎯 Setting active job count to:', count, '(filtered from', data.jobs?.length || 0, 'total jobs)');
-        setJobCount(count);
-
-        // If no active jobs, check for in-progress jobs
-        if (count === 0 && user?.type === 'worker') {
-          try {
-            const inProgressResponse = await fetch(buildApiUrl(`/jobs/count?status=in-progress${user?.id ? `&workerId=${user.id}` : ''}`));
-            if (inProgressResponse.ok) {
-              const inProgressData = await inProgressResponse.json();
-              const inProgressCount = inProgressData.count || 0;
-
-              if (inProgressCount > 0 && !hasShownNotification) {
-                console.log(`Found ${inProgressCount} in-progress jobs`);
-                setTimeout(() => {
-                  setShowInProgressNotification(true);
-                  setHasShownNotification(true);
-                }, 1500);
-              }
-            }
-          } catch (err) {
-            console.error('Error checking in-progress jobs:', err);
-          }
-        }
-        // Show active jobs notification if available
-        else if (user?.type === 'worker' && count > 0 && !hasShownNotification) {
-          console.log('Showing active jobs notification popup for worker with', count, 'jobs');
-
-          // Show the job notification popup directly without duplicate toast
-          setTimeout(() => {
-            setShowJobNotification(true);
-            setHasShownNotification(true);
-          }, 1500); // Reduced delay for better UX
-        }
-
-        return count;
-      }
-    } catch (error) {
-      console.error('Error fetching job count:', error);
-      console.log('⚠️ Setting job count to 0 due to error');
-      setJobCount(0);
-      return 0;
-    } finally {
-      setJobCountLoading(false);
-    }
-  }, [user, hasShownNotification]);
-
-  // Fetch worker balance and earnings - wrapped in useCallback
-  const fetchWorkerFinancials = useCallback(async () => {
-    if (user?.type === 'worker' && user?.id) {
-      try {
-        const response = await fetch(buildApiUrl(`/workers/${user.id}/balance`));
-        if (response.ok) {
-          const data = await response.json();
-          setWorkerBalance(data.balance || 0);
-          setRecentEarnings(data.earnings?.slice(-5) || []);
-        }
-      } catch (error) {
-        console.error('Error fetching worker financials:', error);
-      }
-    }
-  }, [user]);
-
   // Removed stats/category/latest jobs fetching for simplified homepage
 
   useEffect(() => {
@@ -586,16 +510,6 @@ function Homepage() {
       navigate('/', { replace: true, state: {} });
     }
   }, [location, user, navigate, t]);
-
-  useEffect(() => {
-    console.log('Homepage useEffect - fetching data');
-
-    if (user?.type === 'worker') {
-      console.log('User is worker, fetching worker-specific data');
-      fetchJobCount();
-      fetchWorkerFinancials();
-    }
-  }, [user, fetchJobCount, fetchWorkerFinancials]);
 
   const fetchShaktiScore = async (workerId) => {
     try {
@@ -614,12 +528,11 @@ function Homepage() {
   // Removed public recent jobs fetch for simplified homepage
 
   useEffect(() => {
-    if (!isLoadingUser && user && user.type === 'worker') {
+    // Only fetch Shakti score from backend if not present in real-time profile
+    if (!isLoadingUser && user && user.type === 'worker' && !workerProfile?.shaktiScore) {
       fetchShaktiScore(user.id);
-    } else if (!isLoadingUser && (!user || user.type !== 'worker')) {
-      setShaktiScore(null);
     }
-  }, [user, isLoadingUser]);
+  }, [user, isLoadingUser, workerProfile?.shaktiScore]);
 
   const isAuthenticated = user && contextUser;
 
@@ -939,15 +852,21 @@ function Homepage() {
                 <div className="grid grid-cols-2 gap-3 md:gap-4">
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Posted Jobs</div>
-                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">{workerProfile?.postedJobs ?? 0}</div>
+                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
+                      {Array.isArray(workerProfile?.postedJobs) ? workerProfile.postedJobs.length : (workerProfile?.postedJobs || 0)}
+                    </div>
                   </div>
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Active Hires</div>
-                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">{workerProfile?.activeHires ?? 0}</div>
+                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
+                      {Array.isArray(workerProfile?.activeHires) ? workerProfile.activeHires.length : (workerProfile?.activeHires || 0)}
+                    </div>
                   </div>
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Completed</div>
-                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">{workerProfile?.completedHires ?? 0}</div>
+                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
+                      {Array.isArray(workerProfile?.completedHires) ? workerProfile.completedHires.length : (workerProfile?.completedHires || 0)}
+                    </div>
                   </div>
                   <div className="rounded-xl bg-gradient-to-br from-[#FF7124]/10 to-[#FF7124]/20 border border-[#FF7124]/30 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#FF7124] mb-1 font-medium">Budget</div>
@@ -966,7 +885,9 @@ function Homepage() {
                   </div>
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Completed</div>
-                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">{workerProfile?.completedJobs ?? 0}</div>
+                    <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
+                      {Array.isArray(workerProfile?.completedJobs) ? workerProfile.completedJobs.length : (workerProfile?.completedJobs || 0)}
+                    </div>
                     <div className="text-[10px] md:text-xs text-[#202124]/40 mt-1">All time</div>
                   </div>
                   <div className="rounded-xl bg-gradient-to-br from-[#FF7124]/10 to-[#FF7124]/20 border border-[#FF7124]/30 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
@@ -976,7 +897,9 @@ function Homepage() {
                   </div>
                   <div className="rounded-xl bg-gradient-to-br from-[#E8DFD5] to-[#DBBBA7] border-2 border-[#FF7124]/30 p-4 shadow-md hover:shadow-lg transition-all">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#FF7124] mb-1 font-medium">Trust</div>
-                    <div className="text-2xl md:text-3xl font-bold text-[#e66420]">{(user?.type === 'worker' && shaktiScore !== null) ? shaktiScore : (workerProfile?.rating?.average ?? '—')}</div>
+                    <div className="text-2xl md:text-3xl font-bold text-[#e66420]">
+                      {workerProfile?.shaktiScore || shaktiScore || (workerProfile?.rating?.average ? (workerProfile.rating.average * 20).toFixed(0) : '35')}
+                    </div>
                     <div className="text-[10px] md:text-xs text-[#FF7124] mt-1">Score</div>
                   </div>
                 </div>
