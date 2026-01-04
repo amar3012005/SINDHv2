@@ -58,6 +58,28 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // API Caching Strategy: Stale-while-revalidate for profile and jobs
+  if (url.pathname.includes('/api/workers/') || url.pathname.includes('/api/jobs')) {
+    event.respondWith(
+      caches.open('sindh-api-cache').then(cache => {
+        return cache.match(request).then(cachedResponse => {
+          const fetchedResponse = fetch(request).then(networkResponse => {
+            if (networkResponse.status === 200) {
+              cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => {
+            // Silently fail network errors for stale-while-revalidate
+          });
+
+          return cachedResponse || fetchedResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // Standard static asset caching
   event.respondWith(
     fetch(request)
       .then(response => {

@@ -54,3 +54,4 @@ To ensure transparency and trust between Employers and Workers, the platform use
 > [!IMPORTANT]
 > Always use `employer-finish` for the final release of funds to ensure consistency between frontend and backend.
 
+

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { admin, db } = require('../config/firebase');
 const logger = require('../config/logger');
+const { sendPushNotification } = require('../services/fcmService');
 const {
   asyncHandler,
   ValidationError,
@@ -82,6 +83,38 @@ router.post('/apply', asyncHandler(async (req, res) => {
     applicantCount: admin.firestore.FieldValue.increment(1),
     status: 'APPLIED'
   }).catch(err => logger.warn(`⚠️ Failed to update job applicant count in Firestore: ${err.message}`));
+
+  // --- Push Notification Trigger ---
+  try {
+    const employerDoc = await db.collection('employers').doc(job.employer).get();
+    if (employerDoc.exists) {
+      const employerData = employerDoc.data();
+      
+      // Save notification to in-app center
+      const notifRef = db.collection('employers').doc(job.employer).collection('notifications').doc();
+      const notifData = {
+        title: 'New Job Application',
+        body: `${worker.name} has applied for your job: ${job.title}`,
+        data: { jobId, applicationId: targetId, type: 'new_application' },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await notifRef.set(notifData);
+
+      // Send push notification
+      if (employerData.fcmToken) {
+        await sendPushNotification(
+          employerData.fcmToken,
+          notifData.title,
+          notifData.body,
+          { ...notifData.data, id: notifRef.id }
+        );
+      }
+    }
+  } catch (err) {
+    logger.error(`FCM: Error triggering notification for application ${targetId}:`, err.message);
+  }
+  // --- End Trigger ---
 
   logger.info(`Application saved successfully in Firestore: ${targetId}`);
 
@@ -473,6 +506,38 @@ router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => 
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
   });
+
+  // --- Push Notification Trigger ---
+  try {
+    const workerDoc = await db.collection('workers').doc(appData.worker).get();
+    if (workerDoc.exists) {
+      const workerData = workerDoc.data();
+      
+      // Save notification to in-app center
+      const notifRef = db.collection('workers').doc(appData.worker).collection('notifications').doc();
+      const notifData = {
+        title: 'Payment Received! 💰',
+        body: `₹${appData.baseAmount + charges} has been added to your wallet for: ${appData.jobSnippet?.title || 'Completed Job'}`,
+        data: { applicationId, type: 'payment_received' },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await notifRef.set(notifData);
+
+      // Send push notification
+      if (workerData.fcmToken) {
+        await sendPushNotification(
+          workerData.fcmToken,
+          notifData.title,
+          notifData.body,
+          { ...notifData.data, id: notifRef.id }
+        );
+      }
+    }
+  } catch (err) {
+    logger.error(`FCM: Error triggering notification for payment ${applicationId}:`, err.message);
+  }
+  // --- End Trigger ---
 
   logger.info(`✅ Stage 2 Payment and Finalization completed for ${applicationId}`);
 

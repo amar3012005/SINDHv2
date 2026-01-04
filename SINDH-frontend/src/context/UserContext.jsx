@@ -2,32 +2,56 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { synchronizeUserData, clearAllUserData } from '../utils/authSyncUtils';
 import { getCurrentUser, saveUserData, clearUserData } from '../utils/authUtils';
+import { offlineStorage } from '../utils/offlineStorage';
 
 const UserContext = createContext(null);
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  // Update online status
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Load user data on initial mount
   useEffect(() => {
-    const loadUserData = () => {
+    const loadUserData = async () => {
       try {
-        console.log('🔍 UserContext: Loading user data from localStorage');
-        const userData = getCurrentUser();
-        console.log('🔍 UserContext: Retrieved user data:', userData);
+        console.log('🔍 UserContext: Loading user data');
+        let userData = getCurrentUser();
+        
+        // If not in localStorage, check IndexedDB (Offline cache)
+        if (!userData && !navigator.onLine) {
+          const cachedProfile = await offlineStorage.getProfile('last_logged_in_user');
+          if (cachedProfile) {
+            userData = cachedProfile;
+            console.log('📦 UserContext: Loaded profile from IndexedDB cache');
+          }
+        }
 
         if (userData) {
           setUser(userData);
           console.log('✅ UserContext: User loaded successfully:', userData.type, userData.name);
-        } else {
-          console.log('ℹ️ UserContext: No user data found in localStorage');
+          
+          // Cache for offline use
+          if (navigator.onLine) {
+            offlineStorage.saveProfile('last_logged_in_user', userData);
+          }
         }
       } catch (error) {
-        console.error('❌ UserContext: Failed to load user from localStorage:', error);
+        console.error('❌ UserContext: Failed to load user:', error);
       } finally {
         setIsLoadingUser(false);
-        console.log('✅ UserContext: Finished loading user, isLoadingUser set to false');
       }
     };
 
@@ -40,6 +64,9 @@ export const UserProvider = ({ children }) => {
 
     // Save to localStorage using utility
     saveUserData(userData);
+    
+    // Cache for offline use
+    offlineStorage.saveProfile('last_logged_in_user', userData);
 
     // Update state
     setUser(userData);
@@ -76,6 +103,7 @@ export const UserProvider = ({ children }) => {
       value={{
         user,
         isLoadingUser,
+        isOffline,
         loginUser,
         logoutUser,
         isPhase1Employer,

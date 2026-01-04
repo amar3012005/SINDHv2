@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Briefcase,
   MapPin,
+  MapPinned,
   DollarSign,
   Users,
   FileText,
@@ -17,8 +18,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { buildApiUrl } from '../../utils/apiUtils';
-import { db } from '../../config/firebase';
+import { db, auth } from '../../config/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { requestAndGetLocation, lookupPincode } from '../../services/locationService';
 
 // --- Theme Constants ---
 const COLORS = {
@@ -38,6 +41,7 @@ const PostJob = () => {
   const [currentPhase, setCurrentPhase] = useState(1); // 1=Details, 2=Location&Payment, 3=Review
   const [submitting, setSubmitting] = useState(false);
   const [employerId, setEmployerId] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -84,7 +88,7 @@ const PostJob = () => {
     'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
   ];
 
-  // Load employer data in real-time
+  // Load employer data in real-time (auth-gated to avoid permission-denied)
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const empId = localStorage.getItem('employerId') || user.id || user._id;
@@ -97,46 +101,86 @@ const PostJob = () => {
 
     setEmployerId(empId);
 
-    console.log('📡 Setting up real-time employer listener for PostJob:', empId);
-    const employerRef = doc(db, 'employers', empId);
-    
-    const unsubscribe = onSnapshot(employerRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const employerData = docSnap.data();
-        console.log('👤 Employer profile updated in PostJob:', employerData);
-
-        const completeEmployerProfile = {
-          id: docSnap.id,
-          _id: docSnap.id,
-          ...employerData,
-          type: 'employer'
-        };
-
-        localStorage.setItem('employerProfile', JSON.stringify(completeEmployerProfile));
-        localStorage.setItem('user', JSON.stringify(completeEmployerProfile));
-
-        // Pre-fill location from fresh employer data
-        if (employerData.location) {
-          setFormData(prev => ({
-            ...prev,
-            location: {
-              ...prev.location,
-              village: employerData.location.village || '',
-              district: employerData.location.district || '',
-              state: employerData.location.state || '',
-              pincode: employerData.location.pincode || ''
-            }
-          }));
-        }
-      } else {
-        console.warn('⚠️ Employer profile not found in Firestore');
+    let unsubscribe = () => {};
+    const stopAuth = onAuthStateChanged(auth, (authUser) => {
+      if (!authUser) {
+        console.warn('⚠️ Auth not ready; waiting to attach employer listener');
+        return;
       }
-    }, (error) => {
-      console.error('❌ Employer listener error:', error);
+
+      console.log('📡 Setting up real-time employer listener for PostJob:', empId);
+      const employerRef = doc(db, 'employers', empId);
+      
+      unsubscribe = onSnapshot(employerRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const employerData = docSnap.data();
+          console.log('👤 Employer profile updated in PostJob:', employerData);
+
+          const completeEmployerProfile = {
+            id: docSnap.id,
+            _id: docSnap.id,
+            ...employerData,
+            type: 'employer'
+          };
+
+          localStorage.setItem('employerProfile', JSON.stringify(completeEmployerProfile));
+          localStorage.setItem('user', JSON.stringify(completeEmployerProfile));
+
+          // Pre-fill location from fresh employer data
+          if (employerData.location) {
+            setFormData(prev => ({
+              ...prev,
+              location: {
+                ...prev.location,
+                village: employerData.location.village || '',
+                district: employerData.location.district || '',
+                state: employerData.location.state || '',
+                pincode: employerData.location.pincode || ''
+              }
+            }));
+          }
+        } else {
+          console.warn('⚠️ Employer profile not found in Firestore');
+        }
+      }, (error) => {
+        console.error('❌ Employer listener error:', error);
+      });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe && unsubscribe();
+      stopAuth && stopAuth();
+    };
   }, [navigate]);
+
+  const handleUseMyLocation = async () => {
+    setLocationLoading(true);
+    try {
+      const result = await requestAndGetLocation();
+      if (result.success) {
+        setFormData(prev => ({
+          ...prev,
+          location: {
+            ...prev.location,
+            district: result.district || prev.location.district || '',
+            state: result.state || prev.location.state || '',
+            pincode: result.pincode || prev.location.pincode || '',
+            coordinates: {
+              type: 'Point',
+              coordinates: result.coordinates
+            }
+          }
+        }));
+        toast.success("Location updated via GPS");
+      } else {
+        toast.error(result.message || "Failed to get location");
+      }
+    } catch (err) {
+      toast.error("Location access error");
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
   const handleNext = () => {
     if (currentPhase === 1) {
@@ -362,6 +406,22 @@ const PostJob = () => {
               <p className="text-xs font-bold text-[#3B4883]/50 uppercase tracking-wide">Where and when</p>
             </div>
           </div>
+
+          {/* GPS Location Button */}
+          <button
+            onClick={handleUseMyLocation}
+            disabled={locationLoading}
+            className="w-full bg-[#FF7124]/5 border-2 border-dashed border-[#FF7124]/30 hover:border-[#FF7124] rounded-2xl p-4 flex items-center justify-center gap-3 transition-all group"
+          >
+            {locationLoading ? (
+              <Loader className="w-5 h-5 text-[#FF7124] animate-spin" />
+            ) : (
+              <MapPinned className="w-5 h-5 text-[#FF7124]" />
+            )}
+            <span className="text-xs font-black text-[#FF7124] uppercase tracking-widest">
+              {locationLoading ? 'Fetching Location...' : 'Use My GPS Location'}
+            </span>
+          </button>
 
           {/* Date Selection */}
           <div className="grid grid-cols-2 gap-4">

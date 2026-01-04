@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { useUser } from '../../context/UserContext';
 import { buildApiUrl } from '../../utils/apiUtils';
 import { db } from '../../config/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocsFromServer } from 'firebase/firestore';
 import {
   MapPin,
   Users,
@@ -14,7 +14,8 @@ import {
   DollarSign,
   Navigation,
   ChevronRight,
-  Clock
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 
 const AvailableJobs = () => {
@@ -29,6 +30,41 @@ const AvailableJobs = () => {
   const [applyingJobId, setApplyingJobId] = useState(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [appliedJobIds, setAppliedJobIds] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Shared helpers
+  const buildJobsQuery = useCallback(() => (
+    query(
+      collection(db, 'jobs'),
+      where('status', 'in', ['POSTED', 'active', 'APPLIED'])
+    )
+  ), []);
+
+  const mapJobDoc = useCallback((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      _id: doc.id,
+      ...data,
+      // Robust location handling
+      displayLocation: data.location?.village || data.location?.district || data.location?.city || 'Location'
+    };
+  }, []);
+
+  const refreshJobsFromServer = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const snapshot = await getDocsFromServer(buildJobsQuery());
+      const jobsList = snapshot.docs.map(mapJobDoc);
+      setJobs(jobsList);
+      toast.success('Jobs updated from server');
+    } catch (error) {
+      console.error('❌ Manual refresh failed:', error);
+      toast.error('Could not refresh jobs. Check your connection.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [buildJobsQuery, mapJobDoc]);
 
   // Real-time jobs listener
   useEffect(() => {
@@ -38,29 +74,19 @@ const AvailableJobs = () => {
     setLoading(true);
 
     // 1. Listen to jobs collection (status-based to match backend writes)
-    const jobsQuery = query(
-      collection(db, 'jobs'),
-      where('status', 'in', ['POSTED', 'active', 'APPLIED'])
-    );
+    const jobsQuery = buildJobsQuery();
 
     const unsubscribeJobs = onSnapshot(jobsQuery, (snapshot) => {
-      const jobsList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          _id: doc.id,
-          ...data,
-          // Robust location handling
-          displayLocation: data.location?.village || data.location?.district || data.location?.city || 'Location'
-        };
-      });
+      const jobsList = snapshot.docs.map(mapJobDoc);
       console.log(`✅ Received ${jobsList.length} jobs from Firestore`);
       setJobs(jobsList);
       setLoading(false);
+      setRefreshing(false);
     }, (error) => {
       console.error('❌ Jobs listener error:', error);
       toast.error('Could not load jobs');
       setLoading(false);
+      setRefreshing(false);
     });
 
     // 2. Listen to worker's applications to track 'hasApplied'
@@ -86,7 +112,7 @@ const AvailableJobs = () => {
       unsubscribeJobs();
       unsubscribeApps();
     };
-  }, [user?.id, user?.type]);
+  }, [user?.id, user?.type, buildJobsQuery, mapJobDoc]);
 
   // Update hasApplied flag when jobs or appliedJobIds change
   useEffect(() => {
@@ -309,6 +335,21 @@ const AvailableJobs = () => {
             <h1 className="text-3xl md:text-4xl font-black text-[#3B4883] tracking-tight uppercase">
               |AVAILABLE_JOBS
             </h1>
+            <button
+              onClick={refreshJobsFromServer}
+              disabled={refreshing || loading}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest border-2 rounded-full transition-all ${refreshing || loading
+                ? 'text-slate-400 border-slate-300 cursor-not-allowed'
+                : 'text-[#3B4883] border-[#3B4883] hover:bg-[#3B4883] hover:text-white active:scale-95'
+                }`}
+            >
+              {refreshing ? (
+                <span className="w-4 h-4 border-2 border-[#3B4883]/30 border-t-[#3B4883] rounded-full animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
           </div>
 
           {/* Filter Tabs - Like "TRENDING | STARTERS | PASTA" */}

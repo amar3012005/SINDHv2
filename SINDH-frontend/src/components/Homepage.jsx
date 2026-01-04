@@ -8,8 +8,9 @@ import { getCurrentUser, logout } from '../utils/authUtils';
 import { Briefcase, ArrowRight, X, Phone, Loader2, RefreshCw } from 'lucide-react';
 import { buildApiUrl, getApiUrl } from '../utils/apiUtils';
 import axios from 'axios';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import NotificationBell from './NotificationBell';
 import '../styles/homepage-light.css';
 
@@ -233,76 +234,116 @@ function Homepage() {
     return () => clearTimeout(timer);
   }, [detectAndShowBackendConnection]);
 
-  // Real-time listeners for profile and job counts
+  // Real-time listeners for profile and job counts (auth-gated to avoid permission-denied)
   useEffect(() => {
     if (!user?.id) return;
 
-    const collectionName = user.type === 'employer' ? 'employers' : 'workers';
-    const profileRef = doc(db, collectionName, user.id);
-
-    console.log(`📡 Setting up real-time listener for ${collectionName}/${user.id}`);
-    const unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        console.log('👤 Profile updated:', data);
-        setWorkerProfile(data);
-        if (user.type === 'worker') {
-          setWorkerBalance(data.wallet?.totalBalance || data.balance || 0);
-          setRecentEarnings(data.wallet?.transactionHistory?.slice(-5) || []);
-        }
-      }
-    }, (error) => {
-      console.error('❌ Profile listener error:', error);
-    });
-
-    // Job count listener (if worker)
+    let unsubscribeProfile = () => {};
     let unsubscribeJobs = () => {};
-    if (user.type === 'worker') {
-      const jobsQuery = query(
-        collection(db, 'jobs'),
-        where('status', 'in', ['POSTED', 'active', 'APPLIED'])
-      );
+    let unsubscribeApps = () => {};
+    let unsubscribeEmployerJobs = () => {};
 
-      console.log('📡 Setting up real-time job count listener');
-      unsubscribeJobs = onSnapshot(jobsQuery, (querySnapshot) => {
-        let activeJobs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        // Client-side filtering for location if worker has district/state preference
-        if (user.location?.district || user.location?.state) {
-          activeJobs = activeJobs.filter(job => {
-            const jobLoc = job.location || {};
-            const userLoc = user.location || {};
-            
-            // Match by district if available, otherwise fallback to state
-            if (userLoc.district && jobLoc.district) {
-              return jobLoc.district.toLowerCase() === userLoc.district.toLowerCase();
-            }
-            if (userLoc.state && jobLoc.state) {
-              return jobLoc.state.toLowerCase() === userLoc.state.toLowerCase();
-            }
-            return true; // Keep if no specific match data
-          });
-        }
+    const stopAuth = onAuthStateChanged(auth, (authUser) => {
+      if (!authUser) {
+        console.warn('⚠️ Auth not ready; waiting to attach homepage listeners');
+        return;
+      }
 
-        const count = activeJobs.length;
-        console.log('🎯 Real-time job count:', count);
-        setJobCount(count);
+      const collectionName = user.type === 'employer' ? 'employers' : 'workers';
+      const profileRef = doc(db, collectionName, user.id);
 
-        // Show notification if needed
-        if (count > 0 && !hasShownNotification) {
-          setTimeout(() => {
-            setShowJobNotification(true);
-            setHasShownNotification(true);
-          }, 1500);
+      console.log(`📡 Setting up real-time listener for ${collectionName}/${user.id}`);
+      unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          console.log('👤 Profile updated:', data);
+          setWorkerProfile(data);
+          if (user.type === 'worker') {
+            setWorkerBalance(data.wallet?.totalBalance || data.balance || 0);
+            setRecentEarnings(data.wallet?.transactionHistory?.slice(-5) || []);
+          }
         }
       }, (error) => {
-        console.error('❌ Job count listener error:', error);
+        console.error('❌ Profile listener error:', error);
       });
-    }
+
+      // 1. Worker Listeners
+      if (user.type === 'worker') {
+        // Job count listener (Available jobs)
+        const jobsQuery = query(
+          collection(db, 'jobs'),
+          where('status', 'in', ['POSTED', 'active', 'APPLIED'])
+        );
+
+        console.log('📡 Setting up real-time job count listener');
+        unsubscribeJobs = onSnapshot(jobsQuery, (querySnapshot) => {
+          let activeJobs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          
+          if (user.location?.district || user.location?.state) {
+            activeJobs = activeJobs.filter(job => {
+              const jobLoc = job.location || {};
+              const userLoc = user.location || {};
+              if (userLoc.district && jobLoc.district) {
+                return jobLoc.district.toLowerCase() === userLoc.district.toLowerCase();
+              }
+              if (userLoc.state && jobLoc.state) {
+                return jobLoc.state.toLowerCase() === userLoc.state.toLowerCase();
+              }
+              return true;
+            });
+          }
+
+          const count = activeJobs.length;
+          console.log('🎯 Real-time job count:', count);
+          setJobCount(count);
+
+          if (count > 0 && !hasShownNotification) {
+            setTimeout(() => {
+              setShowJobNotification(true);
+              setHasShownNotification(true);
+            }, 1500);
+          }
+        }, (error) => {
+          console.error('❌ Job count listener error:', error);
+        });
+
+        // Application listener (Completed count)
+        const appsQuery = query(
+          collection(db, 'applications'),
+          where('worker', '==', user.id)
+        );
+        unsubscribeApps = onSnapshot(appsQuery, (snapshot) => {
+          const apps = snapshot.docs.map(d => d.data());
+          const completedCount = apps.filter(a => ['completed', 'paid', 'finished'].includes(a.status?.toLowerCase())).length;
+          setWorkerProfile(prev => ({ ...prev, completedJobsCount: completedCount }));
+        });
+      }
+
+      // 2. Employer Listeners
+      if (user.type === 'employer') {
+        // Posted jobs count
+        const employerJobsQuery = query(
+          collection(db, 'jobs'),
+          where('employer', '==', user.id)
+        );
+        unsubscribeEmployerJobs = onSnapshot(employerJobsQuery, (snapshot) => {
+          const jobDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setWorkerProfile(prev => ({
+            ...prev,
+            postedJobsCount: jobDocs.length,
+            activeJobsCount: jobDocs.filter(j => ['POSTED', 'active', 'APPLIED', 'accepted', 'working'].includes(j.status)).length,
+            completedJobsCount: jobDocs.filter(j => j.status === 'completed').length
+          }));
+        });
+      }
+    });
 
     return () => {
       unsubscribeProfile();
       unsubscribeJobs();
+      unsubscribeApps();
+      unsubscribeEmployerJobs();
+      stopAuth && stopAuth();
     };
   }, [user?.id, user?.type, user?.location?.state, hasShownNotification]);
 
@@ -853,19 +894,19 @@ function Homepage() {
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Posted Jobs</div>
                     <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
-                      {Array.isArray(workerProfile?.postedJobs) ? workerProfile.postedJobs.length : (workerProfile?.postedJobs || 0)}
+                      {workerProfile?.postedJobsCount ?? (Array.isArray(workerProfile?.postedJobs) ? workerProfile.postedJobs.length : (workerProfile?.postedJobs || 0))}
                     </div>
                   </div>
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
-                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Active Hires</div>
+                    <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Active Jobs</div>
                     <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
-                      {Array.isArray(workerProfile?.activeHires) ? workerProfile.activeHires.length : (workerProfile?.activeHires || 0)}
+                      {workerProfile?.activeJobsCount ?? (Array.isArray(workerProfile?.activeHires) ? workerProfile.activeHires.length : (workerProfile?.activeHires || 0))}
                     </div>
                   </div>
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Completed</div>
                     <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
-                      {Array.isArray(workerProfile?.completedHires) ? workerProfile.completedHires.length : (workerProfile?.completedHires || 0)}
+                      {workerProfile?.completedJobsCount ?? (Array.isArray(workerProfile?.completedHires) ? workerProfile.completedHires.length : (workerProfile?.completedHires || 0))}
                     </div>
                   </div>
                   <div className="rounded-xl bg-gradient-to-br from-[#FF7124]/10 to-[#FF7124]/20 border border-[#FF7124]/30 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
@@ -886,7 +927,7 @@ function Homepage() {
                   <div className="rounded-xl bg-white border border-[#3B4883]/10 p-4 shadow-md hover:shadow-lg transition-all backdrop-blur-md">
                     <div className="text-[10px] md:text-xs uppercase tracking-widest text-[#3B4883] mb-1 font-medium">Completed</div>
                     <div className="text-2xl md:text-3xl font-bold text-[#272D4E]">
-                      {Array.isArray(workerProfile?.completedJobs) ? workerProfile.completedJobs.length : (workerProfile?.completedJobs || 0)}
+                      {workerProfile?.completedJobsCount ?? (Array.isArray(workerProfile?.completedJobs) ? workerProfile.completedJobs.length : (workerProfile?.completedJobs || 0))}
                     </div>
                     <div className="text-[10px] md:text-xs text-[#202124]/40 mt-1">All time</div>
                   </div>

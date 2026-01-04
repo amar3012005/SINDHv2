@@ -12,6 +12,14 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
+    
+    // Helper: some docs store firebaseUid field; allow if it matches
+    function uidMatchesResource() {
+      return isSignedIn() && (
+        (resource.data.firebaseUid != null && resource.data.firebaseUid == request.auth.uid) ||
+        (request.resource.data.firebaseUid != null && request.resource.data.firebaseUid == request.auth.uid)
+      );
+    }
 
     // Helper function: check if user owns a job
     function jobOwnedByUser(jobId) {
@@ -26,7 +34,7 @@ service cloud.firestore {
 
     // Workers collection
     match /workers/{workerId} {
-      allow read, write: if isOwner(workerId);
+      allow read, write: if isOwner(workerId) || uidMatchesResource();
       
       match /transactions/{txId} {
         allow read: if isOwner(workerId);
@@ -39,7 +47,7 @@ service cloud.firestore {
 
     // Employers collection
     match /employers/{employerId} {
-      allow read, write: if isOwner(employerId);
+      allow read, write: if isOwner(employerId) || uidMatchesResource();
       
       match /reviews/{reviewId} {
         allow read, create: if isSignedIn();

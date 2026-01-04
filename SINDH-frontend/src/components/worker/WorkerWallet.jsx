@@ -60,6 +60,7 @@ const WorkerWallet = () => {
           ...prev,
           balance: workerData.wallet?.totalBalance || workerData.balance || 0,
           withdrawableBalance: workerData.wallet?.withdrawableBalance || 0,
+          heldBalance: (workerData.wallet?.totalBalance || workerData.balance || 0) - (workerData.wallet?.withdrawableBalance || 0),
           totalEarned: workerData.wallet?.totalEarnings || 0,
           totalSpent: workerData.wallet?.withdrawnAmount || 0,
         }));
@@ -183,17 +184,25 @@ const WorkerWallet = () => {
             </div>
             
             <div className="space-y-4">
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 flex justify-between items-center">
-                <div>
-                  <p className="text-[10px] font-black text-white/50 uppercase mb-1">Withdrawable Cash</p>
-                  <p className="text-2xl font-black">₹{walletData.withdrawableBalance.toLocaleString()}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10 flex flex-col justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-white/50 uppercase mb-1">Available Cash</p>
+                    <p className="text-2xl font-black">₹{walletData.withdrawableBalance.toLocaleString()}</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowWithdrawModal(true)}
+                    className="mt-4 bg-[#FF7124] text-white px-4 py-2 rounded-xl font-black uppercase text-[10px] shadow-lg shadow-[#FF7124]/20 active:scale-95 transition-all w-full"
+                  >
+                    Withdraw
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setShowWithdrawModal(true)}
-                  className="bg-[#FF7124] text-white px-6 py-3 rounded-xl font-black uppercase text-xs shadow-lg shadow-[#FF7124]/20 active:scale-95 transition-all"
-                >
-                  Withdraw
-                </button>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/10">
+                  <p className="text-[10px] font-black text-white/50 uppercase mb-1">Frozen / Pending</p>
+                  <p className="text-2xl font-black text-blue-300">₹{walletData.heldBalance?.toLocaleString() || 0}</p>
+                  <p className="text-[8px] text-white/30 uppercase mt-2">Released on Job Completion</p>
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">

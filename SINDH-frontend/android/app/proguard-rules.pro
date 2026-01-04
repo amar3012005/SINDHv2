@@ -144,6 +144,17 @@
     public boolean onShowFileChooser(android.webkit.WebView, android.webkit.ValueCallback, android.webkit.WebChromeClient$FileChooserParams);
 }
 
+# ===== FIREBASE AUTHENTICATION PLUGIN RULES =====
+-keep class io.capawesome.capacitorjs.plugins.firebase.authentication.** { *; }
+-dontwarn io.capawesome.capacitorjs.plugins.firebase.authentication.**
+
+# Ignore missing optional dependencies (Facebook, Google, etc. if not included)
+-dontwarn com.facebook.**
+-dontwarn com.google.android.gms.auth.api.signin.**
+-dontwarn com.google.firebase.auth.**
+-dontwarn com.google.android.recaptcha.**
+-dontwarn com.google.android.play.core.**
+
 # ===== CUSTOM RULES FOR YOUR APP =====
 # Add app-specific rules below this line
 

@@ -10,6 +10,7 @@ import { auth } from '../config/firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber, signInWithCustomToken } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { Capacitor } from '@capacitor/core';
+import { requestNotificationPermission } from '../utils/notificationUtils';
 
 
 const Login = () => {
@@ -285,6 +286,10 @@ const Login = () => {
         }
 
         loginUser(userData);
+
+        // Request notification permission
+        requestNotificationPermission(userData.id || userData._id, userType)
+          .catch(err => console.error('FCM: Error requesting permission on login:', err));
 
         import('../services/notificationService').then(({ createNotification, NOTIFICATION_TYPES }) => {
           createNotification({

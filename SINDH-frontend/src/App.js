@@ -23,6 +23,7 @@ import GreetingPage from './components/GreetingPage';
 import NetworkStatusBanner from './components/NetworkStatusBanner';
 import ErrorFallback from './components/ErrorFallback';
 import ErrorBoundary from './components/ErrorBoundary';
+import OfflineBanner from './components/common/OfflineBanner';
 
 // Worker Components
 import WorkerRegistration from './components/worker/WorkerRegistration';
@@ -63,6 +64,7 @@ const AppContent = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <OfflineBanner />
       <NetworkStatusBanner />
       {!isHomepage && !isGreetingPage && !isChatModePage && !isLoginPage && <Navbar />}
       <main>
