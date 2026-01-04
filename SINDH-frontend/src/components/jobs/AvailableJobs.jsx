@@ -105,6 +105,8 @@ const AvailableJobs = () => {
         }));
         console.log(`📝 Worker has applied to ${appJobIds.size} jobs`);
         setAppliedJobIds(appJobIds);
+      }, (error) => {
+        console.error('❌ Applications listener error:', error);
       });
     }
 

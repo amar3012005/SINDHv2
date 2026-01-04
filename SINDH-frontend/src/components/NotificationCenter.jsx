@@ -1,26 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Bell, 
-  X, 
-  CheckCircle2, 
-  Briefcase, 
-  DollarSign, 
-  Clock, 
+import {
+  Bell,
+  X,
+  CheckCircle2,
+  Briefcase,
+  DollarSign,
+  Clock,
   Trash2,
   AlertCircle,
   ChevronRight
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { db } from '../config/firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  doc, 
-  updateDoc, 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  doc,
+  updateDoc,
   deleteDoc,
   writeBatch
 } from 'firebase/firestore';
@@ -46,6 +46,9 @@ const NotificationCenter = ({ isOpen, onClose }) => {
         date: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate() : new Date()
       }));
       setNotifications(list);
+      setLoading(false);
+    }, (error) => {
+      console.error('❌ Notifications listener error:', error);
       setLoading(false);
     });
 
@@ -77,14 +80,14 @@ const NotificationCenter = ({ isOpen, onClose }) => {
 
   const handleNotificationClick = (notif) => {
     markAsRead(notif.id);
-    
+
     // Navigate based on type
     if (notif.data?.type === 'new_application' && user.type === 'employer') {
       navigate(`/employer/job/${notif.data.jobId}`);
     } else if (notif.data?.type === 'payment_received' && user.type === 'worker') {
       navigate('/worker/wallet');
     }
-    
+
     onClose();
   };
 
@@ -108,7 +111,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="fixed inset-0 bg-[#3B4883]/20 backdrop-blur-sm z-[1000]"
           />
-          
+
           {/* Panel */}
           <motion.div
             initial={{ x: '100%' }}
@@ -125,7 +128,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
                   {notifications.filter(n => !n.read).length} Unread Messages
                 </p>
               </div>
-              <button 
+              <button
                 onClick={onClose}
                 className="w-10 h-10 rounded-2xl bg-[#3B4883]/5 flex items-center justify-center text-[#3B4883]/40 hover:text-[#FF7124] transition-all"
               >
@@ -136,7 +139,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
             {/* Actions */}
             {notifications.length > 0 && (
               <div className="px-6 py-3 bg-[#F8F5F2] flex items-center justify-between">
-                <button 
+                <button
                   onClick={markAllAsRead}
                   className="text-[9px] font-black text-[#FF7124] uppercase tracking-widest hover:underline"
                 >
@@ -188,7 +191,7 @@ const NotificationCenter = ({ isOpen, onClose }) => {
                           </p>
                         </div>
                       </div>
-                      
+
                       {/* Delete Button */}
                       <button
                         onClick={(e) => deleteNotification(e, notif.id)}

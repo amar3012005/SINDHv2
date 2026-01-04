@@ -66,7 +66,7 @@ const AppContent = () => {
     <div className="min-h-screen bg-gray-50">
       <OfflineBanner />
       <NetworkStatusBanner />
-      {!isHomepage && !isGreetingPage && !isChatModePage && !isLoginPage && <Navbar />}
+      {!isGreetingPage && !isChatModePage && !isLoginPage && <Navbar />}
       <main>
         <AnimatePresence mode="wait">
           <ErrorBoundary fallback={(props) => <ErrorFallback {...props} />}>
