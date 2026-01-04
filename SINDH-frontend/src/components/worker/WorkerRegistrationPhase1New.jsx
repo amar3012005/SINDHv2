@@ -225,6 +225,20 @@ const WorkerRegistrationPhase1 = () => {
 
     setIsSubmitting(true);
     try {
+      // Capture registration location and time
+      let registrationLocation = null;
+      try {
+        const locResult = await requestAndGetLocation();
+        if (locResult.success) {
+          registrationLocation = {
+            coordinates: locResult.coordinates, // [lng, lat]
+            recordedAt: new Date().toISOString()
+          };
+        }
+      } catch (locErr) {
+        console.warn('⚠️ Could not capture registration coordinates:', locErr);
+      }
+
       const apiUrl = getApiUrlSync();
       const payload = {
         ...formData,
@@ -236,7 +250,8 @@ const WorkerRegistrationPhase1 = () => {
         experience: 'Less than 1 year',
         languages: ['Hindi'],
         preferredWorkType: 'Full-time daily work',
-        availability: 'Available immediately'
+        availability: 'Available immediately',
+        registrationLocation // Add exact coordinates and timestamp
       };
 
       const response = await fetch(`${apiUrl}/workers/register`, {

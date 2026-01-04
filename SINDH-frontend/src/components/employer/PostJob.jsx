@@ -101,7 +101,7 @@ const PostJob = () => {
 
     setEmployerId(empId);
 
-    let unsubscribe = () => {};
+    let unsubscribe = () => { };
     const stopAuth = onAuthStateChanged(auth, (authUser) => {
       if (!authUser) {
         console.warn('⚠️ Auth not ready; waiting to attach employer listener');
@@ -110,7 +110,7 @@ const PostJob = () => {
 
       console.log('📡 Setting up real-time employer listener for PostJob:', empId);
       const employerRef = doc(db, 'employers', empId);
-      
+
       unsubscribe = onSnapshot(employerRef, (docSnap) => {
         if (docSnap.exists()) {
           const employerData = docSnap.data();
@@ -243,6 +243,20 @@ const PostJob = () => {
 
     setSubmitting(true);
     try {
+      // Capture exact GPS coordinates and time when job is posted
+      let postingLocation = null;
+      try {
+        const locResult = await requestAndGetLocation();
+        if (locResult.success) {
+          postingLocation = {
+            coordinates: locResult.coordinates, // [lng, lat]
+            recordedAt: new Date().toISOString()
+          };
+        }
+      } catch (locErr) {
+        console.warn('⚠️ Could not capture job posting coordinates:', locErr);
+      }
+
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       const employerProfile = JSON.parse(localStorage.getItem('employerProfile') || '{}');
       const companyName = employerProfile.companyName || user.companyName || user.name || 'Company';
@@ -282,7 +296,9 @@ const PostJob = () => {
         startDate: formData.startDate,
         endDate: formData.endDate,
         startTime: formData.startTime,
-        endTime: formData.endTime
+        endTime: formData.endTime,
+        postingLocation, // Add exact coordinates and timestamp
+        postingTimestamp: new Date().toISOString() // Redundant but explicit as requested
       };
 
       const response = await fetch(buildApiUrl('/jobs'), {

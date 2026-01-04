@@ -19,7 +19,7 @@ const chunkArray = (arr, size = 10) => {
 // Apply for a job (Firestore)
 router.post('/apply', asyncHandler(async (req, res) => {
   logger.info('🎯 Job application request received for Firestore');
-  const { jobId, workerId, workerDetails } = req.body;
+  const { jobId, workerId, workerDetails, applicationLocation } = req.body;
 
   if (!jobId || !workerId) {
     throw new ValidationError('Job ID and Worker ID are required');
@@ -67,6 +67,7 @@ router.post('/apply', asyncHandler(async (req, res) => {
       location: job.location,
       companyName: job.companyName || ''
     },
+    applicationLocation: applicationLocation || null, // Store exact coordinates and timestamp
     appliedAt: admin.firestore.FieldValue.serverTimestamp(),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -747,13 +748,13 @@ router.post('/:applicationId/worker-finish', asyncHandler(async (req, res) => {
 
   const applicationRef = db.collection('applications').doc(applicationId);
   const applicationSnap = await applicationRef.get();
-  
+
   if (!applicationSnap.exists) {
     throw new NotFoundError('Application not found');
   }
-  
+
   const appData = applicationSnap.data();
-  
+
   // Validate current status - should be 'working' or 'in-progress'
   if (!['working', 'in-progress'].includes(appData.status?.toLowerCase())) {
     throw new ValidationError(`Cannot mark work finished from status: ${appData.status}`);

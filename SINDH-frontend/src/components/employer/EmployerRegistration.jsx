@@ -207,6 +207,20 @@ const EmployerRegistration = () => {
 
     setIsSubmitting(true);
     try {
+      // Capture registration location and time
+      let registrationLocation = null;
+      try {
+        const locResult = await requestAndGetLocation();
+        if (locResult.success) {
+          registrationLocation = {
+            coordinates: locResult.coordinates, // [lng, lat]
+            recordedAt: new Date().toISOString()
+          };
+        }
+      } catch (locErr) {
+        console.warn('⚠️ Could not capture registration coordinates:', locErr);
+      }
+
       const payload = {
         name: formData.name.trim(),
         phone: formData.phone,
@@ -214,7 +228,8 @@ const EmployerRegistration = () => {
         companyName: formData.companyName?.trim() || formData.name.trim(),
         location: formData.location,
         termsAccepted: formData.termsAccepted,
-        phase: 1
+        phase: 1,
+        registrationLocation // Add exact coordinates and timestamp
       };
 
       const response = await fetch(buildApiUrl('/employers/register'), {

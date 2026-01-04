@@ -102,7 +102,8 @@ router.post('/register', asyncHandler(async (req, res) => {
     termsAcceptedAt: new Date(),
     type: 'employer',
     isLoggedIn: 1,
-    lastLogin: new Date()
+    lastLogin: new Date(),
+    registrationLocation: req.body.registrationLocation || null // Capture exact coordinates and timestamp
   };
 
   const { firebaseUid } = req.body;
@@ -306,5 +307,6 @@ router.put('/:id', checkEmployerAccess, asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
+
 
 

@@ -17,6 +17,7 @@ import {
   Clock,
   RefreshCw
 } from 'lucide-react';
+import { requestAndGetLocation } from '../../services/locationService';
 
 const AvailableJobs = () => {
   const navigate = useNavigate();
@@ -146,6 +147,20 @@ const AvailableJobs = () => {
 
     setApplyingJobId(job._id);
     try {
+      // Capture application location and time
+      let applicationLocation = null;
+      try {
+        const locResult = await requestAndGetLocation();
+        if (locResult.success) {
+          applicationLocation = {
+            coordinates: locResult.coordinates, // [lng, lat]
+            recordedAt: new Date().toISOString()
+          };
+        }
+      } catch (locErr) {
+        console.warn('⚠️ Could not capture application coordinates:', locErr);
+      }
+
       const response = await fetch(buildApiUrl('/job-applications/apply'), {
         method: 'POST',
         headers: {
@@ -161,7 +176,8 @@ const AvailableJobs = () => {
             phone: user.phone,
             skills: user.skills || [],
             experience: user.experience_years || 0
-          }
+          },
+          applicationLocation // Add exact coordinates and timestamp for this specific application
         })
       });
 

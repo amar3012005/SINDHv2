@@ -200,6 +200,8 @@ router.post('/', asyncHandler(async (req, res) => {
     urgency: req.body.urgency || 'Normal',
     startDate: req.body.startDate || new Date(),
     endDate: req.body.endDate || new Date(Date.now() + 86400000),
+    postingLocation: req.body.postingLocation || null, // Store exact coordinates and timestamp
+    postingTimestamp: req.body.postingTimestamp || new Date().toISOString(),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   };

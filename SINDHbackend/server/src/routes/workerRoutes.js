@@ -144,6 +144,7 @@ router.post('/register', asyncHandler(async (req, res) => {
     verificationStatus: 'pending',
     isAvailable: true,
     rating: { average: 0, count: 0, reviews: [] },
+    registrationLocation: req.body.registrationLocation || null, // Capture exact coordinates and timestamp
     registrationDate: new Date().toISOString(),
     lastLogin: new Date().toISOString(),
     isLoggedIn: 1,
@@ -239,10 +240,10 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   logger.info(`Fetching worker by ID from Firestore: ${id}`);
-  
+
   // PRIMARY: Fetch from Firestore 'workers' collection
   const workerDoc = await db.collection('workers').doc(id).get();
-  
+
   if (!workerDoc.exists) {
     console.error(`❌ [GET /api/workers/${id}] Worker NOT FOUND in Firestore`);
     throw new NotFoundError('Worker not found');
@@ -250,7 +251,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 
   const workerData = workerDoc.data();
   console.log(`✅ [GET /api/workers/${id}] Worker found in Firestore: ${workerData.name}`);
-  
+
   // Return formatted worker object (normalize ID)
   res.json({
     ...workerData,
@@ -264,7 +265,7 @@ router.put('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   logger.info(`ROBUSTNESS_CHECK: H3 - Worker profile update attempt for ${id}`, { updates: Object.keys(req.body) });
   logger.info(`Updating worker in Firestore: ${id}`);
-  
+
   await db.collection('workers').doc(id).update({
     ...req.body,
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -285,9 +286,9 @@ router.put('/:id', asyncHandler(async (req, res) => {
 router.delete('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   logger.info(`Deleting worker from Firestore: ${id}`);
-  
+
   await db.collection('workers').doc(id).delete();
-  await db.collection('users').doc(id).delete().catch(() => {});
+  await db.collection('users').doc(id).delete().catch(() => { });
 
   logger.info(`Worker deleted from Firestore: ${id}`);
   res.json({ message: 'Worker deleted successfully' });
@@ -297,7 +298,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 router.get('/:id/profile', asyncHandler(async (req, res) => {
   const workerId = req.params.id;
   logger.info(`Fetching worker profile from Firestore: ${workerId}`);
-  
+
   const workerDoc = await db.collection('workers').doc(workerId).get();
   if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
@@ -310,7 +311,7 @@ router.get('/:id/profile', asyncHandler(async (req, res) => {
     .orderBy('createdAt', 'desc')
     .limit(20)
     .get();
-  
+
   const reviews = reviewsSnapshot.docs.map(doc => ({
     ...doc.data(),
     id: doc.id
@@ -360,7 +361,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   logger.info(`Worker login attempt for phone: ${phone}`);
-  
+
   // PRIMARY: Check Firestore
   const snapshot = await db.collection('workers').where('phone', '==', phone).limit(1).get();
 
@@ -397,7 +398,7 @@ router.post('/login', asyncHandler(async (req, res) => {
 router.get('/:id/balance', asyncHandler(async (req, res) => {
   const { id } = req.params;
   const workerDoc = await db.collection('workers').doc(id).get();
-  
+
   if (!workerDoc.exists) {
     throw new NotFoundError('Worker not found');
   }

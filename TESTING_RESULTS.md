@@ -39,3 +39,4 @@
 1. **VAPID Key**: Ensure the VAPID key from Firebase Console is added to `SINDH-frontend/.env`.
 2. **Keystore Backup**: Keep `my-release-key.keystore` in a secure location.
 
+
