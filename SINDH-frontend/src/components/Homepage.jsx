@@ -11,7 +11,6 @@ import axios from 'axios';
 import { db, auth } from '../config/firebase';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import NotificationBell from './NotificationBell';
 import '../styles/homepage-light.css';
 
 
@@ -105,20 +104,12 @@ function Homepage() {
   const [hasShownNotification, setHasShownNotification] = useState(false);
   const [workerProfile, setWorkerProfile] = useState(null);
 
-  // Menu refs for focus management - Comment 5
-  const homeMenuRef = useRef(null);
-  const userMenuRef = useRef(null);
-  const homeMenuTriggerRef = useRef(null);
-  const userMenuTriggerRef = useRef(null);
-
   // Logo asset centralization - Comment 7
   const logoSrc = '/sindh.svg';
 
   // Worker financial states
   const [workerBalance, setWorkerBalance] = useState(0);
   const [recentEarnings, setRecentEarnings] = useState([]);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showHomeMenu, setShowHomeMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [homeLang, setHomeLang] = useState(localStorage.getItem('homeLang') || 'EN');
   const isHindi = homeLang === 'HI';
@@ -238,10 +229,10 @@ function Homepage() {
   useEffect(() => {
     if (!user?.id) return;
 
-    let unsubscribeProfile = () => {};
-    let unsubscribeJobs = () => {};
-    let unsubscribeApps = () => {};
-    let unsubscribeEmployerJobs = () => {};
+    let unsubscribeProfile = () => { };
+    let unsubscribeJobs = () => { };
+    let unsubscribeApps = () => { };
+    let unsubscribeEmployerJobs = () => { };
 
     const stopAuth = onAuthStateChanged(auth, (authUser) => {
       if (!authUser) {
@@ -278,7 +269,7 @@ function Homepage() {
         console.log('📡 Setting up real-time job count listener');
         unsubscribeJobs = onSnapshot(jobsQuery, (querySnapshot) => {
           let activeJobs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          
+
           if (user.location?.district || user.location?.state) {
             activeJobs = activeJobs.filter(job => {
               const jobLoc = job.location || {};
@@ -436,77 +427,6 @@ function Homepage() {
     };
   }, [showLogoutConfirm]);
 
-  // Focus management for home menu - Comment 5
-  useEffect(() => {
-    if (!showHomeMenu) return;
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        setShowHomeMenu(false);
-        // Return focus to trigger button
-        homeMenuTriggerRef.current?.focus();
-      }
-    };
-
-    const handleOutsideClick = (e) => {
-      if (homeMenuRef.current && !homeMenuRef.current.contains(e.target) &&
-        homeMenuTriggerRef.current && !homeMenuTriggerRef.current.contains(e.target)) {
-        setShowHomeMenu(false);
-      }
-    };
-
-    // Focus first button in menu
-    const firstButton = homeMenuRef.current?.querySelector('button');
-    firstButton?.focus();
-
-    // Add event listeners
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('touchstart', handleOutsideClick);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('touchstart', handleOutsideClick);
-    };
-  }, [showHomeMenu]);
-
-  // Focus management for user menu - Comment 5
-  useEffect(() => {
-    if (!showUserMenu) return;
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        setShowUserMenu(false);
-        // Return focus to trigger button
-        userMenuTriggerRef.current?.focus();
-      }
-    };
-
-    const handleOutsideClick = (e) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target) &&
-        userMenuTriggerRef.current && !userMenuTriggerRef.current.contains(e.target)) {
-        setShowUserMenu(false);
-      }
-    };
-
-    // Focus first button in menu
-    const firstButton = userMenuRef.current?.querySelector('button');
-    firstButton?.focus();
-
-    // Add event listeners
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('touchstart', handleOutsideClick);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('touchstart', handleOutsideClick);
-    };
-  }, [showUserMenu]);
 
   // Logout function
   const handleLogout = () => {
@@ -667,47 +587,9 @@ function Homepage() {
       </div>
 
       <div className="relative z-10">
-        {/* Top-left Brand - Fixed Position */}
-        <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[100] cursor-pointer" onClick={() => window.location.reload()}>
-          <span className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#3B4883] drop-shadow-sm hover:text-[#FF7124] transition-colors">
-            SINDH
-          </span>
-        </div>
-
-        {/* Top-right controls: language + menu (no navbar) - Fixed Position */}
-        <div className="fixed top-4 right-4 md:top-6 md:right-6 flex items-center gap-2 md:gap-3 z-[100]">
-          <div className="bg-white/90 rounded-full shadow-sm backdrop-blur-md">
-            <NotificationBell />
-          </div>
-          <button onClick={toggleHomeLang} className="px-3 py-2 rounded-lg text-xs md:text-sm bg-white/90 border border-[#3B4883]/20 text-[#202124] hover:border-[#FF7124] hover:bg-[#FF7124]/10 transition-all shadow-sm font-medium backdrop-blur-md min-w-[44px] min-h-[44px] p-3.5" aria-label="Toggle language">
-            {isHindi ? 'HI' : 'EN'}
-          </button>
-          <button ref={homeMenuTriggerRef} onClick={() => setShowHomeMenu(v => !v)} className={`rounded-full transition-all shadow-sm group backdrop-blur-md ${user ? 'p-0 border-2 border-[#FF7124]/20 hover:border-[#FF7124] hover:shadow-md' : 'p-2.5 md:p-3 bg-white/90 border border-[#3B4883]/20 hover:bg-[#FF7124]/10'}`} aria-label="Open menu" aria-expanded={showHomeMenu} aria-controls="home-menu">
-            {user ? (
-              <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-br from-[#FF7124] to-[#e66420] text-white flex items-center justify-center font-bold text-lg">
-                {user.name?.charAt(0)?.toUpperCase() || 'U'}
-              </div>
-            ) : (
-              <>
-                <span className="block w-4 md:w-5 h-0.5 bg-[#202124] group-hover:bg-[#FF7124] mb-1 transition-colors"></span>
-                <span className="block w-3 md:w-4 h-0.5 bg-[#202124] group-hover:bg-[#FF7124] mb-1 transition-colors"></span>
-                <span className="block w-5 md:w-6 h-0.5 bg-[#202124] group-hover:bg-[#FF7124] transition-colors"></span>
-              </>
-            )}
-          </button>
-        </div>
-        <AnimatePresence>
-          {showHomeMenu && (
-            <motion.div ref={homeMenuRef} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute top-14 sm:top-16 right-4 md:right-6 w-56 bg-white border border-[#3B4883]/10 rounded-xl p-3 text-sm text-[#202124] z-[70] shadow-xl backdrop-blur-xl" id="home-menu">
-              <button onClick={() => navigate(`/${user?.type || 'worker'}/profile`)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FF7124]/10 hover:text-[#FF7124] transition-all">{t('menu.profile', { ns: 'home' })}</button>
-              <button onClick={handleViewJobs} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FF7124]/10 hover:text-[#FF7124] transition-all">{t('menu.jobs', { ns: 'home' })}</button>
-              <button onClick={() => setShowLogoutConfirm(true)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FF7124]/10 hover:text-[#FF7124] transition-all">{t('menu.logout', { ns: 'home' })}</button>
-            </motion.div>
-          )}
-        </AnimatePresence>
         {/* Mobile-Optimized Job Notification */}
         <AnimatePresence>
-          {showJobNotification && user?.type === 'worker' && jobCount > 0 && !jobCountLoading && !showHomeMenu && (
+          {showJobNotification && user?.type === 'worker' && jobCount > 0 && !jobCountLoading && (
             <motion.div
               initial={{ opacity: 0, x: 100 }}
               animate={{ opacity: 1, x: 0 }}
@@ -800,58 +682,11 @@ function Homepage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15 }}
-                  className="relative mt-6 flex flex-wrap items-center justify-center gap-4 text-[#202124]"
+                  className="mt-6 text-[#202124]"
                 >
-                  <button
-                    ref={userMenuTriggerRef}
-                    onClick={() => setShowUserMenu(v => !v)}
-                    className="relative inline-flex items-center gap-4 px-5 py-3 rounded-2xl bg-white border-2 border-[#3B4883]/20 hover:border-[#FF7124] hover:shadow-lg backdrop-blur-md transition-all shadow-md"
-                  >
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-[#FF7124] to-[#e66420] border border-[#FF7124]/30 flex items-center justify-center font-bold tracking-wide text-lg text-white shadow-sm">
-                      {user?.name?.charAt(0)?.toUpperCase()}
-                    </div>
-                    <div className="text-left">
-                      <div className="text-base sm:text-lg font-semibold leading-tight text-[#202124]">{user?.name}</div>
-                      <div className="text-xs sm:text-sm uppercase tracking-widest text-[#202124]/60 font-medium">{user?.type}</div>
-                    </div>
-                    <svg className={`w-5 h-5 text-[#202124]/60 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
-                  </button>
-
-                  <AnimatePresence>
-                    {showUserMenu && (
-                      <motion.div
-                        ref={userMenuRef}
-                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                        className="absolute top-full mt-4 w-[92vw] left-1/2 -translate-x-1/2"
-                      >
-                        <div className="relative px-4">
-                          <div className="absolute inset-x-6 -top-2 h-8 bg-gradient-to-b from-[#FF7124]/10 to-transparent blur-2xl opacity-60 pointer-events-none" />
-                        </div>
-                        {/* Comment 8: Overflow handling */}
-                        <div className="max-h-[60vh] overflow-auto overscroll-contain scroll-py-2">
-                          <div className="mx-auto max-w-3xl grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                            <button onClick={() => navigate(`/${user.type}/profile`)} className="group flex items-center justify-between p-4 sm:p-5 rounded-xl bg-white hover:bg-[#FF7124]/10 border border-[#3B4883]/10 hover:border-[#FF7124] transition-all shadow-md hover:shadow-lg backdrop-blur-md">
-                              <span className="text-sm sm:text-base font-semibold tracking-wide text-[#202124] group-hover:text-[#FF7124]">Profile</span>
-                              <span className="text-xs sm:text-sm text-[#202124]/60 group-hover:text-[#FF7124]">→</span>
-                            </button>
-                            <button onClick={() => setShowLogoutConfirm(true)} className="group flex items-center justify-between p-4 sm:p-5 rounded-xl bg-white hover:bg-[#FF7124]/10 border border-[#3B4883]/10 hover:border-[#FF7124] transition-all shadow-md hover:shadow-lg backdrop-blur-md">
-                              <span className="text-sm sm:text-base font-semibold tracking-wide text-[#202124] group-hover:text-[#FF7124]">Logout</span>
-                              <span className="text-xs sm:text-sm text-[#202124]/60 group-hover:text-[#FF7124]">↘</span>
-                            </button>
-                            {user?.type === 'worker' && (
-                              <div className="flex items-center justify-between p-4 sm:p-5 rounded-xl bg-gradient-to-br from-[#FF7124]/10 to-[#FF7124]/20 border border-[#FF7124]/30 shadow-md backdrop-blur-md">
-                                <span className="text-sm sm:text-base font-semibold tracking-wide text-[#FF7124]">Wallet</span>
-                                <span className="text-sm sm:text-base font-bold text-[#e66420]">₹{workerBalance.toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <h2 className="text-2xl font-black text-[#3B4883] uppercase tracking-tight">
+                    Welcome back, {user?.name}!
+                  </h2>
                 </motion.div>
               )}
               <p className="mt-6 text-xl md:text-2xl text-gray-500 max-w-2xl mx-auto">

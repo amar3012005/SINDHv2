@@ -411,7 +411,7 @@ router.patch('/:applicationId/status', asyncHandler(async (req, res) => {
         const employerDoc = await db.collection('employers').doc(currentApplication.employer).get();
         if (employerDoc.exists && employerDoc.data().fcmToken) {
           const title = status === 'working' ? 'Work Started! 🚀' : 'Job Done! 🏁';
-          const body = status === 'working' 
+          const body = status === 'working'
             ? `${currentApplication.workerSnippet?.name || 'Worker'} has started working on: ${currentApplication.jobSnippet?.title}`
             : `${currentApplication.workerSnippet?.name || 'Worker'} marked the job as done: ${currentApplication.jobSnippet?.title}. Please review and release payment.`;
 
@@ -629,6 +629,189 @@ router.post('/:applicationId/employer-finish', asyncHandler(async (req, res) => 
     success: true,
     message: 'Job finalized and payment released successfully',
     totalPaid: appData.baseAmount + charges
+  });
+}));
+
+// Start Work (Transition to working state)
+router.post('/:applicationId/start-work', asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  logger.info(`🚀 Starting work for application: ${applicationId}`);
+
+  const applicationRef = db.collection('applications').doc(applicationId);
+  const applicationSnap = await applicationRef.get();
+
+  if (!applicationSnap.exists) {
+    throw new NotFoundError('Application not found');
+  }
+
+  const appData = applicationSnap.data();
+
+  // Validate current status - should be 'accepted'
+  if (appData.status !== 'accepted' && appData.status !== 'ACCEPTED') {
+    throw new ValidationError(`Cannot start work from status: ${appData.status}. Application must be accepted first.`);
+  }
+
+  const jobRef = db.collection('jobs').doc(appData.job);
+  const jobSnap = await jobRef.get();
+
+  if (!jobSnap.exists) {
+    throw new NotFoundError('Job not found');
+  }
+
+  const jobData = jobSnap.data();
+
+  // Use a transaction for atomic update
+  await db.runTransaction(async (transaction) => {
+    // 1. Update Application status
+    transaction.update(applicationRef, {
+      status: 'working',
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // 2. Update Job status
+    transaction.update(jobRef, {
+      status: 'working',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // 3. Add to status history
+    const historyRef = applicationRef.collection('statusHistory').doc();
+    transaction.set(historyRef, {
+      status: 'working',
+      changedAt: admin.firestore.FieldValue.serverTimestamp(),
+      previousStatus: appData.status,
+      note: 'Work started by participant',
+      updatedBy: 'system'
+    });
+  });
+
+  // --- Notifications ---
+  try {
+    // Notify Employer
+    const employerDoc = await db.collection('employers').doc(appData.employer).get();
+    if (employerDoc.exists) {
+      const employerData = employerDoc.data();
+      const notifRef = db.collection('employers').doc(appData.employer).collection('notifications').doc();
+      const notifData = {
+        title: 'Work Started! 🚀',
+        body: `${appData.workerSnippet?.name || 'Worker'} has started working on: ${jobData.title}`,
+        data: { jobId: appData.job, applicationId, type: 'status_update', status: 'working' },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await notifRef.set(notifData);
+
+      if (employerData.fcmToken) {
+        await sendPushNotification(employerData.fcmToken, notifData.title, notifData.body, { ...notifData.data, id: notifRef.id });
+      }
+    }
+
+    // Notify Worker
+    const workerDoc = await db.collection('workers').doc(appData.worker).get();
+    if (workerDoc.exists) {
+      const workerData = workerDoc.data();
+      const notifRef = db.collection('workers').doc(appData.worker).collection('notifications').doc();
+      const notifData = {
+        title: 'Work Started! 🚀',
+        body: `You have successfully started working on: ${jobData.title}`,
+        data: { jobId: appData.job, applicationId, type: 'status_update', status: 'working' },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await notifRef.set(notifData);
+
+      if (workerData.fcmToken) {
+        await sendPushNotification(workerData.fcmToken, notifData.title, notifData.body, { ...notifData.data, id: notifRef.id });
+      }
+    }
+  } catch (err) {
+    logger.error(`FCM: Error triggering notification for start-work ${applicationId}:`, err.message);
+  }
+
+  res.json({
+    success: true,
+    message: 'Work started successfully',
+    data: {
+      applicationId,
+      status: 'working',
+      startedAt: new Date().toISOString()
+    }
+  });
+}));
+
+// Worker Finish (Worker signals work is done)
+router.post('/:applicationId/worker-finish', asyncHandler(async (req, res) => {
+  const { applicationId } = req.params;
+  logger.info(`🏁 Worker signaling work is done for application: ${applicationId}`);
+
+  const applicationRef = db.collection('applications').doc(applicationId);
+  const applicationSnap = await applicationRef.get();
+  
+  if (!applicationSnap.exists) {
+    throw new NotFoundError('Application not found');
+  }
+  
+  const appData = applicationSnap.data();
+  
+  // Validate current status - should be 'working' or 'in-progress'
+  if (!['working', 'in-progress'].includes(appData.status?.toLowerCase())) {
+    throw new ValidationError(`Cannot mark work finished from status: ${appData.status}`);
+  }
+
+  await applicationRef.update({
+    workerConfirmedFinish: true,
+    status: 'payment_pending',
+    workerFinishedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  // Add to status history
+  await applicationRef.collection('statusHistory').add({
+    status: 'payment_pending',
+    changedAt: admin.firestore.FieldValue.serverTimestamp(),
+    previousStatus: appData.status,
+    note: 'Worker marked work as finished',
+    updatedBy: 'worker'
+  });
+
+  // --- Notification Trigger (Notify Employer) ---
+  try {
+    const employerDoc = await db.collection('employers').doc(appData.employer).get();
+    if (employerDoc.exists && employerDoc.data().fcmToken) {
+      const employerData = employerDoc.data();
+      const title = 'Work Finished! 🏁';
+      const body = `${appData.workerSnippet?.name || 'Worker'} has completed the job: ${appData.jobSnippet?.title}. Please verify and release final payment.`;
+
+      // Save to In-App center for Employer
+      const notifRef = db.collection('employers').doc(appData.employer).collection('notifications').doc();
+      await notifRef.set({
+        title,
+        body,
+        data: { jobId: appData.job, applicationId, type: 'status_update', status: 'payment_pending' },
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Send Push
+      await sendPushNotification(
+        employerData.fcmToken,
+        title,
+        body,
+        { applicationId, type: 'status_update', status: 'payment_pending', id: notifRef.id }
+      );
+    }
+  } catch (err) {
+    logger.error(`FCM: Error triggering notification for worker-finish ${applicationId}:`, err.message);
+  }
+
+  res.json({
+    success: true,
+    message: 'Work marked as finished successfully',
+    data: {
+      applicationId,
+      status: 'payment_pending'
+    }
   });
 }));
 

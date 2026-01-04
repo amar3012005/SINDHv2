@@ -53,7 +53,7 @@ const PostedJobs = () => {
         user?.id ||
         localStorage.getItem('employerId') ||
         JSON.parse(localStorage.getItem('user') || '{}')?.id;
-      
+
       if (!employerId) {
         console.warn('⚠️ No employerId found for jobs listener');
         return;
@@ -71,13 +71,13 @@ const PostedJobs = () => {
 
       unsubscribeJobs = onSnapshot(jobsQuery, (snapshot) => {
         console.log(`📥 Snapshot received with ${snapshot.docs.length} documents`);
-        
+
         const jobsList = snapshot.docs
           .map(doc => {
             const data = doc.data();
             // Log each job for debugging
             console.log(`Job Doc: ${doc.id}, Status: ${data.status}, Employer: ${data.employer}`);
-            
+
             let createdAtDate;
             if (data.createdAt?.toDate) {
               createdAtDate = data.createdAt.toDate();
@@ -92,18 +92,18 @@ const PostedJobs = () => {
 
             const rawStatus = data.status || 'POSTED';
             const status = rawStatus.toLowerCase();
-            
-            return { 
+
+            return {
               ...data,
-              id: doc.id, 
-              _id: doc.id, 
-              createdAt: createdAtDate, 
-              status 
+              id: doc.id,
+              _id: doc.id,
+              createdAt: createdAtDate,
+              status
             };
           })
           .filter(j => {
             // Be very inclusive for debugging
-            const validStatuses = ['posted', 'applied', 'active', 'in-progress', 'working', 'completed', 'payment_pending', 'paid'];
+            const validStatuses = ['posted', 'applied', 'accepted', 'active', 'in-progress', 'working', 'completed', 'payment_pending', 'paid', 'finished', 'cancelled', 'expired'];
             const keep = validStatuses.includes(j.status);
             if (!keep) console.log(`🚫 Filtering out job ${j.id} with status ${j.status}`);
             return keep;
@@ -309,7 +309,7 @@ const PostedJobs = () => {
   };
 
   const totalJobs = jobs.length;
-  const activeJobs = jobs.filter(j => ['posted', 'applied', 'active'].includes(j.status)).length;
+  const activeJobs = jobs.filter(j => ['posted', 'applied', 'accepted', 'working', 'in-progress', 'active'].includes(j.status)).length;
 
   const getStatusBadge = (status) => {
     const s = status?.toUpperCase();
@@ -391,10 +391,10 @@ const PostedJobs = () => {
                 <Briefcase className="w-8 h-8 text-slate-400" />
               </div>
               <p className="text-[#3B4883] font-bold">No jobs posted yet</p>
-              
+
               {/* Debug Info for User */}
               <div className="mt-8 p-4 bg-[#3B4883]/5 rounded-xl text-[10px] text-[#3B4883]/40 font-mono break-all">
-                DEBUG: Employer ID: {user?.id || localStorage.getItem('employerId') || 'Not found'}<br/>
+                DEBUG: Employer ID: {user?.id || localStorage.getItem('employerId') || 'Not found'}<br />
                 TYPE: {user?.type || 'Not found'}
               </div>
 
@@ -444,15 +444,15 @@ const PostedJobs = () => {
 
                   <div className="flex items-center justify-between text-[10px] font-bold text-[#202124]/40 uppercase tracking-widest mt-3">
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5 text-[#3B4883]/40">
-                          <Clock className="w-3 h-3" />
-                          <span>Posted on {(() => {
-                            try {
-                              const d = job.createdAt?.toDate ? job.createdAt.toDate() : new Date(job.createdAt || Date.now());
-                              return d.toLocaleDateString();
-                            } catch (e) { return 'Recently'; }
-                          })()}</span>
-                        </div>
+                      <div className="flex items-center gap-1.5 text-[#3B4883]/40">
+                        <Clock className="w-3 h-3" />
+                        <span>Posted on {(() => {
+                          try {
+                            const d = job.createdAt?.toDate ? job.createdAt.toDate() : new Date(job.createdAt || Date.now());
+                            return d.toLocaleDateString();
+                          } catch (e) { return 'Recently'; }
+                        })()}</span>
+                      </div>
                       {job.category && (
                         <div className="bg-[#3B4883]/5 px-2 py-0.5 rounded text-[#3B4883]/60 border border-[#3B4883]/10">
                           {job.category}
