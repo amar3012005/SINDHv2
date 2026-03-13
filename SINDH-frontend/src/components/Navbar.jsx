@@ -20,8 +20,8 @@ const Navbar = () => {
   const isHomepage = location.pathname === '/' || location.pathname === '/home';
 
   return (
-    <nav className="sticky top-0 z-50 transition-all duration-300 bg-white border-b border-[#3B4883]/10 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="sticky top-0 z-[100] transition-all duration-300 bg-white border-b border-[#3B4883]/10 shadow-sm pt-[env(safe-area-inset-top,0px)]">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10">
         <div className="flex justify-between items-center h-16 md:h-20">
           {/* Logo / Brand Name */}
           <Link to="/home" className="flex items-center group">

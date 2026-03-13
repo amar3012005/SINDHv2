@@ -336,6 +336,20 @@ const PostedJobs = () => {
     );
   };
 
+  // Distance calculation (Haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -348,7 +362,7 @@ const PostedJobs = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#202124] relative overflow-hidden pb-20">
+    <div className="min-h-screen bg-white text-[#202124] relative pb-28">
       {/* Background matching MyApplications */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
@@ -363,7 +377,7 @@ const PostedJobs = () => {
 
       <div className="relative z-10 max-w-4xl mx-auto">
         {/* Header Section */}
-        <div className="px-6 pt-8 pb-4">
+        <div className="px-6 pt-12 pb-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl md:text-3xl font-black text-[#3B4883] tracking-tight uppercase">
               |MY_POSTED_JOBS
@@ -422,14 +436,34 @@ const PostedJobs = () => {
                         {job.title}
                       </h3>
                       <div className="flex items-center gap-3 mt-1">
-                        <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs">
-                          <MapPin className="w-3 h-3 text-[#3B4883]/40" />
-                          <span>{job.location?.village}, {job.location?.district}</span>
+                        <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs text-green-600">
+                          <MapPin className="w-3 h-3" />
+                          <span>{job.location?.village}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs">
-                          <Users className="w-3 h-3 text-[#3B4883]/40" />
-                          <span>{job.applicantCount || 0} applicants</span>
-                        </div>
+                        {(() => {
+                          const acceptedApp = applications.find(app => (app.jobId === job._id || app.job?._id === job._id) && ['accepted', 'working', 'in-progress', 'payment_pending', 'completed', 'paid', 'finished'].includes(app.status?.toLowerCase()));
+                          if (acceptedApp) {
+                            const jobCoords = job.location?.coordinates?.coordinates || job.location?.coordinates;
+                            const workerCoords = acceptedApp.applicationLocation?.coordinates || acceptedApp.workerSnippet?.registrationLocation?.coordinates || acceptedApp.worker?.registrationLocation?.coordinates;
+                            if (jobCoords && workerCoords) {
+                              const [jLon, jLat] = jobCoords;
+                              const [wLon, wLat] = Array.isArray(workerCoords.coordinates) ? workerCoords.coordinates : (workerCoords.lat ? [workerCoords.lon, workerCoords.lat] : workerCoords);
+                              const dist = calculateDistance(jLat, jLon, wLat, wLon);
+                              return (
+                                <div className="flex items-center gap-1.5 text-[#FF7124] font-bold text-xs">
+                                  <span>📍 {dist !== null ? `${dist.toFixed(1)}km matched` : 'Matched'}</span>
+                                </div>
+                              );
+                            }
+                            return <span className="text-xs font-bold text-emerald-600">Matched</span>;
+                          }
+                          return (
+                            <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs">
+                              <Users className="w-3 h-3 text-[#3B4883]/40" />
+                              <span>{job.applicantCount || 0} applicants</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="text-right">
@@ -524,43 +558,56 @@ const PostedJobs = () => {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-[40] bg-[#3B4883]/60 backdrop-blur-md p-8 flex flex-col items-center justify-center text-center"
+                      className="absolute inset-0 z-[110] bg-[#3B4883]/40 backdrop-blur-sm flex items-center justify-center p-6"
                     >
                       <motion.div
-                        initial={{ scale: 0.9, y: 20 }}
+                        initial={{ scale: 0.9, y: 30 }}
                         animate={{ scale: 1, y: 0 }}
-                        className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full border-4 border-white/20"
+                        exit={{ scale: 0.9, y: 30 }}
+                        className="bg-white p-8 rounded-[2rem] shadow-2xl max-w-[340px] w-full border border-[#3B4883]/5 relative overflow-hidden"
                       >
-                        <div className="w-20 h-20 bg-[#FF7124]/10 rounded-3xl flex items-center justify-center mb-6 text-[#FF7124] mx-auto rotate-3">
-                          <CreditCard className="w-10 h-10" />
-                        </div>
-                        <h3 className="text-2xl font-black text-[#3B4883] uppercase mb-2">Secure Payment</h3>
-                        <p className="text-[#3B4883]/60 font-bold mb-8">
-                          Confirm payment for <span className="text-[#FF7124]">{pendingPaymentApp.worker?.name || pendingPaymentApp.workerDetails?.name}</span>
-                        </p>
+                        {/* Decorative background circle */}
+                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#FF7124]/5 rounded-full" />
 
-                        <div className="space-y-3">
-                          <button
-                            onClick={handleConfirmPayment}
-                            disabled={isPaying}
-                            className="w-full py-4 bg-[#FF7124] text-white rounded-2xl font-black uppercase tracking-wider hover:bg-[#e66420] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg shadow-[#FF7124]/20"
-                          >
-                            {isPaying ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                                PROCESSING...
-                              </div>
-                            ) : (
-                              `PAY ₹${selectedJob.salary || selectedJob.baseAmount}`
-                            )}
-                          </button>
-                          <button
-                            onClick={() => setPendingPaymentApp(null)}
-                            disabled={isPaying}
-                            className="w-full py-4 border-2 border-[#3B4883]/10 text-[#3B4883]/60 rounded-2xl font-black uppercase tracking-wider hover:bg-[#3B4883]/5 transition-all"
-                          >
-                            CANCEL
-                          </button>
+                        <div className="relative z-10 text-center">
+                          <div className="w-16 h-16 bg-[#FF7124]/10 rounded-2xl flex items-center justify-center mb-5 mx-auto -rotate-6">
+                            <CreditCard className="w-8 h-8 text-[#FF7124]" />
+                          </div>
+
+                          <h3 className="text-xl font-black text-[#3B4883] uppercase tracking-tight mb-2">Secure Acceptance</h3>
+                          <p className="text-xs font-bold text-[#3B4883]/40 uppercase tracking-widest mb-6 leading-relaxed">
+                            Paying base amount for <br />
+                            <span className="text-[#FF7124]">{pendingPaymentApp.worker?.name || pendingPaymentApp.workerDetails?.name}</span>
+                          </p>
+
+                          <div className="bg-[#F8F5F2] rounded-2xl p-4 mb-6 border border-[#3B4883]/5">
+                            <p className="text-[10px] font-black text-[#3B4883]/40 uppercase mb-1">Base Amount to Pay</p>
+                            <p className="text-2xl font-black text-[#3B4883]">₹{selectedJob.salary || selectedJob.baseAmount}</p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <button
+                              onClick={handleConfirmPayment}
+                              disabled={isPaying}
+                              className="w-full py-4 bg-[#FF7124] text-white rounded-xl font-black uppercase tracking-wider hover:bg-[#e66420] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg shadow-[#FF7124]/20"
+                            >
+                              {isPaying ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  <span>PROCESSING...</span>
+                                </>
+                              ) : (
+                                <span>CONFIRM & PAY</span>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setPendingPaymentApp(null)}
+                              disabled={isPaying}
+                              className="w-full py-3 text-[10px] font-black text-[#3B4883]/30 uppercase tracking-widest hover:text-[#FF7124] transition-colors"
+                            >
+                              CANCEL
+                            </button>
+                          </div>
                         </div>
                       </motion.div>
                     </motion.div>
@@ -570,20 +617,28 @@ const PostedJobs = () => {
 
 
                 <div className="relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider">Applicants & Management</p>
-                    {applications.length > 0 && !applications.some(a => ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(a.status?.toLowerCase())) && (
-                      <span className="bg-[#FF7124]/10 text-[#FF7124] px-2 py-0.5 rounded text-[10px] font-black uppercase">
-                        {applications.length} APPLIED
-                      </span>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-sm font-black text-[#3B4883] uppercase tracking-wider">Management & Applicants</h3>
+                      <p className="text-[10px] text-[#3B4883]/50 font-bold uppercase mt-0.5">Track and manage your chosen worker</p>
+                    </div>
+                    {applications.length > 0 && !applications.some(a => ['accepted', 'working', 'in-progress', 'payment_pending', 'completed', 'paid', 'finished'].includes(a.status?.toLowerCase())) && (
+                      <div className="flex flex-col items-end">
+                        <span className="bg-[#FF7124]/10 text-[#FF7124] px-3 py-1 rounded-full text-[10px] font-black uppercase border border-[#FF7124]/20 shadow-sm">
+                          {applications.length} APPLIED
+                        </span>
+                      </div>
                     )}
                   </div>
 
                   {loadingApplications ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="w-8 h-8 border-4 border-[#3B4883]/20 border-t-[#FF7124] rounded-full animate-spin" />
+                    <div className="flex items-center justify-center py-20">
+                      <div className="relative w-10 h-10">
+                        <div className="absolute inset-0 border-4 border-[#3B4883]/5 rounded-full"></div>
+                        <div className="absolute inset-0 border-4 border-[#FF7124] rounded-full border-t-transparent animate-spin"></div>
+                      </div>
                     </div>
-                  ) : applications.some(a => ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(a.status?.toLowerCase())) ? (
+                  ) : applications.some(a => ['accepted', 'working', 'in-progress', 'payment_pending', 'completed', 'paid', 'finished'].includes(a.status?.toLowerCase())) ? (
                     // Workflow Progress View
                     <div className="space-y-6">
                       {(() => {
@@ -744,62 +799,82 @@ const PostedJobs = () => {
                     </div>
                   ) : (
                     // Multiple Applicants Selection List
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {applications.map((app) => {
                         const status = app.status?.toLowerCase();
-                        const isAccepted = ['accepted', 'working', 'in-progress', 'payment_pending', 'completed'].includes(status);
+                        const isAccepted = ['accepted', 'working', 'in-progress', 'payment_pending', 'completed', 'paid', 'finished'].includes(status);
 
                         return (
                           <div
                             key={app._id}
-                            className={`p-4 bg-white border-2 rounded-2xl transition-all cursor-pointer shadow-sm group ${isAccepted
-                              ? 'border-emerald-200 bg-emerald-50/30'
-                              : 'border-[#3B4883]/5 hover:border-[#FF7124]/30'
+                            className={`p-5 bg-white border-2 rounded-3xl transition-all cursor-pointer shadow-sm group relative overflow-hidden ${isAccepted
+                              ? 'border-emerald-100 bg-emerald-50/20'
+                              : 'border-[#3B4883]/5 hover:border-[#FF7124]/30 hover:shadow-md'
                               }`}
                             onClick={() => {
-                              // Only show payment modal for 'applied' status
                               if (status === 'applied' || status === 'pending') {
                                 handleAcceptClick(app);
                               }
-                              // For accepted/working, the workflow view is already shown above
                             }}
                           >
-                            <div className="flex justify-between items-center">
+                            <div className="flex justify-between items-center relative z-10">
                               <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl transition-colors ${isAccepted
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl transition-all duration-300 ${isAccepted
                                   ? 'bg-emerald-100 text-emerald-600'
-                                  : 'bg-[#F8F5F2] text-[#FF7124] group-hover:bg-[#FF7124] group-hover:text-white'
+                                  : 'bg-[#F8F5F2] text-[#FF7124] group-hover:bg-[#FF7124] group-hover:text-white group-hover:rotate-3'
                                   }`}>
                                   {app.worker?.name?.charAt(0) || 'W'}
                                 </div>
                                 <div>
-                                  <p className="font-black text-[#3B4883] uppercase">{app.worker?.name || app.workerDetails?.name}</p>
-                                  <div className="flex items-center gap-2 text-xs font-bold text-[#3B4883]/40">
-                                    <span className="flex items-center gap-1 text-green-600">
-                                      <MapPin className="w-3 h-3" /> ~{app.distanceFromWork ? app.distanceFromWork.toFixed(1) : 10}km
+                                  <h4 className="font-black text-[#3B4883] uppercase text-sm tracking-tight mb-0.5">
+                                    {app.worker?.name || app.workerDetails?.name}
+                                  </h4>
+                                  <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-[#3B4883]/40">
+                                    <span className="flex items-center gap-1.5 text-green-600">
+                                      <MapPin className="w-3 h-3" />
+                                      {(() => {
+                                        const jobCoords = selectedJob?.location?.coordinates?.coordinates || selectedJob?.location?.coordinates;
+                                        const workerCoords = app.applicationLocation?.coordinates || app.workerSnippet?.registrationLocation?.coordinates || app.worker?.registrationLocation?.coordinates;
+
+                                        if (jobCoords && workerCoords) {
+                                          const [jLon, jLat] = jobCoords;
+                                          const [wLon, wLat] = Array.isArray(workerCoords.coordinates) ? workerCoords.coordinates : (workerCoords.lat ? [workerCoords.lon, workerCoords.lat] : workerCoords);
+                                          const dist = calculateDistance(jLat, jLon, wLat, wLon);
+                                          return dist !== null ? `${dist.toFixed(1)}km` : 'N/A';
+                                        }
+                                        return 'N/A';
+                                      })()}
                                     </span>
-                                    <span>• Shakti: {app.worker?.shaktiScore || 85}</span>
+                                    <span className="opacity-40">•</span>
+                                    <span>Shakti: {app.worker?.shaktiScore || 85}</span>
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {isAccepted && (
-                                  <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wider ${status === 'working' || status === 'in-progress'
-                                    ? 'bg-orange-50 text-orange-600 border border-orange-100'
-                                    : status === 'payment_pending'
-                                      ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
-                                      : status === 'completed'
-                                        ? 'bg-purple-50 text-purple-600 border border-purple-100'
-                                        : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                                    }`}>
-                                    {status === 'in-progress' ? 'Working' : (status === 'payment_pending' ? 'Payment Pending' : status)}
-                                  </span>
-                                )}
-                                {!isAccepted && (
-                                  <ChevronRight className="w-5 h-5 text-[#3B4883]/20 group-hover:text-[#FF7124] transition-colors" />
+
+                              <div className="flex items-center gap-3">
+                                {isAccepted ? (
+                                  <div className="flex flex-col items-end gap-1">
+                                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${['paid', 'finished', 'completed'].includes(status)
+                                      ? 'bg-purple-100 text-purple-600 border-purple-200'
+                                      : status === 'payment_pending'
+                                        ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
+                                        : 'bg-emerald-100 text-emerald-600 border-emerald-200'
+                                      }`}>
+                                      {status === 'in-progress' || status === 'working' ? 'WORKING' : (status === 'payment_pending' ? 'PAYMENT PENDING' : status)}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-white border-2 border-[#3B4883]/5 flex items-center justify-center group-hover:border-[#FF7124]/30 group-hover:bg-[#FF7124]/5 transition-all">
+                                    <ChevronRight className="w-5 h-5 text-[#3B4883]/20 group-hover:text-[#FF7124] transition-colors" />
+                                  </div>
                                 )}
                               </div>
                             </div>
+
+                            {/* Visual indicator for accepted worker */}
+                            {isAccepted && (
+                              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12" />
+                            )}
                           </div>
                         );
                       })}

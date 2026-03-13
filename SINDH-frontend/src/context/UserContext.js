@@ -2,6 +2,7 @@ import { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 
 import { buildApiUrl } from '../utils/apiUtils';
+import { initializePushNotifications } from '../utils/notificationUtils';
 
 export const UserContext = createContext();
 
@@ -38,6 +39,13 @@ export const UserProvider = ({ children }) => {
 
     setLoading(false);
   }, []);
+
+  // Initialize Push Notifications when user is available
+  useEffect(() => {
+    if (currentUser?.id && currentUser?.type) {
+      initializePushNotifications(currentUser.id, currentUser.type);
+    }
+  }, [currentUser?.id, currentUser?.type]);
 
   // Register a new user
   const registerUser = (userData) => {

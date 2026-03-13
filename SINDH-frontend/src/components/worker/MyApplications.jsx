@@ -4,12 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUser } from '../../context/UserContext';
 import { buildApiUrl } from '../../utils/apiUtils';
 import { db } from '../../config/firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc 
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc
 } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 import {
@@ -98,7 +98,7 @@ const MyApplications = () => {
         .filter(a => a.paymentStatus === 'paid' || a.status?.toUpperCase() === 'PAID')
         .reduce((sum, a) => sum + (a.paymentAmount || a.jobSnippet?.salary || a.job?.salary || a.job?.baseAmount || 0), 0);
       setTotalEarnings(total);
-      
+
       setLoading(false);
     }, (error) => {
       console.error('Error listening to applications:', error);
@@ -152,6 +152,20 @@ const MyApplications = () => {
     );
   };
 
+  // Distance calculation (Haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+  };
+
   const handleStartWork = async (e, applicationId) => {
     e.stopPropagation(); // Prevent opening modal
     try {
@@ -186,7 +200,7 @@ const MyApplications = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#202124] relative overflow-hidden pb-20">
+    <div className="min-h-screen bg-white text-[#202124] relative pb-28">
       {/* Background matching AvailableJobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
@@ -201,7 +215,7 @@ const MyApplications = () => {
 
       <div className="relative z-10 max-w-4xl mx-auto">
         {/* Compact Wallet Header */}
-        <div className="px-6 pt-8 pb-4">
+        <div className="px-6 pt-12 pb-4">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-2xl md:text-3xl font-black text-[#3B4883] tracking-tight uppercase">
               |MY_APPLICATIONS
@@ -265,11 +279,15 @@ const MyApplications = () => {
                       <h3 className="text-base font-bold text-[#272D4E] uppercase tracking-wide group-hover:text-[#FF7124] transition-colors line-clamp-1">
                         {app.displayTitle}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Building className="w-3 h-3 text-[#3B4883]/40" />
-                        <span className="text-xs font-medium text-[#3B4883]/60">
-                          {app.displayCompany}
-                        </span>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs text-green-600">
+                          <MapPin className="w-3 h-3" />
+                          <span>{app.displayLocation}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 font-medium text-[#3B4883]/60 text-xs">
+                          <Building className="w-3 h-3 text-[#3B4883]/40" />
+                          <span>{app.displayCompany}</span>
+                        </div>
                       </div>
                     </div>
                     <div className="text-right">
@@ -295,9 +313,22 @@ const MyApplications = () => {
                           }
                         })()}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3 h-3 text-green-600" />
-                        <span className="text-green-600 font-bold">{app.displayLocation}</span>
+                      <div className="flex items-center gap-1.5 text-[#FF7124]">
+                        <span className="font-bold">
+                          {(() => {
+                            const workerCoords = user?.location?.coordinates?.coordinates || user?.location?.coordinates;
+                            const jobJob = app.jobSnippet || app.job || {};
+                            const jobCoords = jobJob.location?.coordinates?.coordinates || jobJob.location?.coordinates;
+
+                            if (workerCoords && jobCoords) {
+                              const [wLon, wLat] = workerCoords;
+                              const [jLon, jLat] = Array.isArray(jobCoords.coordinates) ? jobCoords.coordinates : (jobCoords.lat ? [jobCoords.lon, jobCoords.lat] : jobCoords);
+                              const dist = calculateDistance(wLat, wLon, jLat, jLon);
+                              return dist !== null ? `📍 ${dist.toFixed(1)} km away` : null;
+                            }
+                            return null;
+                          })()}
+                        </span>
                       </div>
                     </div>
                     {['accepted'].includes(app.status?.toLowerCase()) &&
@@ -320,7 +351,7 @@ const MyApplications = () => {
       </div>
 
       {/* Aesthetic Modal Template to match style */}
-      < AnimatePresence >
+      <AnimatePresence>
         {selectedApp && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
@@ -334,110 +365,137 @@ const MyApplications = () => {
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              className="bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[1.5rem] shadow-2xl relative overflow-hidden"
+              className="bg-white w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2rem] shadow-2xl relative overflow-hidden"
             >
-              {/* Compact Header Card */}
-              <div className="relative bg-gradient-to-br from-[#E8DFD5] to-[#DBBBA7] p-6 pb-8">
-                {/* Top Row: Price & Urgency */}
-                <div className="flex justify-between items-start mb-4">
-                  {/* Base Price - Top Left */}
-                  <div className="bg-white px-4 py-2 rounded-xl shadow-sm">
-                    <p className="text-xs text-[#3B4883]/60 font-bold uppercase mb-0.5">Base Price</p>
-                    <p className="text-2xl font-black text-[#FF7124]">
+              {/* Refined Header Card */}
+              <div className="relative bg-gradient-to-br from-[#E8DFD5] to-[#DBBBA7] p-8 pb-10">
+                {/* Close Button */}
+                <button
+                  onClick={() => setSelectedApp(null)}
+                  className="absolute top-6 right-6 p-2 bg-white/20 hover:bg-white/40 rounded-full transition-colors z-20"
+                >
+                  <X className="w-5 h-5 text-[#3B4883]" />
+                </button>
+
+                <div className="flex justify-between items-start mb-6">
+                  {/* Price Tag */}
+                  <div className="bg-white px-5 py-3 rounded-2xl shadow-sm border border-[#3B4883]/5">
+                    <p className="text-[10px] text-[#3B4883]/50 font-black uppercase mb-1 tracking-widest">Expected Pay</p>
+                    <p className="text-3xl font-black text-[#FF7124]">
                       ₹{selectedApp.displaySalary}
                     </p>
                   </div>
 
-                  {/* Urgency Badge - Top Right */}
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      onClick={() => setSelectedApp(null)}
-                      className="p-2 hover:bg-white/50 rounded-full transition-colors"
-                    >
-                      <X className="w-5 h-5 text-[#3B4883]" />
-                    </button>
-                    <div className={`px-3 py-1 rounded-full text-xs font-black uppercase ${(selectedApp.jobSnippet?.urgency || selectedApp.job?.urgency) && (selectedApp.jobSnippet?.urgency !== 'Normal' && selectedApp.job?.urgency !== 'Normal')
-                      ? 'bg-[#FF7124] text-white'
-                      : 'bg-[#3B4883] text-white'
-                      }`}>
-                      {selectedApp.jobSnippet?.urgency || selectedApp.job?.urgency || 'General'}
-                    </div>
+                  {/* Urgency Badge */}
+                  <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${(selectedApp.jobSnippet?.urgency || selectedApp.job?.urgency) && (selectedApp.jobSnippet?.urgency !== 'Normal' && selectedApp.job?.urgency !== 'Normal')
+                    ? 'bg-[#FF7124] text-white'
+                    : 'bg-[#3B4883] text-white'
+                    }`}>
+                    {selectedApp.jobSnippet?.urgency || selectedApp.job?.urgency || 'General'}
                   </div>
                 </div>
 
-                {/* Job Title */}
-                <h2 className="text-xl font-black text-[#3B4883] mb-2 uppercase tracking-tight leading-tight">
+                {/* Job Title & Company */}
+                <h2 className="text-2xl font-black text-[#3B4883] mb-3 uppercase tracking-tight leading-tight pr-10">
                   {selectedApp.displayTitle}
                 </h2>
 
-                {/* Distance, Company & Location */}
-                <div className="flex items-start gap-3 text-sm flex-wrap pb-2">
-                  <div className="flex items-center gap-1.5 text-green-600">
-                    <MapPin className="w-4 h-4 shrink-0" />
-                    <span className="font-bold">{selectedApp.displayLocation}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[#3B4883]/70">
-                    <Building className="w-4 h-4 shrink-0" />
-                    <span className="font-bold">{selectedApp.displayCompany}</span>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="bg-[#3B4883]/10 px-3 py-1 rounded-lg flex items-center gap-2">
+                    <Building className="w-4 h-4 text-[#3B4883]/60" />
+                    <span className="text-xs font-bold text-[#3B4883]">{selectedApp.displayCompany}</span>
                   </div>
                 </div>
 
-                {/* Category Badge */}
+                {/* Distance & Location */}
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-1.5 text-green-700 font-bold">
+                    <MapPin className="w-4 h-4" />
+                    <span>{selectedApp.displayLocation}</span>
+                  </div>
+                  {(() => {
+                    const workerCoords = user?.location?.coordinates?.coordinates || user?.location?.coordinates;
+                    const jobJob = selectedApp.jobSnippet || selectedApp.job || {};
+                    const jobCoords = jobJob.location?.coordinates?.coordinates || jobJob.location?.coordinates;
+
+                    if (workerCoords && jobCoords) {
+                      const [wLon, wLat] = workerCoords;
+                      const [jLon, jLat] = Array.isArray(jobCoords.coordinates) ? jobCoords.coordinates : (jobCoords.lat ? [jobCoords.lon, jobCoords.lat] : jobCoords);
+                      const dist = calculateDistance(wLat, wLon, jLon, jLat);
+                      if (dist !== null) {
+                        return (
+                          <div className="px-3 py-1 bg-[#FF7124]/10 rounded-lg text-[#FF7124] font-black uppercase tracking-widest text-[9px]">
+                            📍 {dist.toFixed(1)} km away
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                {/* Category Badge - Overhanging */}
                 {(selectedApp.jobSnippet?.category || selectedApp.job?.category) && (
-                  <div className="absolute -bottom-3 left-6 z-10">
-                    <span className="inline-block px-4 py-1.5 bg-[#3B4883] text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg border-2 border-white">
+                  <div className="absolute -bottom-4 left-8">
+                    <span className="inline-block px-5 py-2 bg-[#3B4883] text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg border-2 border-white">
                       {selectedApp.jobSnippet?.category || selectedApp.job?.category}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="p-6 pt-8 space-y-5">
-                {/* Job Description */}
-                {(selectedApp.jobSnippet?.description || selectedApp.job?.description) && (
-                  <div>
-                    <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-2">Description</p>
-                    <p className="text-sm text-[#202124]/80 leading-relaxed line-clamp-3">
-                      {selectedApp.jobSnippet?.description || selectedApp.job?.description}
+              <div className="p-8 pt-10 space-y-8 overflow-y-auto max-h-[60vh]">
+                {/* Description */}
+                {(selectedApp.jobSnippet?.description || selectedApp.job?.description || selectedApp.notes) && (
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-black text-[#3B4883]/40 uppercase tracking-widest">Job Details</h4>
+                    <p className="text-sm text-[#3B4883]/80 leading-relaxed">
+                      {selectedApp.jobSnippet?.description || selectedApp.job?.description || selectedApp.notes}
                     </p>
                   </div>
                 )}
 
-                {/* Progress Bar - Application Status */}
-                <div>
-                  <p className="text-xs font-black text-[#3B4883]/50 uppercase tracking-wider mb-3">Application Status</p>
-                  <div className="relative">
-                    {/* Progress Line */}
-                    <div className="absolute top-4 left-0 right-0 h-0.5 bg-[#3B4883]/10" />
+                {/* Progress Tracking */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-[#3B4883]/40 uppercase tracking-widest">Application Progress</h4>
+                  <div className="relative px-2">
+                    {/* Background Line */}
+                    <div className="absolute top-5 left-0 right-0 h-1 bg-[#3B4883]/5 rounded-full" />
 
-                    {/* Status Steps */}
                     <div className="relative flex justify-between">
-                      {['Applied', 'Accepted', 'Working', 'Completed'].map((step, idx) => {
+                      {['Applied', 'Accepted', 'Working', 'Paid'].map((step, idx) => {
                         const statusMap = {
-                          'Applied': ['applied', 'APPLIED'],
+                          'Applied': ['applied', 'pending', 'APPLIED'],
                           'Accepted': ['accepted', 'ACCEPTED'],
-                          'Working': ['working', 'WORKING'],
-                          'Completed': ['payment_pending', 'PAYMENT_PENDING', 'completed', 'COMPLETED', 'paid', 'PAID']
+                          'Working': ['working', 'WORKING', 'in-progress'],
+                          'Paid': ['payment_pending', 'completed', 'paid', 'finished', 'PAID', 'FINISHED']
                         };
 
-                        const isActive = statusMap[step].includes(selectedApp.status);
-                        const isPast = idx < (
-                          ['applied', 'APPLIED'].includes(selectedApp.status) ? 0 :
-                            ['accepted', 'ACCEPTED'].includes(selectedApp.status) ? 1 :
-                              ['working', 'WORKING'].includes(selectedApp.status) ? 2 : 3
-                        );
+                        const currentStatus = selectedApp.status?.toLowerCase();
+                        const isActive = statusMap[step].some(s => s.toLowerCase() === currentStatus);
+
+                        const statusOrder = ['applied', 'accepted', 'working', 'payment_pending', 'completed', 'paid', 'finished'];
+                        const currentIdx = statusOrder.indexOf(currentStatus === 'in-progress' ? 'working' : currentStatus);
+                        const stepOrder = ['applied', 'accepted', 'working', 'paid'];
+                        const isPast = idx < stepOrder.findIndex(s => statusMap[step].includes(s)) || (currentIdx > statusOrder.indexOf(step.toLowerCase()));
+
+                        // Simple logic for isPast based on status
+                        const isCompleted = (step === 'Applied') ||
+                          (step === 'Accepted' && ['accepted', 'working', 'payment_pending', 'completed', 'paid', 'finished'].includes(currentStatus)) ||
+                          (step === 'Working' && ['working', 'payment_pending', 'completed', 'paid', 'finished'].includes(currentStatus)) ||
+                          (step === 'Paid' && ['paid', 'finished'].includes(currentStatus));
 
                         return (
-                          <div key={step} className="flex flex-col items-center gap-1 z-10">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isActive
-                              ? 'bg-[#FF7124] text-white shadow-md scale-110'
-                              : isPast
-                                ? 'bg-[#10b981] text-white'
-                                : 'bg-white border-2 border-[#3B4883]/20 text-[#3B4883]/40'
+                          <div key={step} className="flex flex-col items-center gap-2 z-10">
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs transition-all duration-500 ${isActive
+                              ? 'bg-[#FF7124] text-white shadow-lg shadow-[#FF7124]/30 scale-110'
+                              : isCompleted
+                                ? 'bg-emerald-500 text-white shadow-md'
+                                : 'bg-white border-2 border-[#3B4883]/10 text-[#3B4883]/30'
                               }`}>
-                              {isActive || isPast ? '✓' : idx + 1}
+                              {isCompleted && !isActive ? '✓' : idx + 1}
                             </div>
-                            <p className={`text-[9px] font-bold uppercase mt-1 ${isActive ? 'text-[#FF7124]' : isPast ? 'text-[#10b981]' : 'text-[#3B4883]/40'
+                            <p className={`text-[9px] font-black uppercase tracking-tighter ${isActive ? 'text-[#FF7124]' : isCompleted ? 'text-emerald-500' : 'text-[#3B4883]/30'
                               }`}>
                               {step}
                             </p>
@@ -448,109 +506,71 @@ const MyApplications = () => {
                   </div>
                 </div>
 
-                {/* Timing & Location Info Row */}
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <div className="bg-[#F8F5F2] p-3 rounded-xl">
-                    <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Work Timing</p>
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
+                    <p className="text-[9px] font-black text-[#3B4883]/40 uppercase mb-1 tracking-widest">Timing</p>
                     <p className="text-xs font-black text-[#3B4883]">
                       {(() => {
                         const job = selectedApp.jobSnippet || selectedApp.job || {};
-                        if (job.startDate || job.startTime) {
+                        if (job.startDate) {
                           try {
                             const d = job.startDate?.toDate ? job.startDate.toDate() : new Date(job.startDate);
-                            const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                            return `${dateStr}${job.startTime ? ` @ ${job.startTime}` : ' - Full day'}`;
-                          } catch (e) { return 'Upcoming'; }
+                            return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                          } catch (e) { return 'Flexible'; }
                         }
-                        return 'Check description';
+                        return 'TBD';
                       })()}
                     </p>
                   </div>
-                  <div className="bg-[#F8F5F2] p-3 rounded-xl">
-                    <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Location</p>
-                    <p className="text-xs font-black text-[#3B4883] truncate">
-                      {selectedApp.displayLocation}
-                    </p>
+                  <div className="bg-[#F8F5F2] p-4 rounded-2xl border border-[#3B4883]/5">
+                    <p className="text-[9px] font-black text-[#3B4883]/40 uppercase mb-1 tracking-widest">Status</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2 h-2 rounded-full ${selectedApp.paymentStatus === 'paid' ? 'bg-emerald-500' : 'bg-[#FF7124]'}`} />
+                      <p className="text-xs font-black text-[#3B4883] uppercase tracking-wide">
+                        {selectedApp.status || 'Applied'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Status Info Row */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-[#F8F5F2] p-3 rounded-xl">
-                    <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Applied On</p>
-                    <p className="text-xs font-black text-[#3B4883]">
-                      {(() => {
-                        try {
-                          const d = selectedApp.appliedAt?.toDate ? selectedApp.appliedAt.toDate() : (selectedApp.createdAt?.toDate ? selectedApp.createdAt.toDate() : new Date(selectedApp.appliedAt || selectedApp.createdAt || Date.now()));
-                          return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                        } catch (e) { return 'Recently'; }
-                      })()}
-                    </p>
-                  </div>
-                  <div className="bg-[#F8F5F2] p-3 rounded-xl">
-                    <p className="text-[9px] font-bold text-[#3B4883]/50 uppercase mb-1">Payment Status</p>
-                    <p className={`text-xs font-black uppercase ${selectedApp.paymentStatus === 'paid' ? 'text-[#10b981]' : 'text-[#FF7124]'
-                      }`}>
-                      {selectedApp.paymentStatus || 'Pending'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Withdraw Button - only for applied/accepted */}
-                {['applied'].includes(selectedApp.status?.toLowerCase()) && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const response = await fetch(buildApiUrl(`/job-applications/${selectedApp._id}`), {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' }
-                        });
-                        if (response.ok) {
-                          try {
-                            const appliedJobs = JSON.parse(localStorage.getItem('appliedJobIds') || '[]');
-                            localStorage.setItem('appliedJobIds', JSON.stringify(appliedJobs.filter(id => id !== selectedApp._id)));
-                          } catch (e) { console.warn(e); }
-                          setApplications(prev => prev.filter(app => app._id !== selectedApp._id));
-                          setFilteredApps(prev => prev.filter(app => app._id !== selectedApp._id));
-                          setSelectedApp(null);
-                          toast.success('Application withdrawn successfully!');
-                        } else {
-                          const error = await response.json();
-                          toast.error(error.message || 'Failed to withdraw');
-                        }
-                      } catch (error) {
-                        console.error(error);
-                        toast.error('Failed to withdraw application');
-                      }
-                    }}
-                    className="w-full py-3 border-2 border-[#FF7124] text-[#FF7124] rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-[#FF7124] hover:text-white transition-all active:scale-95"
-                  >
-                    Withdraw Application
-                  </button>
-                )}
-
-                {/* Start Work Button - shows when accepted AND startDate reached */}
-                {['accepted'].includes(selectedApp.status?.toLowerCase()) &&
-                  new Date(selectedApp.job?.startDate) <= new Date() && (
+                {/* Footer Actions */}
+                <div className="pt-2">
+                  {['applied'].includes(selectedApp.status?.toLowerCase()) && (
                     <button
-                      onClick={(e) => handleStartWork(e, selectedApp._id)}
-                      className="w-full py-3 bg-green-600 text-white rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-green-700 transition-all active:scale-95"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(buildApiUrl(`/job-applications/${selectedApp._id}`), {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' }
+                          });
+                          if (response.ok) {
+                            try {
+                              const appliedJobs = JSON.parse(localStorage.getItem('appliedJobIds') || '[]');
+                              localStorage.setItem('appliedJobIds', JSON.stringify(appliedJobs.filter(id => id !== selectedApp._id)));
+                            } catch (e) { console.warn(e); }
+                            setApplications(prev => prev.filter(app => app._id !== selectedApp._id));
+                            setSelectedApp(null);
+                            toast.success('Application withdrawn');
+                          }
+                        } catch (error) { toast.error('Failed to withdraw'); }
+                      }}
+                      className="w-full py-4 border-2 border-[#FF7124] text-[#FF7124] rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#FF7124] hover:text-white transition-all active:scale-95 shadow-sm"
                     >
-                      🚀 START WORK
+                      Withdraw Application
                     </button>
                   )}
 
-                {/* Waiting for start date */}
-                {['accepted'].includes(selectedApp.status?.toLowerCase()) &&
-                  new Date(selectedApp.job?.startDate) > new Date() && (
-                    <div className="w-full py-3 bg-gray-100 text-gray-500 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
-                      ⏳ Work starts on {new Date(selectedApp.job?.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                    </div>
+                  {['accepted'].includes(selectedApp.status?.toLowerCase()) && (
+                    <button
+                      onClick={(e) => handleStartWork(e, selectedApp._id)}
+                      className="w-full py-5 bg-emerald-600 text-white rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-emerald-700 transition-all active:scale-95 shadow-xl shadow-emerald-200 flex items-center justify-center gap-3"
+                    >
+                      🚀 START WORK NOW
+                    </button>
                   )}
 
-                {/* WORK DONE Button - shows when working AND not yet confirmed */}
-                {['working', 'in-progress'].includes(selectedApp.status?.toLowerCase()) &&
-                  !selectedApp.workerConfirmedFinish && (
+                  {['working', 'in-progress'].includes(selectedApp.status?.toLowerCase()) && !selectedApp.workerConfirmedFinish && (
                     <button
                       onClick={async () => {
                         try {
@@ -561,40 +581,32 @@ const MyApplications = () => {
                           if (response.ok) {
                             toast.success('✅ Work marked as complete!');
                             setSelectedApp({ ...selectedApp, workerConfirmedFinish: true, status: 'PAYMENT_PENDING' });
-                          } else {
-                            const error = await response.json();
-                            toast.error(error.message || 'Failed to mark work finished');
                           }
-                        } catch (error) {
-                          console.error(error);
-                          toast.error('Failed to mark work finished');
-                        }
+                        } catch (error) { toast.error('Failed to mark finished'); }
                       }}
-                      className="w-full py-4 bg-orange-600 text-white rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-orange-700 transition-all active:scale-95 shadow-lg shadow-orange-200 flex items-center justify-center gap-2"
+                      className="w-full py-5 bg-orange-600 text-white rounded-2xl font-black uppercase text-sm tracking-widest hover:bg-orange-700 transition-all active:scale-95 shadow-xl shadow-orange-200 flex items-center justify-center gap-3"
                     >
-                      ✅ WORK DONE
+                      ✅ FINISH WORK
                     </button>
                   )}
 
-                {/* Waiting for employer confirmation */}
-                {((['working', 'in-progress'].includes(selectedApp.status?.toLowerCase()) && selectedApp.workerConfirmedFinish) ||
-                  ['payment_pending'].includes(selectedApp.status?.toLowerCase())) && (
-                    <div className="w-full py-4 bg-yellow-50 border-2 border-yellow-200 text-yellow-700 rounded-2xl font-black uppercase text-xs tracking-widest text-center">
-                      ⏳ Waiting for employer to confirm & pay additional...
+                  {['payment_pending'].includes(selectedApp.status?.toLowerCase()) && (
+                    <div className="w-full py-5 bg-yellow-50 border-2 border-yellow-200 text-yellow-700 rounded-2xl font-black uppercase text-xs tracking-widest text-center shadow-inner">
+                      ⏳ Waiting for payment confirmation...
                     </div>
                   )}
 
-                {/* Completed */}
-                {['completed', 'paid', 'finished'].includes(selectedApp.status?.toLowerCase()) && (
-                  <div className="w-full py-3 bg-green-100 text-green-700 rounded-xl font-bold uppercase text-xs tracking-wider text-center">
-                    🎉 Job Completed!
-                  </div>
-                )}
+                  {['paid', 'finished'].includes(selectedApp.status?.toLowerCase()) && (
+                    <div className="w-full py-5 bg-emerald-50 text-emerald-700 rounded-2xl font-black uppercase text-xs tracking-widest text-center shadow-inner">
+                      🎉 Payment Received & Job Finished!
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>
         )}
-      </AnimatePresence >
+      </AnimatePresence>
     </div >
   );
 };

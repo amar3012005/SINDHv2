@@ -21,7 +21,6 @@ import UnifiedRegistration from './components/UnifiedRegistration';
 import Layout from './components/Layout';
 import GreetingPage from './components/GreetingPage';
 import NetworkStatusBanner from './components/NetworkStatusBanner';
-import ErrorFallback from './components/ErrorFallback';
 import ErrorBoundary from './components/ErrorBoundary';
 import OfflineBanner from './components/common/OfflineBanner';
 
@@ -69,7 +68,18 @@ const AppContent = () => {
       {!isGreetingPage && !isChatModePage && !isLoginPage && <Navbar />}
       <main>
         <AnimatePresence mode="wait">
-          <ErrorBoundary fallback={(props) => <ErrorFallback {...props} />}>
+          <ErrorBoundary fallback={({ error }) => (
+            <div className="p-4 text-center">
+              <h2 className="text-xl font-bold text-red-600 mb-2">Something went wrong</h2>
+              <p className="text-gray-600 mb-4">{error?.message || 'An unexpected error occurred'}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Try again
+              </button>
+            </div>
+          )}>
             <Routes>
               {/* Root route */}
               <Route path="/" element={<Navigate to="/home" replace />} />

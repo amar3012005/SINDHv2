@@ -29,6 +29,7 @@
   --shadow-float: 0 10px 15px -3px rgba(26, 35, 126, 0.1), 0 4px 6px -2px rgba(26, 35, 126, 0.05);
 
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
 }
 
 body {
